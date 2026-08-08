@@ -1,0 +1,88 @@
+{
+  "title": "Centrum pomocy",
+  "intro": "Znajdź odpowiedź lub sprawdź połączenie aplikacji z serwerem.",
+  "categories": [
+    {
+      "title": "Konto i logowanie",
+      "items": [
+        {
+          "question": "Nie mogę się zalogować. Co zrobić?",
+          "answer": "Sprawdź połączenie z internetem lub Wi-Fi, upewnij się, że nazwa użytkownika i hasło są poprawne, a następnie spróbuj ponownie. Możesz też użyć testu serwera na dole tego ekranu."
+        },
+        {
+          "question": "Jak długo jestem zalogowany?",
+          "answer": "Aplikacja automatycznie odnawia bezpieczną sesję. Ponowne logowanie będzie potrzebne po wylogowaniu, unieważnieniu sesji albo długiej nieaktywności."
+        }
+      ]
+    },
+    {
+      "title": "Postacie",
+      "items": [
+        {
+          "question": "Jak utworzyć postać?",
+          "answer": "Otwórz zakładkę Postacie, wybierz Dodaj postać, uzupełnij imię, rasę, klasę i poziom, a następnie zapisz formularz."
+        },
+        {
+          "question": "Czy inni użytkownicy widzą moje postacie?",
+          "answer": "Postać jest prywatna, dopóki nie dołączysz nią do kampanii. Wtedy członkowie drużyny mogą przeglądać jej dane, a właściciel kampanii (DM) ma pełny podgląd karty w Panelu DM."
+        },
+        {
+          "question": "Czy usunięcie postaci można cofnąć?",
+          "answer": "Nie. Po potwierdzeniu usunięcia postać jest trwale usuwana, dlatego aplikacja zawsze prosi o potwierdzenie."
+        }
+      ]
+    },
+    {
+      "title": "Kampanie i Panel DM",
+      "items": [
+        {
+          "question": "Gdzie zaakceptować zaproszenie do kampanii?",
+          "answer": "Oczekujące zaproszenie pojawia się w powiadomieniach. Podczas akceptacji wybierz postać, którą chcesz dołączyć do drużyny."
+        },
+        {
+          "question": "Kto ma dostęp do Panelu DM?",
+          "answer": "Panel DM jest dostępny właścicielowi kampanii pod rekordem drużyny. DM widzi pełne karty członków, może prowadzić prywatne notatki i dodawać przedmioty do ich ekwipunku."
+        }
+      ]
+    },
+    {
+      "title": "Formatowanie opisów",
+      "items": [
+        {
+          "question": "Gdzie mogę używać formatowania tekstu?",
+          "answer": "Formatowanie działa w opisach umiejętności, obozówek i pasywek podczas tworzenia oraz edycji postaci."
+        },
+        {
+          "question": "Jak pogrubić tekst lub zapisać go kursywą?",
+          "answer": "Pogrubienie: **ważny tekst**. Kursywa: *pochylony tekst*."
+        },
+        {
+          "question": "Jak zmienić kolor tekstu?",
+          "answer": "Użyj [kolor=red]czerwony tekst[/kolor]. Dostępne nazwy kolorów: red, orange, yellow, green, blue, purple, pink, white, gray, grey, gold i cyan. Możesz też podać kolor HEX, np. [kolor=#7c3aed]fioletowy tekst[/kolor]."
+        }
+      ]
+    },
+    {
+      "title": "Aktualizacje",
+      "items": [
+        {
+          "question": "Jak sprawdzić nową wersję?",
+          "answer": "Przejdź do zakładki Konto i wybierz Sprawdź aktualizacje. Jeśli dostępna jest nowa wersja, pojawi się przycisk aktualizacji."
+        },
+        {
+          "question": "Android blokuje instalację APK.",
+          "answer": "W ustawieniach telefonu zezwól przeglądarce użytej do pobrania na instalowanie aplikacji z tego źródła. Po aktualizacji możesz ponownie wyłączyć to uprawnienie."
+        }
+      ]
+    },
+    {
+      "title": "Powiadomienia",
+      "items": [
+        {
+          "question": "Jak zmienić uprawnienia powiadomień?",
+          "answer": "W zakładce Konto wybierz Opcje powiadomień. Aplikacja otworzy systemowy ekran ustawień powiadomień D&D Companion."
+        }
+      ]
+    }
+  ]
+}

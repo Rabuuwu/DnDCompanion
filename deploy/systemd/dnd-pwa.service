@@ -1,0 +1,17 @@
+[Unit]
+Description=D&D Companion installable PWA over HTTPS
+After=network-online.target dnd-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rabu/aplikacja_dnd
+Environment=PWA_HTTPS_KEY=/home/rabu/.local/share/dnd-pwa-tls/server.key
+Environment=PWA_HTTPS_CERT=/home/rabu/.local/share/dnd-pwa-tls/server.crt
+ExecStart=/usr/bin/npm run preview --workspace mobile -- --host 0.0.0.0 --port 4174 --strictPort
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

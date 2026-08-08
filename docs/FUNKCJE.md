@@ -1,0 +1,77 @@
+# Funkcje aplikacji dla użytkownika
+
+## Konto
+
+- rejestracja, logowanie i automatyczne odnawianie sesji;
+- autouzupełnianie formularza logowania;
+- własne zdjęcie profilowe przesyłane z urządzenia;
+- zmiana hasła, wylogowanie i trwałe usunięcie konta;
+- sprawdzanie połączenia, wersji, zmian, prywatności i pomocy;
+- automatyczne zapamiętywanie ustawień interfejsu.
+
+## Postacie
+
+- biblioteka wielu postaci, tworzenie, edycja i usuwanie;
+- awatar, imię, motto, rasa, klasa, poziom i waga;
+- statystyki główne z wartościami przygodowymi i bojowymi;
+- statystyki walki, pomocnicze oraz własne podstatystyki;
+- automatyczne przeliczniki z obsługą zer i wartości ujemnych;
+- rozwój specjalny, wiele gildii, rangi i profesje;
+- karta postaci z sekcjami, których stan rozwinięcia jest zapamiętywany.
+
+## Umiejętności
+
+- dowolne listy umiejętności, pasywek i obozówek;
+- opisy automatycznie dopasowujące wysokość;
+- pogrubienie, kursywa i kolory w opisach;
+- koszt, cooldown i czas trwania;
+- oznaczenie czaru zasięgowego, jego zasięg i wieloczłonowy wzór oparty o statystyki oraz wartości stałe.
+
+## Ekwipunek
+
+- lista z ikoną, nazwą, ilością i opcjonalnym czasem trwania;
+- dodawanie i edycja po dotknięciu rekordu;
+- przeciąganie na telefonie i trwała kolejność;
+- automatyczne rozpoznawanie popularnych typów przedmiotów i ręczna zmiana ikony;
+- zgodność ze starym formatem tekstowym „jedna linia — jeden przedmiot”.
+
+## Notatnik
+
+- tryb tekstowy i automatyczny zapis bez przycisku;
+- nieskończona kartka do rysowania;
+- zoom gestem, przesuwanie, cofanie, rysowanie i gumka;
+- pełne koło wyboru koloru i kompaktowe wysuwane narzędzia.
+
+## Znajomi i wiadomości
+
+- dodawanie znajomych za pomocą czasowego kodu;
+- zdjęcia profilowe i prywatne pseudonimy na liście;
+- wiadomości bezpośrednie i licznik nieprzeczytanych;
+- natychmiastowe odświeżenie otwartej rozmowy;
+- powiadomienia otwierające właściwy czat, bez duplikatu w aktywnej rozmowie;
+- usuwanie znajomych, blokowanie i zgłaszanie.
+
+## Kampanie i drużyny
+
+- tworzenie wielu kampanii;
+- zapraszanie znajomych z wyborem własnej postaci;
+- akceptowanie lub odrzucanie zaproszenia z wyborem postaci;
+- drużyna widoczna na karcie postaci;
+- podgląd danych i statystyk postaci współgraczy;
+- opuszczanie kampanii z poziomu postaci.
+
+## Panel DM
+
+- automatyczne uprawnienia Mistrza Gry dla twórcy kampanii;
+- przewijana lista pełnych kart członków;
+- zwijanie karty postaci i gest zmiany postaci;
+- pełny podgląd danych członka kampanii;
+- prywatne notatki DM dla kampanii i każdej postaci;
+- dodawanie przedmiotów bezpośrednio do ekwipunku gracza.
+
+## Platformy
+
+- Android przez APK/Capacitor;
+- projekt iOS przez Capacitor (wymaga podpisania na macOS do dystrybucji);
+- instalowalna PWA z ikoną i trybem pełnoekranowym;
+- pomocniczy podgląd deweloperski Expo.

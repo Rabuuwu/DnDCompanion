@@ -1,0 +1,25 @@
+{
+  "name": "@dnd/server",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/audit.js && node --check src/auth.js && node --check src/preferences.js && node --check src/characters.js && node --check src/friends.js && node --check src/social.js && node --check src/campaigns.js && node --check src/notifications.js && node --check scripts/migrate.js && node --check scripts/smoke-auth.js && node --check scripts/smoke-friends.js",
+    "test:auth": "node scripts/smoke-auth.js",
+    "test:friends": "node scripts/smoke-friends.js",
+    "db:migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.3.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.16.3"
+  }
+}

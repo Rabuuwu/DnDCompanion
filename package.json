@@ -1,0 +1,20 @@
+{
+  "name": "aplikacja-dnd",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "mobile"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace server",
+    "dev:mobile": "npm run dev --workspace mobile",
+    "start": "npm run start --workspace server",
+    "build": "npm run build --workspace mobile",
+    "db:migrate": "npm run db:migrate --workspace server",
+    "check": "npm run check --workspace server && npm run build --workspace mobile"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

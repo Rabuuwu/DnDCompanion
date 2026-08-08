@@ -1,0 +1,106 @@
+# Dependencies and package-manager caches
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Web, PWA and Expo build output
+dist/
+dist-pwa/
+web-build/
+.expo/
+.vite/
+.parcel-cache/
+expo-env.d.ts
+
+# Test, coverage and temporary output
+coverage/
+.nyc_output/
+.cache/
+.tmp/
+tmp/
+*.tsbuildinfo
+
+# Logs and running processes
+*.log
+logs/
+.pm2/
+*.pid
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Android / Gradle generated files
+mobile/android/.gradle/
+mobile/android/**/build/
+mobile/android/local.properties
+mobile/android/.idea/
+mobile/android/*.iml
+mobile/android/captures/
+mobile/android/.externalNativeBuild/
+mobile/android/.cxx/
+mobile/android/capacitor-cordova-android-plugins/
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/assets/capacitor.config.json
+mobile/android/app/src/main/assets/capacitor.plugins.json
+mobile/android/app/src/main/res/xml/config.xml
+
+# iOS / Xcode / CocoaPods generated files
+mobile/ios/App/Pods/
+mobile/ios/App/build/
+mobile/ios/App/output/
+mobile/ios/App/App/public/
+mobile/ios/DerivedData/
+mobile/ios/**/DerivedData/
+mobile/ios/**/xcuserdata/
+mobile/ios/capacitor-cordova-ios-plugins/
+mobile/ios/App/App/capacitor.config.json
+mobile/ios/App/App/config.xml
+
+# Locally built application packages
+*.apk
+*.aab
+*.aar
+*.ipa
+mobile/download/build-info.json
+
+# Signing material and platform credentials
+*.keystore
+*.jks
+*.p8
+*.p12
+*.pem
+*.mobileprovision
+mobile/android/key.properties
+mobile/android/app/google-services.json
+mobile/ios/App/GoogleService-Info.plist
+
+# Host-specific TLS material
+deploy/tls/*.key
+deploy/tls/*.crt
+deploy/tls/*.csr
+deploy/tls/*.srl
+mobile/download/dnd-local-ca.crt
+
+# Database dumps and backups
+*.sql.gz
+*.dump
+*.backup
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~

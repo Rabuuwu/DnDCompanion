@@ -1,0 +1,263 @@
+[
+  {
+    "version": "1.5.2",
+    "date": "2026-08-09",
+    "title": "Panel DM i rozbudowana karta postaci",
+    "changes": [
+      "Dodano Panel DM dla założyciela drużyny z pełnym podglądem kart wszystkich członków.",
+      "Dodano poziome przełączanie postaci, zwijanie kart oraz prywatne notatki DM zapisywane automatycznie.",
+      "DM może dodawać przedmioty bezpośrednio do ekwipunku postaci w swojej kampanii.",
+      "Rozbudowano ekwipunek o ikony, edycję, czas trwania i zmianę kolejności dostosowaną do ekranów dotykowych.",
+      "Dodano notatnik tekstowy i nieskończoną kartkę z rysowaniem, kolorami, gumką, przesuwaniem i przybliżaniem.",
+      "Aplikacja zapamiętuje w bazie ustawienia rozwinięcia sekcji osobno dla każdego użytkownika.",
+      "Dodano centralne logi audytowe połączeń i zmian wykonywanych w aplikacji.",
+      "Odświeżono mobilne menu, ikony, formularze postaci oraz obsługę statystyk, gildii i umiejętności."
+    ]
+  },
+  {
+    "version": "1.5.1",
+    "date": "2026-07-25",
+    "title": "Wiadomości w czasie rzeczywistym",
+    "changes": [
+      "Dodano natychmiastowe odbieranie nowych wiadomości bez ręcznego odświeżania rozmowy.",
+      "Otwarty czat aktualizuje się automatycznie po otrzymaniu wiadomości.",
+      "Powiadomienie nie jest wyświetlane, gdy użytkownik ma otwartą rozmowę z jej nadawcą.",
+      "Pozostawiono okresową synchronizację jako zabezpieczenie po zerwaniu połączenia.",
+      "Ustabilizowano położenie dolnych zakładek na ekranie Konta.",
+      "Zmniejszono kontener wyboru zdjęcia profilowego, a opcje konta przewijają się wewnątrz panelu."
+    ]
+  },
+  {
+    "version": "1.5.0",
+    "date": "2026-07-25",
+    "title": "Powiadomienia wewnątrz aplikacji",
+    "changes": [
+      "Dodano klikalne banery o wiadomościach i zaproszeniach wyświetlane wewnątrz aplikacji.",
+      "Kliknięcie banera wiadomości otwiera bezpośrednio właściwy czat.",
+      "Kliknięcie zaproszenia otwiera monit przyjęcia lub odrzucenia kampanii.",
+      "Android automatycznie prosi o uprawnienie do wyświetlania powiadomień.",
+      "Poprawiono natychmiastowe planowanie powiadomień systemowych.",
+      "Skrócono czas wykrywania nowych zdarzeń do maksymalnie około 5 sekund.",
+      "Powiadomienia działają również podczas otwartego widoku rozmowy."
+    ]
+  },
+  {
+    "version": "1.4.9",
+    "date": "2026-07-25",
+    "title": "Czytelniejsza lista ekwipunku",
+    "changes": [
+      "Zmniejszono ikony przedmiotów oraz ich tła.",
+      "Zmniejszono odstępy i wysokość rekordów ekwipunku.",
+      "Zwiększono miejsce na nazwę przedmiotu i dodano obsługę nazw zajmujących dwie linie.",
+      "Uproszczono rozmiary kontrolek ilości, przeciągania i usuwania."
+    ]
+  },
+  {
+    "version": "1.4.8",
+    "date": "2026-07-25",
+    "title": "Rozszerzone ikony ekwipunku",
+    "changes": [
+      "Dodano ikony pancerza oraz księgi zaklęć do selektora ekwipunku.",
+      "Rozszerzono automatyczne rozpoznawanie pancerzy, zbroi, hełmów, napierśników i kolczug.",
+      "Dodano rozpoznawanie ogólnych nazw ksiąg, spellbooków i grymuarów.",
+      "Poprawiono wyrównanie checkboxa czasu trwania, gdy pole wartości jest ukryte."
+    ]
+  },
+  {
+    "version": "1.4.7",
+    "date": "2026-07-25",
+    "title": "Motta postaci",
+    "changes": [
+      "Przywrócono baner ze zdjęciem oraz imieniem w zakładce danych postaci.",
+      "Dodano pole motta w formularzu tworzenia i edycji postaci.",
+      "Motto jest wyświetlane kursywą przy prawej krawędzi banera postaci.",
+      "Motta są widoczne również podczas przeglądania danych członków drużyny."
+    ]
+  },
+  {
+    "version": "1.4.6",
+    "date": "2026-07-25",
+    "title": "Poprawka formatowania opisów",
+    "changes": [
+      "Naprawiono układ kolorowego, pogrubionego i pochylonego tekstu w opisach umiejętności, pasywek i obozówek.",
+      "Formatowane fragmenty tekstu są teraz prawidłowo wyświetlane w jednej linii z pozostałą częścią opisu."
+    ]
+  },
+  {
+    "version": "1.4.5",
+    "date": "2026-07-25",
+    "title": "Ikony i mobilna obsługa ekwipunku",
+    "changes": [
+      "Dodano zestaw graficznych ikon przedmiotów oraz automatyczne rozpoznawanie popularnych nazw.",
+      "Dla pozostałych przedmiotów dodano wybór ikony podczas tworzenia i edycji wpisu.",
+      "Poprawiono zmianę kolejności przedmiotów przez przeciąganie na Androidzie, iOS i w PWA.",
+      "Dodano automatyczne przewijanie ekwipunku podczas przeciągania przy krawędzi ekranu.",
+      "Czas trwania przedmiotu jest teraz włączany osobnym checkboxem, a pole wartości pojawia się tylko po jego zaznaczeniu.",
+      "Usunięto powielony kontener zdjęcia i imienia z zakładki danych postaci."
+    ]
+  },
+  {
+    "version": "1.4.4",
+    "date": "2026-07-24",
+    "title": "Avatary, formatowanie opisów i rozwój ekwipunku",
+    "changes": [
+      "Dodano zdjęcia profilowe kont użytkowników wybierane z urządzenia oraz ich wyświetlanie w nagłówku aplikacji.",
+      "Dodano osobne zdjęcia postaci widoczne na liście, karcie postaci i w drużynach kampanii.",
+      "Zdjęcia użytkowników są wyświetlane na liście znajomych, profilach, czatach, zaproszeniach i w powiadomieniach PWA.",
+      "Dodano bezpieczne formatowanie opisów umiejętności, pasywek i obozówek: pogrubienie, kursywę oraz kolory.",
+      "Rozszerzono Pomoc o instrukcję formatowania tekstu.",
+      "Dodano zmianę kolejności przedmiotów w ekwipunku z zapisem ustawienia oraz opcjonalny czas trwania przedmiotu.",
+      "Ujednolicono obliczenia statystyk pomocniczych i podstatystyk oraz uproszczono ich opisy w formularzu."
+    ]
+  },
+  {
+    "version": "1.4.3",
+    "date": "2026-07-24",
+    "title": "Postacie w drużynach kampanii",
+    "changes": [
+      "Przy wysyłaniu zaproszenia do kampanii gracz wybiera swoją postać.",
+      "Przy akceptowaniu zaproszenia odbiorca wybiera postać, którą dołącza do kampanii.",
+      "Dodano sekcję Drużyna na karcie postaci z listą wszystkich postaci kampanii.",
+      "Kliknięcie członka drużyny otwiera bezpieczny podgląd jego danych i statystyk.",
+      "Dodano możliwość opuszczenia kampanii z poziomu postaci.",
+      "Nagłówek listy postaci zmieniono na Twoja biblioteka — Postaci."
+    ]
+  },
+  {
+    "version": "1.4.2",
+    "date": "2026-07-24",
+    "title": "Powiadomienia społecznościowe",
+    "changes": [
+      "Dodano systemowe powiadomienia o nowych wiadomościach od znajomych.",
+      "Kliknięcie powiadomienia o wiadomości otwiera bezpośrednio odpowiedni czat.",
+      "Dodano powiadomienia o zaproszeniach do kampanii z możliwością dołączenia lub odrzucenia.",
+      "Powiadomienia są synchronizowane po wznowieniu aplikacji i nie są wyświetlane wielokrotnie.",
+      "Dodano obsługę powiadomień natywnych Androida oraz powiadomień service workera w PWA."
+    ]
+  },
+  {
+    "version": "1.4.1",
+    "date": "2026-07-24",
+    "title": "Nowa nazwa i poprawki karty postaci",
+    "changes": [
+      "Zmieniono nazwę aplikacji na D&D Companion we wszystkich obsługiwanych wariantach.",
+      "Dodano dedykowaną ikonę PWA dla ekranu początkowego iOS.",
+      "Changelog, Prywatność i Pomoc otwierają się teraz w widoku pełnoekranowym.",
+      "Geologia jest obliczana z Mądrości.",
+      "Ujednolicono obliczanie podstatystyk: 0% daje 0, wartości ujemne pozostają bez zmian, a dodatnie mają minimum 1.",
+      "W podglądzie umiejętności zastąpiono ikonę zębatki ikoną stopera."
+    ]
+  },
+  {
+    "version": "1.4.0",
+    "date": "2026-07-24",
+    "title": "PWA, nowa ikona i własne podstatystyki",
+    "changes": [
+      "Dodano instalowalną wersję PWA dostępną pod adresem dndcompanion.pl/app/.",
+      "Dodano możliwość bezpiecznego usunięcia konta wraz ze wszystkimi danymi użytkownika.",
+      "Wprowadzono nową ikonę aplikacji dla Androida, PWA oraz ekranu logowania.",
+      "Uproszczono ekran logowania i dodano obsługę autouzupełniania przez menedżery haseł.",
+      "Dodano edycję przedmiotów w ekwipunku oraz automatyczne ikony złota i mikstur.",
+      "Dodano własne podstatystyki w każdej kategorii wraz z automatycznym obliczaniem wyniku.",
+      "Poprawiono układ kosztu i przycisku usuwania w edytorze umiejętności."
+    ]
+  },
+  {
+    "version": "1.3.9",
+    "date": "2026-07-24",
+    "title": "Ekwipunek, gildie i wygodniejsza edycja postaci",
+    "changes": [
+      "Przebudowano ekwipunek na listę przedmiotów z nazwą i ilością, zachowując zgodność ze starszym formatem tekstowym.",
+      "Dodano obsługę wielu gildii wraz z nazwą gildii i rangą postaci.",
+      "Ustawiono domyślne wartości podstatystyk i rozwoju specjalnego dla nowych postaci.",
+      "Dodano automatyczne obliczanie statystyk pomocniczych z minimalną wartością 1 dla dodatnich atrybutów źródłowych.",
+      "Uproszczono statystyki walki, zmieniono HIT na Trafienie i usunięto wzór inicjatywy.",
+      "Tworzenie i edycja postaci działają teraz w osobnym, pełnoekranowym formularzu.",
+      "Poprawiono układ listy postaci oraz edytora pasywek, obozówek i umiejętności.",
+      "Opisy pasywek, obozówek i umiejętności automatycznie dopasowują wysokość do tekstu."
+    ]
+  },
+  {
+    "version": "1.3.8",
+    "date": "2026-07-23",
+    "title": "Rozbudowana karta postaci",
+    "changes": [
+      "Rozszerzono tworzenie postaci o pełne dane, statystyki główne, bojowe, pomocnicze i podstatystyki.",
+      "Dodano automatyczne wyliczanie wartości bojowych statystyk głównych.",
+      "Dodano pasywki, obozówki i umiejętności wraz z informacyjnym kosztem ząbków dla umiejętności.",
+      "Dodano tryb aktywnej postaci z osobnymi zakładkami danych, statystyk, umiejętności i ekwipunku.",
+      "Dodano zapisywany ekwipunek tekstowy oraz wygodniejszą listę postaci."
+    ]
+  },
+  {
+    "version": "1.3.7",
+    "date": "2026-07-23",
+    "title": "Znajomi, wiadomości i centrum konta",
+    "changes": [
+      "Dodano funkcjonalne ekrany changelogu, prywatności i pomocy.",
+      "Dodano systemowe ustawienia powiadomień oraz bezpieczną zmianę hasła.",
+      "Dodano wzajemne znajomości przy użyciu jednorazowych kodów.",
+      "Dodano profile znajomych i prywatne wiadomości.",
+      "Dodano usuwanie i blokowanie znajomych, zgłoszenia oraz prywatne pseudonimy.",
+      "Dodano tworzenie kampanii, wysyłanie zaproszeń oraz ich przyjmowanie i odrzucanie."
+    ]
+  },
+  {
+    "version": "1.3.6",
+    "date": "2026-07-23",
+    "title": "Odświeżony panel aplikacji",
+    "changes": [
+      "Pełnoekranowy panel po zalogowaniu.",
+      "Usunięto zbędne komunikaty, kontenery i powielony przycisk wylogowania.",
+      "Sprawdzanie aktualizacji przeniesiono do zakładki Konto."
+    ]
+  },
+  {
+    "version": "1.3.4",
+    "date": "2026-07-23",
+    "title": "Diagnostyka połączenia",
+    "changes": [
+      "Dodano endpoint diagnostyczny serwera.",
+      "Poprawiono komunikację aplikacji z API w sieci lokalnej.",
+      "Dodano czytelniejsze komunikaty błędów połączenia."
+    ]
+  },
+  {
+    "version": "1.3.3",
+    "date": "2026-07-23",
+    "title": "Poprawki aktualizacji",
+    "changes": [
+      "Naprawiono stan sprawdzania aktualizacji po zalogowaniu.",
+      "Ujednolicono wersjonowanie aplikacji webowej i Androida."
+    ]
+  },
+  {
+    "version": "1.3.2",
+    "date": "2026-07-23",
+    "title": "Stabilniejsze logowanie",
+    "changes": [
+      "Usunięto błąd interfejsu występujący po poprawnym zalogowaniu.",
+      "Poprawiono obsługę elementów formularza po zmianie ekranu."
+    ]
+  },
+  {
+    "version": "1.3.1",
+    "date": "2026-07-23",
+    "title": "Połączenie z lokalnym API",
+    "changes": [
+      "Poprawiono komunikację Android WebView z serwerem HTTP.",
+      "Rozszerzono konfigurację CORS dla aplikacji Capacitor."
+    ]
+  },
+  {
+    "version": "1.3.0",
+    "date": "2026-07-23",
+    "title": "Konta i postacie",
+    "changes": [
+      "Dodano bezpieczne logowanie JWT i odnawianie sesji.",
+      "Dodano tworzenie, edycję i usuwanie postaci.",
+      "Dane użytkowników i postaci przeniesiono do PostgreSQL.",
+      "Dodano mechanizm wykrywania nowych wersji aplikacji."
+    ]
+  }
+]

@@ -1,0 +1,15 @@
+[Unit]
+Description=D&D Companion web application
+After=network-online.target dnd-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rabu/aplikacja_dnd
+ExecStart=/usr/bin/npm run preview --workspace mobile -- --host 0.0.0.0 --port 4173 --strictPort
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

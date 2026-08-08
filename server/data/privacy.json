@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "effectiveDate": "2026-08-09",
+  "title": "Prywatność w D&D Companion",
+  "summary": "Przetwarzamy dane potrzebne do działania konta, postaci, komunikacji, kampanii, bezpieczeństwa i synchronizacji ustawień.",
+  "sections": [
+    {
+      "title": "Dane konta",
+      "content": [
+        "Przechowujemy nazwę użytkownika, techniczny identyfikator konta oraz opcjonalne zdjęcie profilowe.",
+        "Hasło nigdy nie jest zapisywane w jawnej postaci. W bazie znajduje się wyłącznie jego hash bcrypt."
+      ]
+    },
+    {
+      "title": "Postacie i zawartość",
+      "content": [
+        "Przechowujemy utworzone postacie wraz z kartą, awatarem, ekwipunkiem i notatnikiem.",
+        "Postać jest przypisana do właściciela. Po dołączeniu nią do kampanii jej dane mogą zobaczyć członkowie drużyny, a właściciel kampanii (DM) otrzymuje pełny podgląd karty.",
+        "Prywatne notatki DM są widoczne wyłącznie dla właściciela danej kampanii."
+      ]
+    },
+    {
+      "title": "Sesje i bezpieczeństwo",
+      "content": [
+        "Do logowania używamy krótkotrwałych tokenów JWT oraz rotowanych tokenów odświeżających.",
+        "Tokeny odświeżające są przechowywane na serwerze wyłącznie jako skróty SHA-256 i można je unieważnić podczas wylogowania."
+      ]
+    },
+    {
+      "title": "Diagnostyka techniczna",
+      "content": [
+        "Dziennik audytowy może zawierać identyfikator i nazwę użytkownika, akcję, adres IP, user-agent, ścieżkę, wynik oraz czas żądania.",
+        "Dane diagnostyczne służą do wykrywania błędów, analizy zmian i ochrony usługi."
+      ]
+    },
+    {
+      "title": "Znajomi, wiadomości i kampanie",
+      "content": [
+        "Przechowujemy relacje znajomych, prywatne pseudonimy, wiadomości, zaproszenia, członkostwo kampanii, blokady i zgłoszenia.",
+        "Wiadomości są dostępne uczestnikom rozmowy, a dane kampanii użytkownikom należącym do właściwej drużyny zgodnie z ich rolą."
+      ]
+    },
+    {
+      "title": "Czego nie robimy",
+      "content": [
+        "Nie sprzedajemy danych użytkowników.",
+        "Nie używamy reklam, zewnętrznych trackerów ani profilowania marketingowego.",
+        "Nie udostępniamy danych innym graczom bez wyraźnej funkcji i działania użytkownika."
+      ]
+    },
+    {
+      "title": "Uprawnienia urządzenia",
+      "content": [
+        "Dostęp do internetu jest potrzebny do logowania, synchronizacji postaci i pobierania aktualizacji.",
+        "Uprawnienie do powiadomień można w każdej chwili zmienić w systemowych ustawieniach aplikacji."
+      ]
+    },
+    {
+      "title": "Twoje prawa",
+      "content": [
+        "Użytkownik może poprawić lub usunąć utworzone przez siebie postacie oraz zmienić swoje zdjęcie i ustawienia.",
+        "Użytkownik może trwale usunąć konto wraz ze wszystkimi powiązanymi danymi po potwierdzeniu aktualnym hasłem w Centrum pomocy.",
+        "Funkcja eksportu danych zostanie udostępniona w przyszłości."
+      ]
+    }
+  ]
+}

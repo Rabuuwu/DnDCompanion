@@ -1,0 +1,8 @@
+{
+  "appId": "pl.example.dndmobile",
+  "appName": "D&D Companion",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http"
+  }
+}
