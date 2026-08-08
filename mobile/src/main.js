@@ -5,7 +5,7 @@ import { Browser } from '@capacitor/browser';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 const app = document.querySelector('#app');
-const DEFAULT_API_BASE = 'http://192.168.1.5:3000';
+const DEFAULT_API_BASE = 'https://dndcompanion-api.onrender.com';
 const API_BASE = String(window.__API_BASE__ || DEFAULT_API_BASE).replace(/\/$/, '');
 const SESSION_KEY = 'dnd-mobile-session';
 const WEB_APP_VERSION = window.__APP_VERSION__ || 'dev';
