@@ -2,7 +2,7 @@
 
 Mobilny companion do prowadzenia postaci i kampanii RPG. Jeden frontend działa jako aplikacja Android/iOS (Capacitor) oraz instalowalna PWA, a dane synchronizuje z API Node.js i PostgreSQL.
 
-> Status: aktywny rozwój, wersja aplikacji `1.5.2`. Obecne wdrożenie jest przeznaczone dla prywatnej sieci LAN i nie jest jeszcze gotowe do publicznego Internetu ani sklepów z aplikacjami.
+> Status: aktywny rozwój, wersja aplikacji `1.5.2`. PWA i API mają wdrożenie internetowe; podpisany APK release jest przygotowywany do publikacji przez GitHub Releases.
 
 ## Najważniejsze funkcje
 
@@ -65,10 +65,10 @@ Domyślnie frontend działa pod `http://localhost:5173`, a API pod `http://local
 npm run check             # kontrola składni serwera + build web
 npm run build             # frontend web
 npm run build:pwa --workspace mobile
-npm run build:apk --workspace mobile
+npm run build:apk --workspace mobile # wymaga zmiennych podpisujących
 ```
 
-APK generowane przez obecny skrypt jest wariantem debug. Publikacja w Google Play lub App Store wymaga osobnego podpisywania i konfiguracji produkcyjnej. Procedura wydań: [docs/ROZWOJ_I_WYDANIA.md](docs/ROZWOJ_I_WYDANIA.md).
+Skrypt APK generuje podpisany `mobile/release/DnDCompanion-<wersja>.apk` oraz SHA-256. Sekrety podpisujące są wymagane w środowisku lokalnym lub GitHub Actions. Procedura wydań: [docs/ROZWOJ_I_WYDANIA.md](docs/ROZWOJ_I_WYDANIA.md).
 
 ## Konfiguracja
 

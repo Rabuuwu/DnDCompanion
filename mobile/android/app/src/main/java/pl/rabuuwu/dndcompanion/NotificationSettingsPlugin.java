@@ -1,4 +1,4 @@
-package pl.example.dndmobile;
+package pl.rabuuwu.dndcompanion;
 
 import android.content.Intent;
 import android.net.Uri;

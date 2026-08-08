@@ -49,7 +49,15 @@ npm run build:pwa --workspace mobile
 npm run build:apk --workspace mobile
 ```
 
-`build:apk` tworzy APK debug. Release Android wymaga unikalnego `applicationId`, keystore, wariantu release i bezpiecznego przechowania klucza poza repozytorium. IPA wymaga macOS, Xcode, konta Apple Developer, profilu provisioning i podpisu; samo środowisko Linux nie tworzy dystrybucyjnego IPA.
+`build:apk` tworzy podpisany APK release i plik SHA-256. Wymaga `DND_RELEASE_STORE_FILE`, `DND_RELEASE_STORE_PASSWORD`, `DND_RELEASE_KEY_ALIAS` i `DND_RELEASE_KEY_PASSWORD`. Finalny identyfikator Androida to `pl.rabuuwu.dndcompanion`. GitHub Actions pobiera wartości z sekretów repozytorium. IPA wymaga macOS, Xcode, konta Apple Developer, profilu provisioning i podpisu; samo środowisko Linux nie tworzy dystrybucyjnego IPA.
+
+Workflow `.github/workflows/release.yml` buduje artefakt ręcznie lub po tagu. Tylko tag `v<wersja>`, np. `v1.5.2`, publikuje GitHub Release. Przed utworzeniem tagu uruchom:
+
+```bash
+npm run check
+npm run release:check
+npm audit
+```
 
 ## Usługi LAN
 

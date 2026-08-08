@@ -70,6 +70,7 @@ mobile/ios/App/App/config.xml
 *.aab
 *.aar
 *.ipa
+mobile/release/
 mobile/download/build-info.json
 
 # Signing material and platform credentials
@@ -91,9 +92,14 @@ deploy/tls/*.srl
 mobile/download/dnd-local-ca.crt
 
 # Database dumps and backups
+backups/
 *.sql.gz
 *.dump
 *.backup
+
+# Private local release planning
+RELEASE_TODO_LOCAL.md
+release-secrets/
 
 # Editors and operating systems
 .DS_Store

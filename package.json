@@ -12,7 +12,8 @@
     "start": "npm run start --workspace server",
     "build": "npm run build --workspace mobile",
     "db:migrate": "npm run db:migrate --workspace server",
-    "check": "npm run check --workspace server && npm run build --workspace mobile"
+    "check": "npm run check --workspace server && npm run build --workspace mobile",
+    "release:check": "node scripts/check-release-version.mjs"
   },
   "engines": {
     "node": ">=22"

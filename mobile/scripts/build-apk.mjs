@@ -1,34 +1,44 @@
-import { mkdir, readFile, copyFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const mobileDir = path.resolve(__dirname, '..');
+const requiredSigningVariables = [
+  'DND_RELEASE_STORE_FILE',
+  'DND_RELEASE_STORE_PASSWORD',
+  'DND_RELEASE_KEY_ALIAS',
+  'DND_RELEASE_KEY_PASSWORD',
+];
 
-const indexHtml = await readFile(path.join(rootDir, 'index.html'), 'utf8');
-const versionMatch = indexHtml.match(/window\.__APP_VERSION__\s*=\s*['"]([^'"]+)['"]/);
-const version = versionMatch?.[1] || 'dev';
+for (const variable of requiredSigningVariables) {
+  if (!process.env[variable]) throw new Error(`Missing release signing variable: ${variable}`);
+}
 
-const sourceFile = path.join(rootDir, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
-const outputDir = path.join(rootDir, 'download');
-const versionedFile = path.join(outputDir, `app-debug-${version}.apk`);
-const legacyFile = path.join(outputDir, 'app-debug.apk');
+function run(command, args, cwd = mobileDir) {
+  const result = spawnSync(command, args, { cwd, stdio: 'inherit', env: process.env });
+  if (result.status !== 0) throw new Error(`${command} failed with exit code ${result.status}`);
+}
 
-await mkdir(outputDir, { recursive: true });
-await copyFile(sourceFile, versionedFile);
-await copyFile(sourceFile, legacyFile);
+const indexHtml = await readFile(path.join(mobileDir, 'index.html'), 'utf8');
+const version = indexHtml.match(/window\.__APP_VERSION__\s*=\s*['"]([^'"]+)['"]/)?.[1];
+if (!version) throw new Error('Unable to read application version from mobile/index.html');
 
-const metadata = {
-  version,
-  generatedAt: new Date().toISOString(),
-  apk: `app-debug-${version}.apk`,
-  iosUrl: process.env.IOS_DOWNLOAD_URL || null,
-  iosVersion: process.env.IOS_APP_VERSION || null,
-};
+run('npm', ['run', 'build']);
+run('npx', ['cap', 'sync', 'android']);
+run('./gradlew', ['assembleRelease'], path.join(mobileDir, 'android'));
 
-await writeFile(path.join(outputDir, 'build-info.json'), JSON.stringify(metadata, null, 2));
+const source = path.join(mobileDir, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
+const releaseDir = path.join(mobileDir, 'release');
+const filename = `DnDCompanion-${version}.apk`;
+const destination = path.join(releaseDir, filename);
+await mkdir(releaseDir, { recursive: true });
+await copyFile(source, destination);
 
-console.log(`APK copied to ${versionedFile}`);
-console.log(`Legacy APK updated at ${legacyFile}`);
-console.log(`Build metadata written to ${path.join(outputDir, 'build-info.json')}`);
+const apk = await readFile(destination);
+const checksum = createHash('sha256').update(apk).digest('hex');
+await writeFile(`${destination}.sha256`, `${checksum}  ${filename}\n`);
+console.log(`Release APK: ${destination}`);
+console.log(`SHA-256: ${checksum}`);
