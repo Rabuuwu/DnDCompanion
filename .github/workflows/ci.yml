@@ -62,7 +62,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run browser UI tests
         env:
-          VITE_API_BASE: http://127.0.0.1:3000
+          VITE_API_BASE: http://127.0.0.1:4173
         run: |
           npm run build --workspace mobile
           npm run test:ui
