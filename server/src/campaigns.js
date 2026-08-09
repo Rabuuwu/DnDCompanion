@@ -20,14 +20,23 @@ function dmNote(value) {
 }
 
 async function listOwnedCampaigns(req, res) {
+  const requestedLimit = Number(req.query.limit || 50);
+  const requestedOffset = Number(req.query.offset || 0);
+  const limit = Number.isSafeInteger(requestedLimit) ? Math.max(1, Math.min(100, requestedLimit)) : 50;
+  const offset = Number.isSafeInteger(requestedOffset) ? Math.max(0, Math.min(10_000, requestedOffset)) : 0;
   const result = await pool.query(
     `SELECT id, name, created_at
      FROM campaigns
      WHERE owner_id = $1
-     ORDER BY LOWER(name), id`,
-    [req.user.id]
+     ORDER BY LOWER(name), id
+     LIMIT $2 OFFSET $3`,
+    [req.user.id, limit + 1, offset]
   );
-  return res.json(result.rows.map((campaign) => ({
+  const hasMore = result.rows.length > limit;
+  const rows = result.rows.slice(0, limit);
+  res.set('X-Has-More', String(hasMore));
+  if (hasMore) res.set('X-Next-Offset', String(offset + limit));
+  return res.json(rows.map((campaign) => ({
     id: Number(campaign.id),
     name: campaign.name,
     createdAt: campaign.created_at,

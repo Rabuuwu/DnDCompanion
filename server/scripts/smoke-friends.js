@@ -108,6 +108,24 @@ async function run() {
     assert.equal(messages[0].body, 'Testowa wiadomość');
     assert.equal(messages[0].sentByMe, false);
 
+    const secondMessageResponse = await request(`/api/friends/${second.user.id}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ body: 'Druga wiadomość' }),
+    });
+    assert.equal(secondMessageResponse.status, 201);
+    const firstPageResponse = await request(`/api/friends/${first.user.id}/messages?limit=1`, {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal(firstPageResponse.headers.get('x-has-more'), 'true');
+    const firstPage = await firstPageResponse.json();
+    assert.equal(firstPage[0].body, 'Druga wiadomość');
+    const cursor = firstPageResponse.headers.get('x-next-cursor');
+    const olderPageResponse = await request(`/api/friends/${first.user.id}/messages?limit=1&before=${cursor}`, {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal((await olderPageResponse.json())[0].body, 'Testowa wiadomość');
+
     const nicknameResponse = await request(`/api/friends/${second.user.id}/nickname`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${first.token}` },

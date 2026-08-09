@@ -1,11 +1,12 @@
 import './style.css';
+import './styles/chat.css';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { API_BASE, PWA_BASE, WEB_APP_VERSION } from './config.js';
 import { clearSession, getStoredSession, initializeSessionStore, saveSession } from './session-store.js';
-import { authenticatedFetch, refreshSession, requestTimeout } from './api-client.js';
+import { authenticatedFetch, fetchAllPages, refreshSession, requestTimeout } from './api-client.js';
 
 const app = document.querySelector('#app');
 let currentAppVersion = WEB_APP_VERSION;
@@ -3509,27 +3510,46 @@ function renderApp(statusMessage = null) {
     });
     const messagesList = document.querySelector('#messages-list');
 
-    async function loadMessages() {
+    function messageMarkup(message) {
+      return `
+        <article class="message-bubble ${message.sentByMe ? 'mine' : 'theirs'}">
+          <p>${escapeHtml(message.body)}</p>
+          <time datetime="${escapeHtml(message.createdAt)}">${new Date(message.createdAt).toLocaleString('pl-PL', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+          })}</time>
+        </article>`;
+    }
+
+    async function loadMessages({ before = '', prepend = false } = {}) {
       try {
-        const response = await authenticatedFetch(`/api/friends/${friend.id}/messages`);
+        const query = new URLSearchParams({ limit: '50' });
+        if (before) query.set('before', before);
+        const response = await authenticatedFetch(`/api/friends/${friend.id}/messages?${query}`);
         if (!response.ok) throw new Error('messages_load_failed');
         const messages = await response.json();
-        messagesList.innerHTML = messages.length
-          ? messages.map((message) => `
-            <article class="message-bubble ${message.sentByMe ? 'mine' : 'theirs'}">
-              <p>${escapeHtml(message.body)}</p>
-              <time datetime="${escapeHtml(message.createdAt)}">${new Date(message.createdAt).toLocaleString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}</time>
-            </article>
-          `).join('')
-          : '<div class="empty-conversation"><p>To początek Waszej rozmowy.</p></div>';
-        messagesList.scrollTop = messagesList.scrollHeight;
+        const hasMore = response.headers.get('X-Has-More') === 'true';
+        const nextCursor = response.headers.get('X-Next-Cursor') || '';
+        const markup = messages.map(messageMarkup).join('');
+        if (prepend) {
+          const oldHeight = messagesList.scrollHeight;
+          messagesList.querySelector('#load-older-messages')?.remove();
+          messagesList.insertAdjacentHTML('afterbegin', markup);
+          messagesList.scrollTop += messagesList.scrollHeight - oldHeight;
+        } else {
+          messagesList.innerHTML = messages.length
+            ? markup
+            : '<div class="empty-conversation"><p>To początek Waszej rozmowy.</p></div>';
+          messagesList.scrollTop = messagesList.scrollHeight;
+        }
+        if (hasMore && nextCursor) {
+          messagesList.insertAdjacentHTML('afterbegin', '<button id="load-older-messages" class="secondary small" type="button">Wczytaj starsze wiadomości</button>');
+          document.querySelector('#load-older-messages')?.addEventListener('click', (event) => {
+            event.currentTarget.disabled = true;
+            void loadMessages({ before: nextCursor, prepend: true });
+          }, { once: true });
+        }
       } catch {
-        messagesList.innerHTML = '<div class="empty-state"><p>Nie udało się pobrać wiadomości.</p></div>';
+        if (!prepend) messagesList.innerHTML = '<div class="empty-state"><p>Nie udało się pobrać wiadomości.</p></div>';
       }
     }
     activeConversationRefresh = loadMessages;
@@ -3673,12 +3693,12 @@ function renderApp(statusMessage = null) {
 
     async function loadCampaigns() {
       try {
-        const [campaignsResponse, charactersResponse] = await Promise.all([
-          authenticatedFetch('/api/campaigns'),
+        const [campaignPage, charactersResponse] = await Promise.all([
+          fetchAllPages('/api/campaigns'),
           authenticatedFetch('/api/characters'),
         ]);
-        if (!campaignsResponse.ok || !charactersResponse.ok) throw new Error('campaigns_failed');
-        const campaigns = await campaignsResponse.json();
+        if (!campaignPage.response.ok || !charactersResponse.ok) throw new Error('campaigns_failed');
+        const campaigns = campaignPage.items;
         const characters = await charactersResponse.json();
         content.innerHTML = `
           <p>Zaproś <strong>${escapeHtml(friend.username)}</strong> do wybranej kampanii:</p>

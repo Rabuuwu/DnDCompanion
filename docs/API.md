@@ -65,7 +65,7 @@ Serwer ogranicza rozmiary list i tekstów oraz ponownie wylicza wartości zależ
 | POST | `/api/friends/invite` | utworzenie czasowego kodu |
 | POST | `/api/friends/accept` | `{ code }` |
 | GET | `/api/friends/:id/profile` | profil znajomego |
-| GET | `/api/friends/:id/messages` | ostatnie maks. 100 wiadomości; oznacza odebrane jako przeczytane |
+| GET | `/api/friends/:id/messages?limit=50&before=<id>` | strona wiadomości; nagłówki `X-Has-More` i `X-Next-Cursor`; oznacza odebrane jako przeczytane |
 | POST | `/api/friends/:id/messages` | `{ body }`, 1–2000 znaków |
 | PUT | `/api/friends/:id/nickname` | `{ nickname }` |
 | DELETE | `/api/friends/:id` | usuwa relację |
@@ -85,7 +85,7 @@ Typy zdarzeń SSE obejmują `connected`, `message` i `campaign`. Broker jest lok
 
 | Metoda | Ścieżka | Body / opis |
 |---|---|---|
-| GET | `/api/campaigns` | kampanie, których użytkownik jest właścicielem |
+| GET | `/api/campaigns?limit=50&offset=0` | kampanie właściciela; nagłówki `X-Has-More` i `X-Next-Offset` |
 | POST | `/api/campaigns` | `{ name }` |
 | POST | `/api/campaigns/:id/invitations` | `{ friendId, characterId }`; postać DM |
 | GET | `/api/campaign-invitations` | oczekujące zaproszenia użytkownika |

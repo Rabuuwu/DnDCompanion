@@ -1,0 +1,9 @@
+.messages-list > #load-older-messages {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  justify-self: center;
+  margin: 0.25rem auto 0.75rem;
+  background: rgba(31, 41, 55, 0.96);
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.25);
+}

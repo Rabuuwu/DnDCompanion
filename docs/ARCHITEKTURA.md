@@ -9,7 +9,7 @@ D&D Companion jest aplikacją typu client–server. Ten sam frontend jest pakowa
 ### Klient (`mobile/`)
 
 - Vite buduje statyczne HTML, CSS i JavaScript.
-- `src/main.js` zawiera obecnie większość stanu, routingu i widoków SPA.
+- `src/main.js` zawiera stan, routing i widoki SPA, a konfiguracja, sesja oraz komunikacja API są wydzielone do `config.js`, `session-store.js` i `api-client.js`.
 - `src/style.css` zawiera wspólne style responsywne.
 - Capacitor zapewnia powłokę natywną i lokalne powiadomienia.
 - `public/manifest.webmanifest` i `public/sw.js` obsługują instalację PWA oraz cache statycznych zasobów. Cache ma obecnie wersję `v23`; żądania `/api`, `/health` i `/ready` nie są cache'owane.

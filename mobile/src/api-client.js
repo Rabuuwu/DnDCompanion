@@ -53,3 +53,18 @@ export async function authenticatedFetch(path, options = {}) {
   if (!session?.token) throw new Error('session_expired');
   return send(session.token);
 }
+
+export async function fetchAllPages(path, { pageSize = 100 } = {}) {
+  const items = [];
+  let offset = 0;
+  for (;;) {
+    const separator = path.includes('?') ? '&' : '?';
+    const response = await authenticatedFetch(`${path}${separator}limit=${pageSize}&offset=${offset}`);
+    if (!response.ok) return { response, items };
+    items.push(...await response.json());
+    if (response.headers.get('X-Has-More') !== 'true') return { response, items };
+    const nextOffset = Number(response.headers.get('X-Next-Offset'));
+    if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset) return { response, items };
+    offset = nextOffset;
+  }
+}
