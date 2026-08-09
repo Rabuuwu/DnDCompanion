@@ -25,9 +25,10 @@ Serwer Express składa się z modułów:
 - `characters.js` — walidacja i serializacja całego modelu postaci, szybkie aktualizacje ekwipunku i notatnika;
 - `friends.js` / `social.js` — relacje, wiadomości, pseudonimy, blokady i zgłoszenia;
 - `campaigns.js` — drużyny, zaproszenia, dostęp do postaci i Panel DM;
-- `notifications.js` — kanał SSE oraz lista bieżących powiadomień;
+- `notifications.js` — kanał SSE, lista bieżących powiadomień i dystrybucja zdarzeń przez PostgreSQL `LISTEN/NOTIFY`;
 - `preferences.js` — trwałe ustawienia interfejsu użytkownika;
 - `audit.js` — dziennik zdarzeń i żądań w bazie;
+- `maintenance.js` — codzienna retencja logów, tokenów i nieaktualnych zaproszeń;
 - `db.js` — pula połączeń PostgreSQL.
 
 Walidacja domenowa odbywa się po stronie API; klient nie jest źródłem zaufania. Limit JSON wynosi 1 MB. Endpointy logowania i wybranych operacji społecznościowych są objęte limitem żądań.
@@ -49,9 +50,7 @@ Model postaci jest przechowywany głównie jako JSONB, natomiast konta, sesje, r
 
 ### Powiadomienia i czat
 
-Po zalogowaniu klient otwiera SSE `/api/notifications/stream`. Wiadomość publikuje zdarzenie do procesu serwera, a klient odświeża aktywną rozmowę natychmiast. Jeśli rozmowa z nadawcą jest otwarta, aplikacja pomija lokalne powiadomienie. Okresowe pobieranie `/api/notifications` stanowi mechanizm awaryjny.
-
-Obecny broker SSE działa w pamięci jednego procesu. Przy wielu instancjach API potrzebny będzie Redis, PostgreSQL LISTEN/NOTIFY albo zewnętrzny broker.
+Po zalogowaniu klient otwiera SSE `/api/notifications/stream`. API publikuje zdarzenie przez PostgreSQL `NOTIFY`, a każda instancja serwera nasłuchuje kanału i przekazuje je do własnych klientów SSE. Dzięki temu wiadomości działają także przy wielu procesach API. Klient odświeża aktywną rozmowę natychmiast; jeśli rozmowa z nadawcą jest otwarta, pomija lokalne powiadomienie. Okresowe pobieranie `/api/notifications` pozostaje mechanizmem awaryjnym.
 
 ### Postać i ekwipunek
 
@@ -81,6 +80,6 @@ DNS i adresy są obecnie przywiązane do interfejsu `enp5s0`, hosta `192.168.1.5
 - `mobile/src/main.js` i `style.css` są monolitami; wymagają podziału na moduły i komponenty.
 - Vite Preview i Python `http.server` są wygodne w LAN, ale nie są docelowym reverse proxy dla Internetu.
 - Awatary są przechowywane jako Data URL w PostgreSQL i powiększają odpowiedzi.
-- Dziennik audytowy nie ma retencji ani partycjonowania.
-- Brakuje automatycznych testów kampanii, Panelu DM, migracji i UI.
-- System nie ma mechanizmu kopii zapasowych opisanego ani wymuszonego przez repozytorium.
+- Dziennik audytowy ma retencję czasową, ale przy dużej skali może wymagać partycjonowania.
+- CI obejmuje kompilację, migrację od pustej bazy i smoke testy auth/znajomych; nadal brakuje testów kampanii, Panelu DM i UI.
+- Repozytorium zawiera szyfrowany workflow backupu z próbą odtworzenia; wymaga skonfigurowania sekretów GitHub i okresowego ręcznego testu odzyskiwania.

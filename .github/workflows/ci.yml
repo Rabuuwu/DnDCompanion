@@ -1,0 +1,62 @@
+name: Continuous integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: dnd_test
+          POSTGRES_PASSWORD: dnd_test
+          POSTGRES_DB: dnd_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dnd_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      HOST: 127.0.0.1
+      PORT: 3000
+      DATABASE_URL: postgresql://dnd_test:dnd_test@127.0.0.1:5432/dnd_test
+      DATABASE_SSL: 'false'
+      CORS_ORIGINS: http://localhost:5173
+      JWT_SECRET: ci-only-secret-ci-only-secret-ci-only-secret-ci-only-secret-ci-only-secret
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run release:check
+      - run: npm audit
+      - run: npm run db:migrate
+      - name: Start test API
+        run: |
+          npm start > /tmp/dnd-test-api.log 2>&1 &
+          echo $! > /tmp/dnd-test-api.pid
+          for attempt in {1..30}; do
+            curl -fsS http://127.0.0.1:3000/ready && exit 0
+            sleep 1
+          done
+          cat /tmp/dnd-test-api.log
+          exit 1
+      - run: npm run test:auth --workspace server
+      - run: npm run test:friends --workspace server
+      - name: Show API logs on failure
+        if: failure()
+        run: cat /tmp/dnd-test-api.log || true

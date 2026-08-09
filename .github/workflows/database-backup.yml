@@ -1,0 +1,68 @@
+name: Encrypted database backup
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.BACKUPS_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: restore_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Install PostgreSQL client and age
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client age
+
+      - name: Validate backup configuration
+        env:
+          DND_RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+          DND_BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: |
+          test -n "$DND_RENDER_DATABASE_URL"
+          test -n "$DND_BACKUP_AGE_RECIPIENT"
+
+      - name: Create and verify backup
+        env:
+          DND_RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+        run: |
+          mkdir -p backup
+          pg_dump --dbname="$DND_RENDER_DATABASE_URL" --format=custom --compress=9 --no-owner --no-privileges --file=backup/dndcompanion.dump
+          pg_restore --list backup/dndcompanion.dump > backup/dndcompanion.contents.txt
+          pg_restore --dbname=postgresql://postgres:postgres@127.0.0.1:5432/restore_check --clean --if-exists --no-owner --no-privileges --exit-on-error backup/dndcompanion.dump
+          psql postgresql://postgres:postgres@127.0.0.1:5432/restore_check -c 'SELECT COUNT(*) AS migrations FROM schema_migrations;'
+
+      - name: Encrypt backup
+        env:
+          DND_BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: |
+          age -r "$DND_BACKUP_AGE_RECIPIENT" -o backup/dndcompanion-$(date -u +%Y%m%d-%H%M%S).dump.age backup/dndcompanion.dump
+          rm backup/dndcompanion.dump
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v6
+        with:
+          name: dndcompanion-database-backup
+          path: |
+            backup/*.dump.age
+            backup/*.contents.txt
+          retention-days: 14
+          if-no-files-found: error

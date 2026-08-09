@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/audit.js && node --check src/auth.js && node --check src/preferences.js && node --check src/characters.js && node --check src/friends.js && node --check src/social.js && node --check src/campaigns.js && node --check src/notifications.js && node --check scripts/migrate.js && node --check scripts/smoke-auth.js && node --check scripts/smoke-friends.js && node --check ../scripts/check-release-version.mjs",
+    "check": "node --check src/server.js && node --check src/audit.js && node --check src/auth.js && node --check src/preferences.js && node --check src/characters.js && node --check src/friends.js && node --check src/social.js && node --check src/campaigns.js && node --check src/notifications.js && node --check src/maintenance.js && node --check scripts/maintenance.js && node --check scripts/migrate.js && node --check scripts/smoke-auth.js && node --check scripts/smoke-friends.js && node --check ../scripts/check-release-version.mjs",
     "test:auth": "node scripts/smoke-auth.js",
     "test:friends": "node scripts/smoke-friends.js",
-    "db:migrate": "node scripts/migrate.js"
+    "db:migrate": "node scripts/migrate.js",
+    "db:maintenance": "node scripts/maintenance.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

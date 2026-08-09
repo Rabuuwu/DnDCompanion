@@ -78,7 +78,7 @@ async function run() {
             { name: 'Twarda skóra', description: 'Stała odporność na obrażenia.' },
           ],
           campActions: [
-            { name: 'Naprawa ekwipunku', description: 'Naprawia wyposażenie podczas obozu.' },
+            { name: 'Naprawa ekwipunku', description: 'Naprawia wyposażenie podczas obozu.', duration: '1 godzina' },
           ],
           abilities: [
             { name: 'Uderzenie tarczą', description: 'Atak i próba odepchnięcia celu.', toothCost: 3 },
@@ -110,6 +110,7 @@ async function run() {
     assert.deepEqual(character.features.passives[0], {
       name: 'Twarda skóra',
       description: 'Stała odporność na obrażenia.',
+      cooldown: '',
     });
     assert.equal(character.inventory, 'Młot kowalski\nTarcza');
 

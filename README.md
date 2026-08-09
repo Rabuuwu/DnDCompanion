@@ -70,6 +70,15 @@ npm run build:apk --workspace mobile # wymaga zmiennych podpisujących
 
 Skrypt APK generuje podpisany `mobile/release/DnDCompanion-<wersja>.apk` oraz SHA-256. Sekrety podpisujące są wymagane w środowisku lokalnym lub GitHub Actions. Procedura wydań: [docs/ROZWOJ_I_WYDANIA.md](docs/ROZWOJ_I_WYDANIA.md).
 
+## Instalacja Android
+
+1. Otwórz sekcję **Releases** repozytorium i wybierz najnowszą wersję.
+2. Pobierz `DnDCompanion-<wersja>.apk` oraz opcjonalnie sprawdź dołączoną sumę SHA-256.
+3. Zezwól użytej przeglądarce lub menedżerowi plików na instalację z tego źródła.
+4. Otwórz APK i potwierdź instalację. Kolejne wersje instaluj bez usuwania aplikacji, aby zachować lokalne ustawienia.
+
+Pobieraj APK wyłącznie z [oficjalnych GitHub Releases](https://github.com/Rabuuwu/DnDCompanion/releases).
+
 ## Konfiguracja
 
 Najważniejsze zmienne z `.env`:
@@ -107,6 +116,8 @@ Testy `test:*` są testami integracyjnymi i wymagają działającego API oraz ba
 - logi audytowe, tokeny i wiadomości wymagają polityki retencji oraz automatycznego sprzątania.
 
 Zgłoszenie podatności powinno odbywać się prywatnie do właściciela wdrożenia, bez publikowania sekretów i danych użytkowników.
+
+Szczegóły: [polityka bezpieczeństwa](SECURITY.md) i [polityka prywatności](PRIVACY.md).
 
 ## Licencja i zasoby
 

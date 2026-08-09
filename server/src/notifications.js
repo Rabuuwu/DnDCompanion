@@ -1,13 +1,79 @@
 const { pool } = require('./db');
 
 const notificationStreams = new Map();
+const NOTIFICATION_CHANNEL = 'dnd_user_notifications';
+let listenerClient = null;
+let listenerReconnectTimer = null;
 
-function publishUserNotification(userId, event = {}) {
+function deliverUserNotification(userId, event) {
   const streams = notificationStreams.get(Number(userId));
   if (!streams) return;
   const payload = `data: ${JSON.stringify(event)}\n\n`;
   for (const response of streams) response.write(payload);
 }
+
+async function connectNotificationListener() {
+  if (listenerClient) return;
+  try {
+    const client = await pool.connect();
+    listenerClient = client;
+    client.on('notification', (message) => {
+      if (message.channel !== NOTIFICATION_CHANNEL || !message.payload) return;
+      try {
+        const payload = JSON.parse(message.payload);
+        deliverUserNotification(payload.userId, payload.event);
+      } catch (error) {
+        console.error('[NOTIFICATIONS] invalid database event:', error.message);
+      }
+    });
+    client.on('error', (error) => {
+      console.error('[NOTIFICATIONS] listener disconnected:', error.message);
+      if (listenerClient === client) listenerClient = null;
+      try { client.release(true); } catch {}
+      scheduleNotificationReconnect();
+    });
+    await client.query(`LISTEN ${NOTIFICATION_CHANNEL}`);
+    console.log('[NOTIFICATIONS] PostgreSQL listener connected');
+  } catch (error) {
+    listenerClient = null;
+    console.error('[NOTIFICATIONS] listener connection failed:', error.message);
+    scheduleNotificationReconnect();
+  }
+}
+
+function scheduleNotificationReconnect() {
+  if (listenerReconnectTimer) return;
+  listenerReconnectTimer = setTimeout(() => {
+    listenerReconnectTimer = null;
+    void connectNotificationListener();
+  }, 5_000);
+  listenerReconnectTimer.unref();
+}
+
+async function stopNotificationListener() {
+  if (listenerReconnectTimer) {
+    clearTimeout(listenerReconnectTimer);
+    listenerReconnectTimer = null;
+  }
+  const client = listenerClient;
+  listenerClient = null;
+  if (!client) return;
+  client.removeAllListeners('notification');
+  client.removeAllListeners('error');
+  try { await client.query(`UNLISTEN ${NOTIFICATION_CHANNEL}`); } catch {}
+  client.release();
+}
+
+function publishUserNotification(userId, event = {}) {
+  const payload = JSON.stringify({ userId: Number(userId), event });
+  void pool.query('SELECT pg_notify($1, $2)', [NOTIFICATION_CHANNEL, payload])
+    .catch((error) => {
+      console.error('[NOTIFICATIONS] publish failed:', error.message);
+      deliverUserNotification(userId, event);
+    });
+}
+
+void connectNotificationListener();
 
 function streamNotifications(req, res) {
   const userId = Number(req.user.id);
@@ -94,4 +160,4 @@ async function listNotifications(req, res) {
   });
 }
 
-module.exports = { listNotifications, publishUserNotification, streamNotifications };
+module.exports = { listNotifications, publishUserNotification, stopNotificationListener, streamNotifications };

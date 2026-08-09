@@ -676,6 +676,13 @@ function setUpdateBanner(message, { visible = true, showButton = false } = {}) {
 function formatError(error) {
   if (!error) return 'Nieznany błąd';
   if (typeof error === 'string') return error;
+  if (!navigator.onLine) return 'Brak połączenia z internetem';
+  if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+    return 'Serwer nie odpowiedział w wymaganym czasie. Może się uruchamiać — spróbuj ponownie za chwilę';
+  }
+  if (error instanceof TypeError && /fetch|network|load/i.test(error.message || '')) {
+    return 'Nie udało się połączyć z API. Sprawdź internet, konfigurację CORS lub stan serwera';
+  }
   if (error.message) return error.message;
   return String(error);
 }

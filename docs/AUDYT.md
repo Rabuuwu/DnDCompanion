@@ -4,11 +4,18 @@
 
 Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, API, migracje i model danych, jednostki systemd/DNS, dokumentację, stan Git oraz raport `npm audit`. Wykonano kontrolę składni i build po zmianach. Audyt nie jest formalnym testem penetracyjnym ani przeglądem prawnym.
 
-## Zmiany wykonane podczas audytu
+## Zmiany wykonane
 
 - naprawiono błąd `ReferenceError` po utworzeniu kampanii: powiadomienie używało nieistniejącego `friendId`;
 - przeniesiono publikację zdarzenia do właściwego przepływu zapraszania do kampanii;
-- zastosowano bezpieczne aktualizacje zależności bez wymuszania zmian głównych wersji; liczba zgłoszeń npm spadła z 8 do 4;
+- zaktualizowano Vite, Capacitor i zależności; pełny `npm audit` nie zgłasza podatności;
+- skonfigurowano finalny identyfikator Androida, podpisany build release, kontrolę spójności wersji oraz workflow wydań;
+- dodano CI z PostgreSQL, migracją od pustej bazy, buildem i smoke testami;
+- dodano CSP, wymuszono HTTPS/zakaz cleartext w Androidzie i ograniczono backup danych aplikacji przez system;
+- zastąpiono lokalny broker powiadomień przez PostgreSQL `LISTEN/NOTIFY` zgodny z wieloma instancjami API;
+- dodano automatyczną retencję logów, tokenów i nieaktualnych zaproszeń;
+- dodano szyfrowany backup PostgreSQL z testowym odtworzeniem w workflow GitHub Actions;
+- dodano politykę bezpieczeństwa, politykę prywatności i szablon informacji o wydaniu;
 - zaktualizowano README oraz dokumentację architektury, API, bazy, funkcji i wydań;
 - urealniono treść prywatności i pomocy w zakresie kampanii, DM i logów;
 - rozszerzono `.gitignore` o lokalne/generowane artefakty;
@@ -18,22 +25,17 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 
 ### P0 — przed publicznym udostępnieniem
 
-1. **Podatność krytyczna w łańcuchu `@capacitor/cli` / `tar`.** Naprawa wymaga migracji Capacitor do wspieranej wersji głównej (według npm obecnie 8.x), synchronizacji platform i pełnych testów buildów. Ryzyko dotyczy przede wszystkim narzędzi budowania i pracy z archiwami, lecz nie powinno pozostać w publicznym pipeline.
-2. **Brak historii Git.** Katalog ma gałąź `main`, ale wszystkie pliki są nieśledzone i nie ma pierwszego commita. Przed GitHubem trzeba przejrzeć `git status`, upewnić się, że nie ma sekretów, wykonać pierwszy commit i włączyć ochronę gałęzi.
-3. **Brak produkcyjnego modelu dystrybucji.** Android używa `pl.example.dndmobile`, debug APK i zezwolenia na cleartext; iOS nie ma gotowego podpisanego IPA. Należy ustalić finalne identyfikatory pakietów zanim aplikacja trafi do sklepów.
-4. **Sesja klienta w `localStorage`.** XSS może przejąć JWT i refresh token. W PWA warto przejść na bezpieczne, `HttpOnly`, `Secure`, `SameSite` cookies lub zaprojektować magazyn tokenów odporny na XSS; równolegle wprowadzić CSP.
-5. **Wdrożenie jest wyłącznie LAN.** Lokalny DNS i prywatny CA nie zapewniają publicznie zaufanej domeny. Publiczna usługa wymaga reverse proxy, publicznego DNS, ACME, firewall i ograniczenia dostępu do PostgreSQL/API.
+1. **Magazyn sesji klienta.** CSP ogranicza ryzyko XSS, ale JWT i refresh token nadal są w `localStorage`. PWA powinna docelowo używać ciastek `HttpOnly`, `Secure`, `SameSite`; aplikacje natywne — systemowego bezpiecznego magazynu.
+2. **Operacyjny backup produkcji.** Workflow jest gotowy, lecz właściciel musi skonfigurować sekrety `RENDER_DATABASE_URL`, `BACKUP_AGE_RECIPIENT`, zmienną `BACKUPS_ENABLED=true` i bezpiecznie przechować prywatny klucz age.
+3. **Licencje.** Trzeba wybrać licencję kodu oraz potwierdzić autora i warunki wszystkich ikon, zwłaszcza zasobu Flaticon, przed publikacją wydania.
 
 ### P1 — wysoki priorytet jakości i bezpieczeństwa
 
-1. Zaktualizować Vite (pozostała podatność `esbuild`) i Capacitor w kontrolowanych osobnych zmianach, bez `npm audit fix --force` na ślepo.
-2. Dodać testy automatyczne dla kampanii, zaproszeń, wyboru postaci, Panelu DM, powiadomień i usunięcia konta. Aktualne smoke testy obejmują tylko auth i znajomych.
-3. Rozdzielić `mobile/src/main.js` (~4,3 tys. linii) i `style.css` (~3 tys. linii) na moduły: API, auth, router, formularz postaci, kampanie/DM, chat, notatnik i komponenty UI.
-4. Dodać retencję i zadania czyszczące dla `audit_logs`, refresh tokenów, kodów zaproszeń i starych danych. Logowanie każdego GET może szybko powiększać bazę.
-5. Wdrożyć backup PostgreSQL, szyfrowanie kopii, monitoring oraz regularny test odtwarzania.
-6. Zastąpić broker powiadomień w pamięci rozwiązaniem współdzielonym (Redis lub PostgreSQL LISTEN/NOTIFY), zanim API będzie skalowane do wielu procesów.
-7. Uporządkować uprawnienia kampanii: właściciel może dziś doprowadzić do niejasnego stanu członkostwa; potrzebne są jawne operacje usunięcia kampanii, przekazania DM i zmiany postaci.
-8. Zastąpić Vite Preview i `python -m http.server` przez Caddy/nginx nawet w stabilnym wdrożeniu LAN.
+1. Dodać testy automatyczne dla kampanii, zaproszeń, wyboru postaci, Panelu DM, powiadomień i usunięcia konta. Aktualne smoke testy obejmują auth i znajomych.
+2. Rozdzielić `mobile/src/main.js` (~4,3 tys. linii) i `style.css` (~3 tys. linii) na moduły: API, auth, router, formularz postaci, kampanie/DM, chat, notatnik i komponenty UI.
+3. Dodać zewnętrzny monitoring dostępności, błędów i czasu odpowiedzi oraz alerty o nieudanych backupach.
+4. Uporządkować uprawnienia kampanii: dodać jawne operacje usunięcia kampanii, przekazania DM i zmiany postaci.
+5. Zastąpić Vite Preview i `python -m http.server` przez Caddy/nginx w stabilnym wdrożeniu LAN.
 
 ### P2 — utrzymanie i rozwój
 
@@ -42,8 +44,8 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 3. Opisać kontrakt OpenAPI/JSON Schema i generować walidację/klienta, zamiast polegać wyłącznie na kodzie parsera.
 4. Ujednolicić migracje: istniejące dwa prefiksy `006` pozostawić bez zmian, kolejne numerować jednoznacznie i dodać test migracji od pustej bazy.
 5. Przenieść stare jednostki `dnd-web.service`, `dnd-pwa.service` i `dnd-download.service` do `deploy/legacy` po potwierdzeniu, że host ich nie używa.
-6. Dodać CI dla `npm ci`, check, build, testów, audytu zależności i skanowania sekretów.
-7. Dodać telemetrykę błędów pozbawioną danych wrażliwych oraz metryki zdrowia, opóźnień i rozmiaru kolejki/DB.
+6. Rozszerzyć CI o skanowanie sekretów i analizę statyczną.
+7. Dodać telemetrykę błędów pozbawioną danych wrażliwych oraz metryki zdrowia, opóźnień i rozmiaru DB.
 8. Ujednolicić format kodu (ESLint + Prettier/EditorConfig) i dodać hook pre-commit.
 
 ## Ryzyka prywatności i prawne
@@ -56,7 +58,7 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 
 ## Wynik kontroli zależności
 
-Po bezpiecznej aktualizacji `npm audit --omit=dev` zgłasza **0 podatności w zależnościach uruchomieniowych**. Pełny audyt zgłasza **4 podatności narzędzi deweloperskich/budowania**: 1 krytyczną, 2 wysokie i 1 umiarkowaną, skupione w zależnościach `@capacitor/cli`/`tar` oraz `vite`/`esbuild`. Ich sugerowane naprawy zmieniają główne wersje, dlatego wymagają zaplanowanej migracji zamiast automatycznego `--force`.
+`npm audit` oraz `npm audit --omit=dev` zgłaszają **0 znanych podatności**. CI powtarza pełną kontrolę przy każdym pushu i pull requeście.
 
 ## Pomysły produktowe
 

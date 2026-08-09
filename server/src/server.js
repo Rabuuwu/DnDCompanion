@@ -36,8 +36,9 @@ const {
 	setFriendNickname,
 } = require('./friends');
 const { blockUser, reportUser } = require('./social');
-const { listNotifications, streamNotifications } = require('./notifications');
+const { listNotifications, stopNotificationListener, streamNotifications } = require('./notifications');
 const { getUiPreferences, updateUiPreferences } = require('./preferences');
+const { startDatabaseMaintenance } = require('./maintenance');
 const {
 	addDmCharacterInventoryItem,
 	createCampaign,
@@ -207,8 +208,11 @@ const server = app.listen(PORT, HOST, () => {
 		metadata: { host: HOST, port: PORT, processId: process.pid },
 	});
 });
+const stopDatabaseMaintenance = startDatabaseMaintenance();
 
 async function shutdown(signal) {
+	stopDatabaseMaintenance();
+	await stopNotificationListener();
 	console.log(`${signal} received, shutting down`);
 	await writeAuditLog({
 		eventType: 'system',
