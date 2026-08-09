@@ -3,7 +3,8 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { API_BASE, PWA_BASE, REQUEST_TIMEOUT_MS, SESSION_KEY, WEB_APP_VERSION } from './config.js';
+import { API_BASE, PWA_BASE, REQUEST_TIMEOUT_MS, WEB_APP_VERSION } from './config.js';
+import { clearSession, getStoredSession, initializeSessionStore, saveSession } from './session-store.js';
 
 const app = document.querySelector('#app');
 let currentAppVersion = WEB_APP_VERSION;
@@ -331,22 +332,6 @@ function compareVersions(a, b) {
   }
 
   return 0;
-}
-
-function getStoredSession() {
-  try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function saveSession(session) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
 }
 
 function escapeHtml(value) {
@@ -4338,6 +4323,7 @@ window.addEventListener('appinstalled', () => {
 });
 
 async function bootstrap() {
+  await initializeSessionStore();
   if (Capacitor.isNativePlatform()) {
     try {
       const appInfo = await CapacitorApp.getInfo();

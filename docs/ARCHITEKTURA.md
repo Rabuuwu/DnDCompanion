@@ -71,7 +71,7 @@ Aktualna topologia hosta `192.168.1.5`:
 | 443/TCP | PWA pod `/app/` i proxy `/api` | `dnd-pwa-web.service` |
 | 3000/TCP | API | `dnd-api.service` |
 
-Pliki `dnd-download.service`, `dnd-pwa.service` i `dnd-web.service` są starszymi wariantami usług użytkownika i nie powinny działać równolegle z wariantami `*-web`. Docelowo warto je przenieść do katalogu `deploy/legacy/` albo usunąć po sprawdzeniu hosta.
+Starsze warianty usług użytkownika zostały po sprawdzeniu hosta przeniesione do `deploy/legacy/`. Nie powinny być instalowane równolegle z aktualnymi wariantami `*-web`.
 
 DNS i adresy są obecnie przywiązane do interfejsu `enp5s0`, hosta `192.168.1.5` i routera `192.168.1.1`. Zmiana sieci wymaga aktualizacji konfiguracji.
 

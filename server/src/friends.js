@@ -215,7 +215,11 @@ async function getFriendProfile(req, res) {
 
 async function listMessages(req, res) {
   const friendId = parseUserId(req.params.id);
+  const requestedLimit = Number(req.query.limit || 50);
+  const limit = Number.isSafeInteger(requestedLimit) ? Math.max(1, Math.min(100, requestedLimit)) : 50;
+  const beforeId = req.query.before ? parseUserId(req.query.before) : null;
   if (!friendId) return res.status(400).json({ error: 'invalid_friend_id' });
+  if (req.query.before && !beforeId) return res.status(400).json({ error: 'invalid_message_cursor' });
   if (!(await areFriends(req.user.id, friendId))) {
     return res.status(404).json({ error: 'friend_not_found' });
   }
@@ -234,17 +238,23 @@ async function listMessages(req, res) {
        FROM (
          SELECT id, sender_id, recipient_id, body, read_at, created_at
          FROM direct_messages
-         WHERE (sender_id = $1 AND recipient_id = $2)
-            OR (sender_id = $2 AND recipient_id = $1)
+         WHERE ((sender_id = $1 AND recipient_id = $2)
+            OR (sender_id = $2 AND recipient_id = $1))
+          AND ($3::bigint IS NULL OR id < $3)
          ORDER BY created_at DESC, id DESC
-         LIMIT 100
+         LIMIT $4
        ) recent
        ORDER BY created_at ASC, id ASC`,
-      [req.user.id, friendId]
+      [req.user.id, friendId, beforeId, limit + 1]
     );
     await client.query('COMMIT');
 
-    return res.json(result.rows.map((message) => ({
+    const hasMore = result.rows.length > limit;
+    const rows = hasMore ? result.rows.slice(1) : result.rows;
+    res.set('X-Has-More', String(hasMore));
+    if (hasMore && rows[0]) res.set('X-Next-Cursor', String(rows[0].id));
+
+    return res.json(rows.map((message) => ({
       id: Number(message.id),
       body: message.body,
       sentByMe: Number(message.sender_id) === req.user.id,
