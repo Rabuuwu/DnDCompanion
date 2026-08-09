@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.5.3",
+    "date": "2026-08-09",
+    "title": "Pierwsza aktualizacja oficjalnego wydania",
+    "changes": [
+      "Zwiększono wersję Androida i przygotowano aktualizację instalowaną na oficjalnym wydaniu z GitHub Releases.",
+      "Potwierdzono pochodzenie ikon ekwipunku wygenerowanych przez AI.",
+      "Zastąpiono zewnętrzną ikonę hełmu własną grafiką wektorową.",
+      "Rozszerzono testy UI, kontrakt OpenAPI i automatyczne kontrole jakości przed wydaniem.",
+      "Odświeżono pamięć podręczną PWA dla nowych zasobów aplikacji."
+    ]
+  },
+  {
     "version": "1.5.2",
     "date": "2026-08-09",
     "title": "Panel DM i rozbudowana karta postaci",
