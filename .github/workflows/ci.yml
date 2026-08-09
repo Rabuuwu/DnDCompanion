@@ -58,6 +58,14 @@ jobs:
           exit 1
       - run: npm run test:auth --workspace server
       - run: npm run test:friends --workspace server
+      - name: Install browser for UI tests
+        run: npx playwright install --with-deps chromium
+      - name: Run browser UI tests
+        env:
+          VITE_API_BASE: http://127.0.0.1:3000
+        run: |
+          npm run build --workspace mobile
+          npm run test:ui
       - name: Show API logs on failure
         if: failure()
         run: cat /tmp/dnd-test-api.log || true

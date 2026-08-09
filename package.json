@@ -14,6 +14,7 @@
     "db:migrate": "npm run db:migrate --workspace server",
     "check": "npm run check --workspace server && npm run build --workspace mobile",
     "security:secrets": "git ls-files --cached --others --exclude-standard -z | node scripts/check-secrets.mjs",
+    "test:ui": "playwright test",
     "release:check": "node scripts/check-release-version.mjs"
   },
   "engines": {

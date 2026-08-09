@@ -3,13 +3,9 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { API_BASE, PWA_BASE, REQUEST_TIMEOUT_MS, SESSION_KEY, WEB_APP_VERSION } from './config.js';
 
 const app = document.querySelector('#app');
-const DEFAULT_API_BASE = 'https://dndcompanion-api.onrender.com';
-const API_BASE = String(window.__API_BASE__ || DEFAULT_API_BASE).replace(/\/$/, '');
-const SESSION_KEY = 'dnd-mobile-session';
-const WEB_APP_VERSION = typeof __DND_APP_VERSION__ === 'string' ? __DND_APP_VERSION__ : 'dev';
-const PWA_BASE = import.meta.env.BASE_URL;
 let currentAppVersion = WEB_APP_VERSION;
 let availableUpdate = null;
 let deferredInstallPrompt = null;
@@ -76,7 +72,6 @@ const CHARACTER_FEATURES = [
   ['campActions', 'Obozówki', 'Dodaj obozówkę'],
   ['abilities', 'Umiejętności', 'Dodaj umiejętność'],
 ];
-const REQUEST_TIMEOUT_MS = 8_000;
 
 function dispatchNotificationRoute(route) {
   if (!route?.type) return;
