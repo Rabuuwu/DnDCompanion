@@ -69,14 +69,18 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-const allowedOrigins = String(process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const nativeOrigins = ['https://localhost', 'capacitor://localhost'];
+const allowedOrigins = new Set([
+  ...nativeOrigins,
+  ...String(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
       return callback(new Error('origin_not_allowed'));
     },
   }),

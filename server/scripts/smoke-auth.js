@@ -20,6 +20,17 @@ async function request(path, options = {}) {
 
 async function run() {
   try {
+    const nativePreflight = await request('/api/auth/login', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://localhost',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    });
+    assert.equal(nativePreflight.status, 204);
+    assert.equal(nativePreflight.headers.get('access-control-allow-origin'), 'https://localhost');
+
     const openapiResponse = await request('/openapi.json');
     assert.equal(openapiResponse.status, 200);
     const openapi = await openapiResponse.json();

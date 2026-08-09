@@ -2,7 +2,7 @@
 
 Mobilny companion do prowadzenia postaci i kampanii RPG. Jeden frontend działa jako aplikacja Android/iOS (Capacitor) oraz instalowalna PWA, a dane synchronizuje z API Node.js i PostgreSQL.
 
-> Status: aktywny rozwój, wersja aplikacji `1.5.3`. PWA i API mają wdrożenie internetowe, a podpisany APK jest publikowany przez GitHub Releases.
+> Status: aktywny rozwój, wersja aplikacji `1.5.4`. PWA i API mają wdrożenie internetowe, a podpisany APK jest publikowany przez GitHub Releases.
 
 ## Najważniejsze funkcje
 
