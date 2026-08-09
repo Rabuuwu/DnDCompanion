@@ -39,6 +39,7 @@ const { blockUser, reportUser } = require('./social');
 const { listNotifications, stopNotificationListener, streamNotifications } = require('./notifications');
 const { getUiPreferences, updateUiPreferences } = require('./preferences');
 const { startDatabaseMaintenance } = require('./maintenance');
+const { setupExpressMonitoring } = require('./monitoring');
 const {
 	addDmCharacterInventoryItem,
 	createCampaign,
@@ -191,6 +192,7 @@ app.get('/api/campaigns/:campaignId/characters/:characterId', requireAuth, getCa
 app.delete('/api/characters/:characterId/campaigns/:campaignId', requireAuth, leaveCampaign);
 
 // Global error handler
+setupExpressMonitoring(app);
 app.use((err, req, res, next) => {
 	console.error(err && err.stack ? err.stack : err);
 	res.status(500).json({ error: 'server_error' });

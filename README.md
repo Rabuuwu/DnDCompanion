@@ -121,4 +121,4 @@ Szczegóły: [polityka bezpieczeństwa](SECURITY.md) i [polityka prywatności](P
 
 ## Licencja i zasoby
 
-Repozytorium nie ma jeszcze wybranej licencji open source — samo udostępnienie kodu na GitHubie nie nadaje prawa do jego kopiowania. Przed publiczną publikacją należy dodać plik `LICENSE` i zweryfikować licencje ikon. Informacje o zasobach zewnętrznych: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Kod jest udostępniony na zasadzie „wszelkie prawa zastrzeżone”; szczegóły zawiera [LICENSE](LICENSE). Zasoby zewnętrzne podlegają osobnym warunkom opisanym w [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
