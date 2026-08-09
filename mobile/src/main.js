@@ -3,7 +3,6 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { captureClientError } from './monitoring.js';
 
 const app = document.querySelector('#app');
 const DEFAULT_API_BASE = 'https://dndcompanion-api.onrender.com';
@@ -159,7 +158,7 @@ async function connectNotificationStream() {
       }
     }
   } catch (error) {
-    if (error.name !== 'AbortError') captureClientError(error, { area: 'notification_stream' });
+    if (error.name !== 'AbortError') console.error('Notification stream disconnected', error);
   } finally {
     if (notificationStreamController === controller) notificationStreamController = null;
     if (!controller.signal.aborted && getStoredSession()?.token) {

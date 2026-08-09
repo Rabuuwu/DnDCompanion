@@ -119,6 +119,8 @@ Zgłoszenie podatności powinno odbywać się prywatnie do właściciela wdroże
 
 Szczegóły: [polityka bezpieczeństwa](SECURITY.md) i [polityka prywatności](PRIVACY.md).
 
+Monitoring dostępności przez UptimeRobot opisuje [docs/MONITORING.md](docs/MONITORING.md).
+
 ## Licencja i zasoby
 
 Kod jest udostępniony na zasadzie „wszelkie prawa zastrzeżone”; szczegóły zawiera [LICENSE](LICENSE). Zasoby zewnętrzne podlegają osobnym warunkom opisanym w [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
