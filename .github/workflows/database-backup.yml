@@ -27,10 +27,10 @@ jobs:
           --health-retries 10
 
     steps:
-      - name: Install PostgreSQL client and age
+      - name: Install age
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client age
+          sudo apt-get install -y age
 
       - name: Validate backup configuration
         env:
@@ -45,10 +45,14 @@ jobs:
           DND_RENDER_DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
         run: |
           mkdir -p backup
-          pg_dump --dbname="$DND_RENDER_DATABASE_URL" --format=custom --compress=9 --no-owner --no-privileges --file=backup/dndcompanion.dump
-          pg_restore --list backup/dndcompanion.dump > backup/dndcompanion.contents.txt
-          pg_restore --dbname=postgresql://postgres:postgres@127.0.0.1:5432/restore_check --clean --if-exists --no-owner --no-privileges --exit-on-error backup/dndcompanion.dump
-          psql postgresql://postgres:postgres@127.0.0.1:5432/restore_check -c 'SELECT COUNT(*) AS migrations FROM schema_migrations;'
+          docker run --rm --network host -v "$PWD/backup:/backup" postgres:18 \
+            pg_dump --dbname="$DND_RENDER_DATABASE_URL" --format=custom --compress=9 --no-owner --no-privileges --file=/backup/dndcompanion.dump
+          docker run --rm -v "$PWD/backup:/backup" postgres:18 \
+            pg_restore --list /backup/dndcompanion.dump > backup/dndcompanion.contents.txt
+          docker run --rm --network host -v "$PWD/backup:/backup" postgres:18 \
+            pg_restore --dbname=postgresql://postgres:postgres@127.0.0.1:5432/restore_check --clean --if-exists --no-owner --no-privileges --exit-on-error /backup/dndcompanion.dump
+          docker run --rm --network host postgres:18 \
+            psql postgresql://postgres:postgres@127.0.0.1:5432/restore_check -c 'SELECT COUNT(*) AS migrations FROM schema_migrations;'
 
       - name: Encrypt backup
         env:
