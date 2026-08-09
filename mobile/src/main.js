@@ -3,8 +3,9 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { API_BASE, PWA_BASE, REQUEST_TIMEOUT_MS, WEB_APP_VERSION } from './config.js';
+import { API_BASE, PWA_BASE, WEB_APP_VERSION } from './config.js';
 import { clearSession, getStoredSession, initializeSessionStore, saveSession } from './session-store.js';
+import { authenticatedFetch, refreshSession, requestTimeout } from './api-client.js';
 
 const app = document.querySelector('#app');
 let currentAppVersion = WEB_APP_VERSION;
@@ -306,10 +307,6 @@ async function installPwa() {
     : 'Otwórz menu przeglądarki i wybierz „Zainstaluj aplikację” lub „Dodaj do ekranu głównego”.');
 }
 
-function requestTimeout() {
-  return AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-}
-
 function bustCache(url) {
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}v=${encodeURIComponent(`${currentAppVersion}-${Date.now()}`)}`;
@@ -539,65 +536,6 @@ function serializeInventory(items) {
     .filter((line) => !line.startsWith(' × '))
     .join('\n')
     .slice(0, 10000);
-}
-
-async function refreshSession() {
-  const session = getStoredSession();
-  if (!session?.refreshToken) {
-    if (session) clearSession();
-    return null;
-  }
-
-  try {
-    const response = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: session.refreshToken }),
-      cache: 'no-store',
-      signal: requestTimeout(),
-    });
-
-    if (!response.ok) {
-      clearSession();
-      return null;
-    }
-
-    const refreshedSession = await response.json();
-    saveSession(refreshedSession);
-    return refreshedSession;
-  } catch {
-    return session;
-  }
-}
-
-let refreshPromise = null;
-
-async function authenticatedFetch(path, options = {}) {
-  let session = getStoredSession();
-  if (!session?.token) throw new Error('session_expired');
-
-  const send = (token) => fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
-    },
-    cache: 'no-store',
-    signal: requestTimeout(),
-  });
-
-  let response = await send(session.token);
-  if (response.status !== 401) return response;
-
-  refreshPromise ||= refreshSession().finally(() => {
-    refreshPromise = null;
-  });
-  session = await refreshPromise;
-  if (!session?.token) throw new Error('session_expired');
-
-  response = await send(session.token);
-  return response;
 }
 
 async function loadUserUiPreferences() {
