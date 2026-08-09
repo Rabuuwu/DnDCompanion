@@ -1,5 +1,7 @@
 # API D&D Companion
 
+Maszynowy kontrakt OpenAPI 3.1 jest publicznie dostępny pod `/openapi.json`. Wersja dokumentu pochodzi z centralnego `release.json`.
+
 ## Konwencje
 
 - Bazowy adres deweloperski: `http://localhost:3000`.

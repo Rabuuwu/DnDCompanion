@@ -25,35 +25,26 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 
 ### P0 — przed publicznym udostępnieniem
 
-1. **Magazyn sesji klienta.** CSP ogranicza ryzyko XSS, ale JWT i refresh token nadal są w `localStorage`. PWA powinna docelowo używać ciastek `HttpOnly`, `Secure`, `SameSite`; aplikacje natywne — systemowego bezpiecznego magazynu.
-2. **Operacyjny backup produkcji.** Workflow jest gotowy, lecz właściciel musi skonfigurować sekrety `RENDER_DATABASE_URL`, `BACKUP_AGE_RECIPIENT`, zmienną `BACKUPS_ENABLED=true` i bezpiecznie przechować prywatny klucz age.
-3. **Licencje.** Trzeba wybrać licencję kodu oraz potwierdzić autora i warunki wszystkich ikon, zwłaszcza zasobu Flaticon, przed publikacją wydania.
+1. **Licencje ikon.** Kod ma zasadę „wszelkie prawa zastrzeżone”, ale zasoby graficzne bez dowodu pochodzenia nie mogą zostać automatycznie uznane za dopuszczone do publicznej dystrybucji.
+2. **Test wydania na urządzeniu.** Podpisany APK musi przejść czystą instalację i aktualizację poprzedniej wersji bez usuwania danych.
 
 ### P1 — wysoki priorytet jakości i bezpieczeństwa
 
 1. Rozszerzać testy UI Playwright wraz z kolejnymi krytycznymi przepływami; obecnie obejmują auth, utworzenie postaci i ekwipunek.
-2. Rozdzielić `mobile/src/main.js` (~4,3 tys. linii) i `style.css` (~3 tys. linii) na moduły: API, auth, router, formularz postaci, kampanie/DM, chat, notatnik i komponenty UI.
-3. Dodać zewnętrzny monitoring dostępności, błędów i czasu odpowiedzi oraz alerty o nieudanych backupach.
-4. Uporządkować uprawnienia kampanii: dodać jawne operacje usunięcia kampanii, przekazania DM i zmiany postaci.
-5. Zastąpić Vite Preview i `python -m http.server` przez Caddy/nginx w stabilnym wdrożeniu LAN.
+2. Kontynuować podział widoków `main.js` i stylów na mniejsze moduły; konfiguracja, sesja, API, schemat postaci i style czatu są już wydzielone.
+3. Utrzymywać alert UptimeRobot dla produkcyjnego `/ready` i kontrolować nieudane backupy GitHub Actions.
 
 ### P2 — utrzymanie i rozwój
 
-1. Przenieść awatary z Data URL w PostgreSQL do magazynu plików/object storage; teraz zwiększają rekordy, odpowiedzi i pamięć klienta.
-2. Dodać paginację wiadomości, kampanii i logów; rozmowa zwraca tylko ostatnie 100 wpisów.
-3. Opisać kontrakt OpenAPI/JSON Schema i generować walidację/klienta, zamiast polegać wyłącznie na kodzie parsera.
-4. Ujednolicić migracje: istniejące dwa prefiksy `006` pozostawić bez zmian, kolejne numerować jednoznacznie i dodać test migracji od pustej bazy.
-5. Przenieść stare jednostki `dnd-web.service`, `dnd-pwa.service` i `dnd-download.service` do `deploy/legacy` po potwierdzeniu, że host ich nie używa.
-6. Rozszerzyć CI o pełną analizę statyczną i skan zależności obrazu/artefaktu Android.
-7. Dodać telemetrykę błędów pozbawioną danych wrażliwych oraz metryki zdrowia, opóźnień i rozmiaru DB.
-8. Opcjonalnie dodać lokalny hook pre-commit; ESLint, Prettier i EditorConfig są już egzekwowane w CI.
+1. Opisać kontrakt OpenAPI i utrzymywać go razem z testami endpointów.
+2. Opcjonalnie dodać lokalny hook pre-commit; ESLint, Prettier i EditorConfig są już egzekwowane w CI.
 
 ## Ryzyka prywatności i prawne
 
 - log audytowy zapisuje IP, user-agent, aktora i metadane; polityka retencji oraz dostęp administracyjny muszą być jawne;
 - DM ma pełny dostęp do kart postaci członków kampanii — polityka aplikacji musi to jasno komunikować;
-- brakuje eksportu danych użytkownika;
-- brakuje wybranej licencji kodu;
+- eksport danych użytkownika został świadomie wyłączony z zakresu produktu;
+- kod ma licencję „wszelkie prawa zastrzeżone”;
 - ikona hełmu pochodzi z Flaticon i wymaga weryfikacji dokładnego autora/warunków oraz właściwej atrybucji; również wszystkie ikony dostarczone do `img/` trzeba zinwentaryzować licencyjnie.
 
 ## Wynik kontroli zależności
@@ -72,6 +63,10 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 - panel administracyjny zgłoszeń, retencji i diagnostyki;
 - dostępność: czytniki ekranu, dynamiczny rozmiar tekstu, kontrast i obsługa klawiatury;
 - lokalizacja treści i przygotowanie wersji angielskiej.
+
+## Architektura produkcyjna
+
+PWA i strona są publikowane przez GitHub Pages, API działa na Render, a PostgreSQL jest usługą Render. Lokalne DNS, certyfikat i jednostki LAN są archiwalnym wariantem pomocniczym i nie stanowią produkcyjnej ścieżki aplikacji.
 
 ## Kryteria „gotowe do publicznej wersji”
 

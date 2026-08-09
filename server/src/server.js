@@ -15,6 +15,7 @@ const changelog = require('../data/changelog.json');
 const privacyPolicy = require('../data/privacy.json');
 const helpContent = require('../data/help.json');
 const release = require('../../release.json');
+const { openapiDocument } = require('./openapi');
 const {
   changePassword,
   deleteAccount,
@@ -94,6 +95,7 @@ const authLimiter = rateLimit({
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+app.get('/openapi.json', (req, res) => res.json(openapiDocument));
 
 app.get('/api/diagnostics/ping', (req, res) => {
   const requestId = crypto.randomUUID();

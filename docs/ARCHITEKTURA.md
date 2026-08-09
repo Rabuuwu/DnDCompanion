@@ -60,9 +60,9 @@ Pełny zapis przechodzi przez `PUT /api/characters/:id`. Ekwipunek i notatnik ma
 
 Właściciel kampanii ma rolę `owner` i dostęp do Panelu DM. Zaproszenie wskazuje postać właściciela, a osoba zaproszona wybiera swoją postać podczas akceptacji. Członkowie widzą postacie drużyny, natomiast DM otrzymuje pełny widok, prywatne notatki kampanii/per postać oraz możliwość dodawania przedmiotów.
 
-## Wdrożenie LAN
+## Archiwalne wdrożenie LAN
 
-Aktualna topologia hosta `192.168.1.5`:
+Poniższa topologia hosta `192.168.1.5` jest wariantem lokalnym, a nie środowiskiem produkcyjnym. Produkcja korzysta z GitHub Pages, API Render i PostgreSQL Render.
 
 | Port | Usługa | Jednostka zalecana |
 |---|---|---|

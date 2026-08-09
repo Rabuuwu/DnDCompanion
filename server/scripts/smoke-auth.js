@@ -20,6 +20,13 @@ async function request(path, options = {}) {
 
 async function run() {
   try {
+    const openapiResponse = await request('/openapi.json');
+    assert.equal(openapiResponse.status, 200);
+    const openapi = await openapiResponse.json();
+    assert.equal(openapi.openapi, '3.1.0');
+    assert.ok(openapi.paths['/api/auth/login'].post);
+    assert.ok(openapi.paths['/api/characters/{id}'].put);
+
     const registration = await request('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({ username, password }),

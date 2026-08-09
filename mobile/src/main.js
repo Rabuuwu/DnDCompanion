@@ -8,6 +8,7 @@ import { API_BASE, PWA_BASE, WEB_APP_VERSION } from './config.js';
 import { clearSession, getStoredSession, initializeSessionStore, saveSession } from './session-store.js';
 import { authenticatedFetch, fetchAllPages, refreshSession, requestTimeout } from './api-client.js';
 import { CHARACTER_ATTRIBUTES, CHARACTER_AUXILIARY, CHARACTER_COMBAT, CHARACTER_FEATURES, CHARACTER_SKILL_GROUPS, CHARACTER_SPECIAL } from './character-schema.js';
+import { automaticInventoryIcon, INVENTORY_ICON_KEYS, INVENTORY_ICONS } from './inventory-schema.js';
 
 const app = document.querySelector('#app');
 let currentAppVersion = WEB_APP_VERSION;
@@ -343,63 +344,6 @@ function formatFeatureText(value) {
   formatted = formatted.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
 
   return formatted.replace(/\r?\n/g, '<br>');
-}
-
-const INVENTORY_ICONS = [
-  ['armor', 'Pancerz'],
-  ['backpack', 'Plecak'],
-  ['dagger', 'Sztylet'],
-  ['diamond', 'Diament'],
-  ['gem', 'Klejnot'],
-  ['gold', 'Złoto'],
-  ['key', 'Klucz'],
-  ['letter', 'List'],
-  ['necklace', 'Naszyjnik'],
-  ['pickaxe', 'Kilof'],
-  ['potion_blue', 'Niebieska mikstura'],
-  ['potion_red', 'Czerwona mikstura'],
-  ['pouch', 'Sakiewka'],
-  ['ring', 'Pierścień'],
-  ['rope', 'Lina'],
-  ['shield', 'Tarcza'],
-  ['spellbook', 'Księga zaklęć'],
-  ['torch', 'Pochodnia'],
-];
-const INVENTORY_ICON_KEYS = new Set(INVENTORY_ICONS.map(([key]) => key));
-
-function automaticInventoryIcon(name) {
-  const normalized = String(name || '').toLocaleLowerCase('pl-PL');
-  const matches = (words) => words.some((word) => normalized.includes(word));
-  if (matches(['złot', 'gold', 'monet'])) return 'gold';
-  if (matches([
-    'pancerz',
-    'zbroj',
-    'hełm',
-    'helm',
-    'helmet',
-    'napierśnik',
-    'napiersnik',
-    'kolczug',
-    'armor',
-    'armour',
-  ])) return 'armor';
-  if (matches(['mana', 'many', 'niebiesk']) && matches(['mikstur', 'potk', 'potion'])) return 'potion_blue';
-  if (matches(['mikstur', 'potk', 'potion', 'eliksir'])) return 'potion_red';
-  if (matches(['sztylet', 'dagger'])) return 'dagger';
-  if (matches(['diament', 'diamond'])) return 'diamond';
-  if (matches(['klejnot', 'gem'])) return 'gem';
-  if (matches(['klucz', 'key'])) return 'key';
-  if (matches(['list', 'letter'])) return 'letter';
-  if (matches(['naszyjnik', 'necklace', 'amulet'])) return 'necklace';
-  if (matches(['kilof', 'pickaxe'])) return 'pickaxe';
-  if (matches(['sakiew', 'pouch'])) return 'pouch';
-  if (matches(['pierścień', 'pierscien', 'ring'])) return 'ring';
-  if (matches(['lina', 'linę', 'rope'])) return 'rope';
-  if (matches(['tarcza', 'tarczę', 'shield'])) return 'shield';
-  if (matches(['księg', 'ksieg', 'spellbook', 'grymuar', 'grimoire'])) return 'spellbook';
-  if (matches(['pochodni', 'torch'])) return 'torch';
-  if (matches(['plecak', 'backpack'])) return 'backpack';
-  return '';
 }
 
 function inventoryIconKey(item) {

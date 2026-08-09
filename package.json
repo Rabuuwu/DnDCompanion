@@ -16,9 +16,10 @@
     "check": "npm run check --workspace server && npm run build --workspace mobile",
     "security:secrets": "git ls-files --cached --others --exclude-standard -z | node scripts/check-secrets.mjs",
     "lint": "eslint --max-warnings=0 server/src server/scripts mobile/src scripts tests playwright.config.js mobile/vite.config.js",
-    "format:check": "prettier --check eslint.config.js playwright.config.js server/src server/scripts mobile/src/api-client.js mobile/src/character-schema.js mobile/src/config.js mobile/src/session-store.js scripts tests .github/workflows",
-    "format": "prettier --write eslint.config.js playwright.config.js server/src server/scripts mobile/src/api-client.js mobile/src/character-schema.js mobile/src/config.js mobile/src/session-store.js scripts tests .github/workflows",
+    "format:check": "prettier --check eslint.config.js playwright.config.js server/src server/scripts mobile/src/api-client.js mobile/src/character-schema.js mobile/src/config.js mobile/src/inventory-schema.js mobile/src/session-store.js scripts tests .github/workflows",
+    "format": "prettier --write eslint.config.js playwright.config.js server/src server/scripts mobile/src/api-client.js mobile/src/character-schema.js mobile/src/config.js mobile/src/inventory-schema.js mobile/src/session-store.js scripts tests .github/workflows",
     "test:ui": "playwright test",
+    "test:unit": "node --test tests/unit/*.test.js",
     "release:check": "node scripts/check-release-version.mjs"
   },
   "engines": {
