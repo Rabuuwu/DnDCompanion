@@ -10,7 +10,7 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 - przeniesiono publikację zdarzenia do właściwego przepływu zapraszania do kampanii;
 - zaktualizowano Vite, Capacitor i zależności; pełny `npm audit` nie zgłasza podatności;
 - skonfigurowano finalny identyfikator Androida, podpisany build release, kontrolę spójności wersji oraz workflow wydań;
-- dodano CI z PostgreSQL, migracją od pustej bazy, buildem, skanowaniem sekretów i smoke testami;
+- dodano CI z PostgreSQL, migracją od pustej bazy, buildem, ESLint, Prettier, skanowaniem sekretów i testami API/UI;
 - dodano CSP, wymuszono HTTPS/zakaz cleartext w Androidzie i ograniczono backup danych aplikacji przez system;
 - zastąpiono lokalny broker powiadomień przez PostgreSQL `LISTEN/NOTIFY` zgodny z wieloma instancjami API;
 - dodano automatyczną retencję logów, tokenów i nieaktualnych zaproszeń;
@@ -31,7 +31,7 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 
 ### P1 — wysoki priorytet jakości i bezpieczeństwa
 
-1. Rozszerzyć istniejące testy kampanii, Panelu DM, powiadomień i usunięcia konta o testy UI wykonywane w prawdziwej przeglądarce.
+1. Rozszerzać testy UI Playwright wraz z kolejnymi krytycznymi przepływami; obecnie obejmują auth, utworzenie postaci i ekwipunek.
 2. Rozdzielić `mobile/src/main.js` (~4,3 tys. linii) i `style.css` (~3 tys. linii) na moduły: API, auth, router, formularz postaci, kampanie/DM, chat, notatnik i komponenty UI.
 3. Dodać zewnętrzny monitoring dostępności, błędów i czasu odpowiedzi oraz alerty o nieudanych backupach.
 4. Uporządkować uprawnienia kampanii: dodać jawne operacje usunięcia kampanii, przekazania DM i zmiany postaci.
@@ -46,7 +46,7 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 5. Przenieść stare jednostki `dnd-web.service`, `dnd-pwa.service` i `dnd-download.service` do `deploy/legacy` po potwierdzeniu, że host ich nie używa.
 6. Rozszerzyć CI o pełną analizę statyczną i skan zależności obrazu/artefaktu Android.
 7. Dodać telemetrykę błędów pozbawioną danych wrażliwych oraz metryki zdrowia, opóźnień i rozmiaru DB.
-8. Ujednolicić format kodu (ESLint + Prettier/EditorConfig) i dodać hook pre-commit.
+8. Opcjonalnie dodać lokalny hook pre-commit; ESLint, Prettier i EditorConfig są już egzekwowane w CI.
 
 ## Ryzyka prywatności i prawne
 

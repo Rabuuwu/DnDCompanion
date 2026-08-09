@@ -14,20 +14,19 @@ async function runDatabaseMaintenance() {
       return { skipped: true };
     }
 
-    const auditLogs = await client.query(
-      `DELETE FROM audit_logs WHERE created_at < NOW() - ($1 * INTERVAL '1 day')`,
-      [AUDIT_RETENTION_DAYS]
-    );
+    const auditLogs = await client.query(`DELETE FROM audit_logs WHERE created_at < NOW() - ($1 * INTERVAL '1 day')`, [
+      AUDIT_RETENTION_DAYS,
+    ]);
     const refreshTokens = await client.query(
-      `DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked_at < NOW() - INTERVAL '7 days'`
+      `DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked_at < NOW() - INTERVAL '7 days'`,
     );
     const friendInvites = await client.query(
       `DELETE FROM friend_invites WHERE expires_at < NOW() - ($1 * INTERVAL '1 day') OR used_at < NOW() - ($1 * INTERVAL '1 day')`,
-      [INVITE_RETENTION_DAYS]
+      [INVITE_RETENTION_DAYS],
     );
     const campaignInvitations = await client.query(
       `DELETE FROM campaign_invitations WHERE status <> 'pending' AND responded_at < NOW() - ($1 * INTERVAL '1 day')`,
-      [INVITE_RETENTION_DAYS]
+      [INVITE_RETENTION_DAYS],
     );
     await client.query('COMMIT');
     return {
@@ -48,9 +47,10 @@ async function runDatabaseMaintenance() {
 }
 
 function startDatabaseMaintenance() {
-  const execute = () => runDatabaseMaintenance()
-    .then((result) => console.log('[MAINTENANCE]', JSON.stringify(result)))
-    .catch((error) => console.error('[MAINTENANCE] failed:', error.message));
+  const execute = () =>
+    runDatabaseMaintenance()
+      .then((result) => console.log('[MAINTENANCE]', JSON.stringify(result)))
+      .catch((error) => console.error('[MAINTENANCE] failed:', error.message));
   const initialTimer = setTimeout(execute, 10_000);
   const interval = setInterval(execute, DAY_MS);
   initialTimer.unref();

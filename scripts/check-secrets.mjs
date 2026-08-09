@@ -1,8 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const trackedFiles = readFileSync(0, 'utf8')
-  .split('\0')
-  .filter(Boolean);
+const trackedFiles = readFileSync(0, 'utf8').split('\0').filter(Boolean);
 const forbiddenNames = [
   /(^|\/)(\.env|google-services\.json|GoogleService-Info\.plist|key\.properties)$/i,
   /\.(jks|keystore|p8|p12|pem|mobileprovision)$/i,

@@ -1,67 +1,79 @@
 const crypto = require('node:crypto');
 const { pool } = require('./db');
 
-const ACTIONS = new Map(Object.entries({
-  'GET /health': ['connection', 'health_check', 'server'],
-  'GET /ready': ['connection', 'readiness_check', 'server'],
-  'GET /api/diagnostics/ping': ['connection', 'connection_test', 'server'],
-  'GET /api/app/version': ['application', 'version_check', 'application'],
-  'GET /api/app/changelog': ['application', 'view_changelog', 'application'],
-  'GET /api/app/privacy': ['application', 'view_privacy', 'application'],
-  'GET /api/app/help': ['application', 'view_help', 'application'],
-  'POST /api/auth/login': ['authentication', 'login', 'user'],
-  'POST /api/auth/register': ['authentication', 'register', 'user'],
-  'POST /api/auth/refresh': ['authentication', 'refresh_session', 'session'],
-  'POST /api/auth/logout': ['authentication', 'logout', 'session'],
-  'POST /api/auth/change-password': ['account', 'change_password', 'user'],
-  'PUT /api/auth/avatar': ['account', 'change_user_avatar', 'user'],
-  'DELETE /api/auth/account': ['account', 'delete_account', 'user'],
-  'GET /api/ui-preferences': ['ui', 'load_ui_preferences', 'user_preferences'],
-  'PUT /api/ui-preferences': ['ui', 'update_ui_preferences', 'user_preferences'],
-  'GET /api/characters': ['character', 'list_characters', 'character'],
-  'POST /api/characters': ['character', 'create_character', 'character'],
-  'GET /api/characters/:id': ['character', 'view_character', 'character'],
-  'PUT /api/characters/:id': ['character', 'update_character', 'character'],
-  'PATCH /api/characters/:id/inventory': ['inventory', 'update_inventory', 'character'],
-  'PATCH /api/characters/:id/notebook': ['notebook', 'update_notebook', 'character'],
-  'DELETE /api/characters/:id': ['character', 'delete_character', 'character'],
-  'GET /api/friends': ['friend', 'list_friends', 'friendship'],
-  'POST /api/friends/invite': ['friend', 'create_friend_invite', 'friend_invite'],
-  'POST /api/friends/accept': ['friend', 'accept_friend_invite', 'friendship'],
-  'GET /api/friends/:id/profile': ['friend', 'view_friend_profile', 'user'],
-  'GET /api/friends/:id/messages': ['message', 'list_messages', 'conversation'],
-  'POST /api/friends/:id/messages': ['message', 'send_message', 'conversation'],
-  'DELETE /api/friends/:id': ['friend', 'remove_friend', 'friendship'],
-  'PUT /api/friends/:id/nickname': ['friend', 'change_friend_nickname', 'friendship'],
-  'POST /api/users/:id/block': ['safety', 'block_user', 'user'],
-  'POST /api/users/:id/report': ['safety', 'report_user', 'user'],
-  'GET /api/notifications': ['notification', 'list_notifications', 'notification'],
-  'GET /api/notifications/stream': ['connection', 'notification_stream', 'notification'],
-  'GET /api/campaigns': ['campaign', 'list_campaigns', 'campaign'],
-  'POST /api/campaigns': ['campaign', 'create_campaign', 'campaign'],
-  'POST /api/campaigns/:id/invitations': ['campaign', 'invite_to_campaign', 'campaign'],
-  'GET /api/campaign-invitations': ['campaign', 'list_campaign_invitations', 'campaign_invitation'],
-  'POST /api/campaign-invitations/:id/respond': ['campaign', 'respond_to_campaign_invitation', 'campaign_invitation'],
-  'GET /api/campaigns/:id/dm': ['campaign_dm', 'open_dm_panel', 'campaign'],
-  'PUT /api/campaigns/:id/dm/note': ['campaign_dm', 'update_dm_campaign_note', 'campaign'],
-  'GET /api/campaigns/:campaignId/dm/characters/:characterId': ['campaign_dm', 'view_dm_character', 'character'],
-  'PUT /api/campaigns/:campaignId/dm/characters/:characterId/note': ['campaign_dm', 'update_dm_character_note', 'character'],
-  'POST /api/campaigns/:campaignId/dm/characters/:characterId/inventory': ['campaign_dm', 'add_dm_inventory_item', 'character'],
-  'GET /api/characters/:characterId/teams': ['campaign', 'view_character_team', 'character'],
-  'GET /api/campaigns/:campaignId/characters/:characterId': ['campaign', 'view_team_character', 'character'],
-  'DELETE /api/characters/:characterId/campaigns/:campaignId': ['campaign', 'leave_campaign', 'campaign'],
-}));
+const ACTIONS = new Map(
+  Object.entries({
+    'GET /health': ['connection', 'health_check', 'server'],
+    'GET /ready': ['connection', 'readiness_check', 'server'],
+    'GET /api/diagnostics/ping': ['connection', 'connection_test', 'server'],
+    'GET /api/app/version': ['application', 'version_check', 'application'],
+    'GET /api/app/changelog': ['application', 'view_changelog', 'application'],
+    'GET /api/app/privacy': ['application', 'view_privacy', 'application'],
+    'GET /api/app/help': ['application', 'view_help', 'application'],
+    'POST /api/auth/login': ['authentication', 'login', 'user'],
+    'POST /api/auth/register': ['authentication', 'register', 'user'],
+    'POST /api/auth/refresh': ['authentication', 'refresh_session', 'session'],
+    'POST /api/auth/logout': ['authentication', 'logout', 'session'],
+    'POST /api/auth/change-password': ['account', 'change_password', 'user'],
+    'PUT /api/auth/avatar': ['account', 'change_user_avatar', 'user'],
+    'DELETE /api/auth/account': ['account', 'delete_account', 'user'],
+    'GET /api/ui-preferences': ['ui', 'load_ui_preferences', 'user_preferences'],
+    'PUT /api/ui-preferences': ['ui', 'update_ui_preferences', 'user_preferences'],
+    'GET /api/characters': ['character', 'list_characters', 'character'],
+    'POST /api/characters': ['character', 'create_character', 'character'],
+    'GET /api/characters/:id': ['character', 'view_character', 'character'],
+    'PUT /api/characters/:id': ['character', 'update_character', 'character'],
+    'PATCH /api/characters/:id/inventory': ['inventory', 'update_inventory', 'character'],
+    'PATCH /api/characters/:id/notebook': ['notebook', 'update_notebook', 'character'],
+    'DELETE /api/characters/:id': ['character', 'delete_character', 'character'],
+    'GET /api/friends': ['friend', 'list_friends', 'friendship'],
+    'POST /api/friends/invite': ['friend', 'create_friend_invite', 'friend_invite'],
+    'POST /api/friends/accept': ['friend', 'accept_friend_invite', 'friendship'],
+    'GET /api/friends/:id/profile': ['friend', 'view_friend_profile', 'user'],
+    'GET /api/friends/:id/messages': ['message', 'list_messages', 'conversation'],
+    'POST /api/friends/:id/messages': ['message', 'send_message', 'conversation'],
+    'DELETE /api/friends/:id': ['friend', 'remove_friend', 'friendship'],
+    'PUT /api/friends/:id/nickname': ['friend', 'change_friend_nickname', 'friendship'],
+    'POST /api/users/:id/block': ['safety', 'block_user', 'user'],
+    'POST /api/users/:id/report': ['safety', 'report_user', 'user'],
+    'GET /api/notifications': ['notification', 'list_notifications', 'notification'],
+    'GET /api/notifications/stream': ['connection', 'notification_stream', 'notification'],
+    'GET /api/campaigns': ['campaign', 'list_campaigns', 'campaign'],
+    'POST /api/campaigns': ['campaign', 'create_campaign', 'campaign'],
+    'POST /api/campaigns/:id/invitations': ['campaign', 'invite_to_campaign', 'campaign'],
+    'GET /api/campaign-invitations': ['campaign', 'list_campaign_invitations', 'campaign_invitation'],
+    'POST /api/campaign-invitations/:id/respond': ['campaign', 'respond_to_campaign_invitation', 'campaign_invitation'],
+    'GET /api/campaigns/:id/dm': ['campaign_dm', 'open_dm_panel', 'campaign'],
+    'PUT /api/campaigns/:id/dm/note': ['campaign_dm', 'update_dm_campaign_note', 'campaign'],
+    'GET /api/campaigns/:campaignId/dm/characters/:characterId': ['campaign_dm', 'view_dm_character', 'character'],
+    'PUT /api/campaigns/:campaignId/dm/characters/:characterId/note': [
+      'campaign_dm',
+      'update_dm_character_note',
+      'character',
+    ],
+    'POST /api/campaigns/:campaignId/dm/characters/:characterId/inventory': [
+      'campaign_dm',
+      'add_dm_inventory_item',
+      'character',
+    ],
+    'GET /api/characters/:characterId/teams': ['campaign', 'view_character_team', 'character'],
+    'GET /api/campaigns/:campaignId/characters/:characterId': ['campaign', 'view_team_character', 'character'],
+    'DELETE /api/characters/:characterId/campaigns/:campaignId': ['campaign', 'leave_campaign', 'campaign'],
+  }),
+);
 
 function safeText(value, maxLength = 200) {
-  return String(value ?? '').trim().slice(0, maxLength);
+  return String(value ?? '')
+    .trim()
+    .slice(0, maxLength);
 }
 
 function requestMetadata(req, action) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const metadata = {};
-  const fields = Object.keys(body).filter((key) => ![
-    'password', 'currentPassword', 'newPassword', 'token', 'refreshToken', 'avatar',
-  ].includes(key));
+  const fields = Object.keys(body).filter(
+    (key) => !['password', 'currentPassword', 'newPassword', 'token', 'refreshToken', 'avatar'].includes(key),
+  );
   if (fields.length) metadata.changedFields = fields.slice(0, 50);
 
   if (['login', 'register'].includes(action)) metadata.username = safeText(body.username, 50);
@@ -92,7 +104,8 @@ function requestMetadata(req, action) {
 }
 
 function entityId(req, entityType) {
-  if (entityType === 'user' || entityType === 'conversation' || entityType === 'friendship') return req.params?.id || req.user?.id || null;
+  if (entityType === 'user' || entityType === 'conversation' || entityType === 'friendship')
+    return req.params?.id || req.user?.id || null;
   if (entityType === 'character') return req.params?.id || req.params?.characterId || null;
   if (entityType === 'campaign') return req.params?.campaignId || req.params?.id || null;
   if (entityType === 'campaign_invitation') return req.params?.id || null;
@@ -127,7 +140,7 @@ async function writeAuditLog(entry) {
         safeText(entry.ipAddress, 100),
         safeText(entry.userAgent, 1000) || null,
         JSON.stringify(entry.metadata || {}),
-      ]
+      ],
     );
   } catch (error) {
     console.error(`[AUDIT] failed action=${entry.action}: ${error.message}`);

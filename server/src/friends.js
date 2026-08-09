@@ -6,7 +6,9 @@ const INVITE_TTL_MINUTES = 15;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function normalizeCode(value) {
-  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 function hashCode(code) {
@@ -33,7 +35,7 @@ async function areFriends(firstUserId, secondUserId, client = pool) {
     `SELECT created_at
      FROM friendships
      WHERE user_low_id = $1 AND user_high_id = $2`,
-    [lowId, highId]
+    [lowId, highId],
   );
   return result.rows[0] || null;
 }
@@ -44,7 +46,7 @@ async function areBlocked(firstUserId, secondUserId, client = pool) {
      FROM user_blocks
      WHERE (blocker_id = $1 AND blocked_id = $2)
         OR (blocker_id = $2 AND blocked_id = $1)`,
-    [firstUserId, secondUserId]
+    [firstUserId, secondUserId],
   );
   return result.rowCount > 0;
 }
@@ -62,16 +64,18 @@ async function listFriends(req, res) {
        ON a.user_id = $1 AND a.friend_id = u.id
      WHERE f.user_low_id = $1 OR f.user_high_id = $1
      ORDER BY LOWER(u.username), u.id`,
-    [req.user.id]
+    [req.user.id],
   );
 
-  return res.json(result.rows.map((friend) => ({
-    id: Number(friend.id),
-    username: friend.username,
-    avatar: friend.avatar || '',
-    nickname: friend.nickname,
-    friendsSince: friend.created_at,
-  })));
+  return res.json(
+    result.rows.map((friend) => ({
+      id: Number(friend.id),
+      username: friend.username,
+      avatar: friend.avatar || '',
+      nickname: friend.nickname,
+      friendsSince: friend.created_at,
+    })),
+  );
 }
 
 async function createInvite(req, res) {
@@ -83,7 +87,7 @@ async function createInvite(req, res) {
       `UPDATE friend_invites
        SET used_at = NOW()
        WHERE owner_id = $1 AND used_at IS NULL`,
-      [req.user.id]
+      [req.user.id],
     );
 
     let code;
@@ -95,7 +99,7 @@ async function createInvite(req, res) {
          VALUES ($1, $2, NOW() + ($3 * INTERVAL '1 minute'))
          ON CONFLICT (code_hash) DO NOTHING
          RETURNING expires_at`,
-        [req.user.id, hashCode(code), INVITE_TTL_MINUTES]
+        [req.user.id, hashCode(code), INVITE_TTL_MINUTES],
       );
       inserted = result.rowCount === 1;
     }
@@ -131,7 +135,7 @@ async function acceptInvite(req, res) {
          AND fi.used_at IS NULL
          AND fi.expires_at > NOW()
        FOR UPDATE`,
-      [hashCode(code)]
+      [hashCode(code)],
     );
     const invite = inviteResult.rows[0];
 
@@ -155,14 +159,14 @@ async function acceptInvite(req, res) {
        VALUES ($1, $2)
        ON CONFLICT (user_low_id, user_high_id) DO NOTHING
        RETURNING created_at`,
-      [lowId, highId]
+      [lowId, highId],
     );
 
     await client.query(
       `UPDATE friend_invites
        SET used_at = NOW(), used_by = $1
        WHERE id = $2`,
-      [req.user.id, invite.id]
+      [req.user.id, invite.id],
     );
     await client.query('COMMIT');
 
@@ -198,7 +202,7 @@ async function getFriendProfile(req, res) {
      LEFT JOIN characters c ON c.owner_id = u.id
      WHERE u.id = $1
      GROUP BY u.id`,
-    [friendId]
+    [friendId],
   );
   const friend = result.rows[0];
   if (!friend) return res.status(404).json({ error: 'friend_not_found' });
@@ -231,7 +235,7 @@ async function listMessages(req, res) {
       `UPDATE direct_messages
        SET read_at = NOW()
        WHERE sender_id = $1 AND recipient_id = $2 AND read_at IS NULL`,
-      [friendId, req.user.id]
+      [friendId, req.user.id],
     );
     const result = await client.query(
       `SELECT *
@@ -245,7 +249,7 @@ async function listMessages(req, res) {
          LIMIT $4
        ) recent
        ORDER BY created_at ASC, id ASC`,
-      [req.user.id, friendId, beforeId, limit + 1]
+      [req.user.id, friendId, beforeId, limit + 1],
     );
     await client.query('COMMIT');
 
@@ -254,13 +258,15 @@ async function listMessages(req, res) {
     res.set('X-Has-More', String(hasMore));
     if (hasMore && rows[0]) res.set('X-Next-Cursor', String(rows[0].id));
 
-    return res.json(rows.map((message) => ({
-      id: Number(message.id),
-      body: message.body,
-      sentByMe: Number(message.sender_id) === req.user.id,
-      readAt: message.read_at,
-      createdAt: message.created_at,
-    })));
+    return res.json(
+      rows.map((message) => ({
+        id: Number(message.id),
+        body: message.body,
+        sentByMe: Number(message.sender_id) === req.user.id,
+        readAt: message.read_at,
+        createdAt: message.created_at,
+      })),
+    );
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -285,7 +291,7 @@ async function sendMessage(req, res) {
     `INSERT INTO direct_messages (sender_id, recipient_id, body)
      VALUES ($1, $2, $3)
      RETURNING id, body, read_at, created_at`,
-    [req.user.id, friendId, body]
+    [req.user.id, friendId, body],
   );
   const message = result.rows[0];
   publishUserNotification(friendId, {
@@ -311,7 +317,7 @@ async function removeFriend(req, res) {
     `DELETE FROM friendships
      WHERE user_low_id = $1 AND user_high_id = $2
      RETURNING user_low_id`,
-    [lowId, highId]
+    [lowId, highId],
   );
   if (result.rowCount === 0) return res.status(404).json({ error: 'friend_not_found' });
   return res.status(204).end();
@@ -327,10 +333,7 @@ async function setFriendNickname(req, res) {
   if (nickname.length > 50) return res.status(400).json({ error: 'invalid_nickname' });
 
   if (!nickname) {
-    await pool.query(
-      'DELETE FROM friendship_aliases WHERE user_id = $1 AND friend_id = $2',
-      [req.user.id, friendId]
-    );
+    await pool.query('DELETE FROM friendship_aliases WHERE user_id = $1 AND friend_id = $2', [req.user.id, friendId]);
     return res.json({ nickname: null });
   }
 
@@ -339,7 +342,7 @@ async function setFriendNickname(req, res) {
      VALUES ($1, $2, $3)
      ON CONFLICT (user_id, friend_id)
      DO UPDATE SET nickname = EXCLUDED.nickname, updated_at = NOW()`,
-    [req.user.id, friendId, nickname]
+    [req.user.id, friendId, nickname],
   );
   return res.json({ nickname });
 }

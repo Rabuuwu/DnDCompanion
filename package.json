@@ -2,6 +2,7 @@
   "name": "aplikacja-dnd",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "workspaces": [
     "server",
     "mobile"
@@ -14,6 +15,9 @@
     "db:migrate": "npm run db:migrate --workspace server",
     "check": "npm run check --workspace server && npm run build --workspace mobile",
     "security:secrets": "git ls-files --cached --others --exclude-standard -z | node scripts/check-secrets.mjs",
+    "lint": "eslint --max-warnings=0 server/src server/scripts mobile/src scripts tests playwright.config.js mobile/vite.config.js",
+    "format:check": "prettier --check eslint.config.js playwright.config.js server/src server/scripts mobile/src/api-client.js mobile/src/character-schema.js mobile/src/config.js mobile/src/session-store.js scripts tests .github/workflows",
+    "format": "prettier --write eslint.config.js playwright.config.js server/src server/scripts mobile/src/api-client.js mobile/src/character-schema.js mobile/src/config.js mobile/src/session-store.js scripts tests .github/workflows",
     "test:ui": "playwright test",
     "release:check": "node scripts/check-release-version.mjs"
   },
@@ -21,6 +25,11 @@
     "node": ">=22"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6"
   }
 }

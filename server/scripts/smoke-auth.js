@@ -3,8 +3,7 @@ require('dotenv').config({ path: require('node:path').resolve(__dirname, '../../
 const assert = require('node:assert/strict');
 const { pool } = require('../src/db');
 
-const apiBase = process.env.API_BASE
-  || `http://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || 3000}`;
+const apiBase = process.env.API_BASE || `http://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || 3000}`;
 const username = `smoke_${Date.now()}`;
 const password = 'Smoke-test-password-123!';
 const newPassword = 'Changed-smoke-password-456!';
@@ -74,15 +73,11 @@ async function run() {
           animalCare: { current: 0, max: 11 },
         },
         features: {
-          passives: [
-            { name: 'Twarda skóra', description: 'Stała odporność na obrażenia.' },
-          ],
+          passives: [{ name: 'Twarda skóra', description: 'Stała odporność na obrażenia.' }],
           campActions: [
             { name: 'Naprawa ekwipunku', description: 'Naprawia wyposażenie podczas obozu.', duration: '1 godzina' },
           ],
-          abilities: [
-            { name: 'Uderzenie tarczą', description: 'Atak i próba odepchnięcia celu.', toothCost: 3 },
-          ],
+          abilities: [{ name: 'Uderzenie tarczą', description: 'Atak i próba odepchnięcia celu.', toothCost: 3 }],
         },
       }),
     });
@@ -217,10 +212,7 @@ async function run() {
     });
     assert.equal(accountDeletion.status, 204);
 
-    const deletedUser = await pool.query(
-      'SELECT 1 FROM users WHERE username = $1',
-      [username]
-    );
+    const deletedUser = await pool.query('SELECT 1 FROM users WHERE username = $1', [username]);
     assert.equal(deletedUser.rowCount, 0);
 
     console.log('Authentication smoke test passed');

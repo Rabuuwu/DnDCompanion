@@ -8,10 +8,10 @@ function parseId(value) {
 }
 
 async function requireCampaignDm(campaignId, userId) {
-  const result = await pool.query(
-    'SELECT id, name FROM campaigns WHERE id = $1 AND owner_id = $2',
-    [campaignId, userId]
-  );
+  const result = await pool.query('SELECT id, name FROM campaigns WHERE id = $1 AND owner_id = $2', [
+    campaignId,
+    userId,
+  ]);
   return result.rows[0] || null;
 }
 
@@ -30,17 +30,19 @@ async function listOwnedCampaigns(req, res) {
      WHERE owner_id = $1
      ORDER BY LOWER(name), id
      LIMIT $2 OFFSET $3`,
-    [req.user.id, limit + 1, offset]
+    [req.user.id, limit + 1, offset],
   );
   const hasMore = result.rows.length > limit;
   const rows = result.rows.slice(0, limit);
   res.set('X-Has-More', String(hasMore));
   if (hasMore) res.set('X-Next-Offset', String(offset + limit));
-  return res.json(rows.map((campaign) => ({
-    id: Number(campaign.id),
-    name: campaign.name,
-    createdAt: campaign.created_at,
-  })));
+  return res.json(
+    rows.map((campaign) => ({
+      id: Number(campaign.id),
+      name: campaign.name,
+      createdAt: campaign.created_at,
+    })),
+  );
 }
 
 async function createCampaign(req, res) {
@@ -54,13 +56,13 @@ async function createCampaign(req, res) {
       `INSERT INTO campaigns (owner_id, name)
        VALUES ($1, $2)
        RETURNING id, name, created_at`,
-      [req.user.id, name]
+      [req.user.id, name],
     );
     const campaign = result.rows[0];
     await client.query(
       `INSERT INTO campaign_members (campaign_id, user_id, role)
        VALUES ($1, $2, 'owner')`,
-      [campaign.id, req.user.id]
+      [campaign.id, req.user.id],
     );
     await client.query('COMMIT');
     return res.status(201).json({
@@ -84,30 +86,30 @@ async function inviteToCampaign(req, res) {
     return res.status(400).json({ error: 'invalid_invitation' });
   }
 
-  const campaign = await pool.query(
-    'SELECT id, name FROM campaigns WHERE id = $1 AND owner_id = $2',
-    [campaignId, req.user.id]
-  );
+  const campaign = await pool.query('SELECT id, name FROM campaigns WHERE id = $1 AND owner_id = $2', [
+    campaignId,
+    req.user.id,
+  ]);
   if (!campaign.rows[0]) return res.status(404).json({ error: 'campaign_not_found' });
 
-  const character = await pool.query(
-    'SELECT id FROM characters WHERE id = $1 AND owner_id = $2',
-    [characterId, req.user.id]
-  );
+  const character = await pool.query('SELECT id FROM characters WHERE id = $1 AND owner_id = $2', [
+    characterId,
+    req.user.id,
+  ]);
   if (!character.rows[0]) return res.status(404).json({ error: 'character_not_found' });
 
   const lowId = Math.min(req.user.id, friendId);
   const highId = Math.max(req.user.id, friendId);
-  const friendship = await pool.query(
-    `SELECT 1 FROM friendships WHERE user_low_id = $1 AND user_high_id = $2`,
-    [lowId, highId]
-  );
+  const friendship = await pool.query(`SELECT 1 FROM friendships WHERE user_low_id = $1 AND user_high_id = $2`, [
+    lowId,
+    highId,
+  ]);
   if (friendship.rowCount === 0) return res.status(404).json({ error: 'friend_not_found' });
 
-  const member = await pool.query(
-    'SELECT 1 FROM campaign_members WHERE campaign_id = $1 AND user_id = $2',
-    [campaignId, friendId]
-  );
+  const member = await pool.query('SELECT 1 FROM campaign_members WHERE campaign_id = $1 AND user_id = $2', [
+    campaignId,
+    friendId,
+  ]);
   if (member.rowCount > 0) return res.status(409).json({ error: 'already_campaign_member' });
 
   const client = await pool.connect();
@@ -118,13 +120,13 @@ async function inviteToCampaign(req, res) {
        VALUES ($1, $2, $3, 'owner')
        ON CONFLICT (campaign_id, user_id)
        DO UPDATE SET character_id = EXCLUDED.character_id`,
-      [campaignId, req.user.id, characterId]
+      [campaignId, req.user.id, characterId],
     );
     const result = await client.query(
       `INSERT INTO campaign_invitations (campaign_id, inviter_id, invitee_id)
        VALUES ($1, $2, $3)
        RETURNING id, created_at`,
-      [campaignId, req.user.id, friendId]
+      [campaignId, req.user.id, friendId],
     );
     await client.query('COMMIT');
     publishUserNotification(friendId, {
@@ -154,18 +156,20 @@ async function listCampaignInvitations(req, res) {
      JOIN users u ON u.id = ci.inviter_id
      WHERE ci.invitee_id = $1 AND ci.status = 'pending'
      ORDER BY ci.created_at DESC`,
-    [req.user.id]
+    [req.user.id],
   );
-  return res.json(result.rows.map((invitation) => ({
-    id: Number(invitation.id),
-    campaign: { id: Number(invitation.campaign_id), name: invitation.campaign_name },
-    inviter: {
-      id: Number(invitation.inviter_id),
-      username: invitation.inviter_username,
-      avatar: invitation.inviter_avatar || '',
-    },
-    createdAt: invitation.created_at,
-  })));
+  return res.json(
+    result.rows.map((invitation) => ({
+      id: Number(invitation.id),
+      campaign: { id: Number(invitation.campaign_id), name: invitation.campaign_name },
+      inviter: {
+        id: Number(invitation.inviter_id),
+        username: invitation.inviter_username,
+        avatar: invitation.inviter_avatar || '',
+      },
+      createdAt: invitation.created_at,
+    })),
+  );
 }
 
 async function respondToCampaignInvitation(req, res) {
@@ -183,7 +187,7 @@ async function respondToCampaignInvitation(req, res) {
        FROM campaign_invitations
        WHERE id = $1 AND invitee_id = $2 AND status = 'pending'
        FOR UPDATE`,
-      [invitationId, req.user.id]
+      [invitationId, req.user.id],
     );
     const invitation = result.rows[0];
     if (!invitation) {
@@ -197,10 +201,10 @@ async function respondToCampaignInvitation(req, res) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'character_required' });
       }
-      const character = await client.query(
-        'SELECT id FROM characters WHERE id = $1 AND owner_id = $2',
-        [characterId, req.user.id]
-      );
+      const character = await client.query('SELECT id FROM characters WHERE id = $1 AND owner_id = $2', [
+        characterId,
+        req.user.id,
+      ]);
       if (!character.rows[0]) {
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'character_not_found' });
@@ -210,14 +214,14 @@ async function respondToCampaignInvitation(req, res) {
          VALUES ($1, $2, $3)
          ON CONFLICT (campaign_id, user_id)
          DO UPDATE SET character_id = EXCLUDED.character_id`,
-        [invitation.campaign_id, req.user.id, characterId]
+        [invitation.campaign_id, req.user.id, characterId],
       );
     }
     await client.query(
       `UPDATE campaign_invitations
        SET status = $1, responded_at = NOW()
        WHERE id = $2`,
-      [action === 'accept' ? 'accepted' : 'declined', invitationId]
+      [action === 'accept' ? 'accepted' : 'declined', invitationId],
     );
     await client.query('COMMIT');
     return res.status(204).end();
@@ -233,10 +237,10 @@ async function listCharacterTeams(req, res) {
   const characterId = parseId(req.params.characterId);
   if (!characterId) return res.status(400).json({ error: 'invalid_character_id' });
 
-  const ownedCharacter = await pool.query(
-    'SELECT 1 FROM characters WHERE id = $1 AND owner_id = $2',
-    [characterId, req.user.id]
-  );
+  const ownedCharacter = await pool.query('SELECT 1 FROM characters WHERE id = $1 AND owner_id = $2', [
+    characterId,
+    req.user.id,
+  ]);
   if (!ownedCharacter.rows[0]) return res.status(404).json({ error: 'character_not_found' });
 
   const result = await pool.query(
@@ -252,7 +256,7 @@ async function listCharacterTeams(req, res) {
      WHERE own_membership.character_id = $1
        AND own_membership.user_id = $2
      ORDER BY LOWER(c.name), c.id, cm.joined_at, member_character.id`,
-    [characterId, req.user.id]
+    [characterId, req.user.id],
   );
 
   const campaigns = new Map();
@@ -307,12 +311,12 @@ async function getDmPanel(req, res) {
         AND notes.character_id = ch.id
        WHERE cm.campaign_id = $1
        ORDER BY cm.joined_at, ch.id`,
-      [campaignId, req.user.id]
+      [campaignId, req.user.id],
     ),
-    pool.query(
-      'SELECT content FROM campaign_dm_notes WHERE campaign_id = $1 AND dm_user_id = $2',
-      [campaignId, req.user.id]
-    ),
+    pool.query('SELECT content FROM campaign_dm_notes WHERE campaign_id = $1 AND dm_user_id = $2', [
+      campaignId,
+      req.user.id,
+    ]),
   ]);
 
   return res.json({
@@ -351,7 +355,7 @@ async function getDmCharacter(req, res) {
       AND notes.dm_user_id = $3
       AND notes.character_id = ch.id
      WHERE cm.campaign_id = $1 AND ch.id = $2`,
-    [campaignId, characterId, req.user.id]
+    [campaignId, characterId, req.user.id],
   );
   const row = result.rows[0];
   if (!row) return res.status(404).json({ error: 'character_not_found' });
@@ -365,14 +369,14 @@ async function getDmCharacter(req, res) {
 async function updateDmNote(req, res) {
   const campaignId = parseId(req.params.id);
   if (!campaignId) return res.status(400).json({ error: 'invalid_campaign_id' });
-  if (!await requireCampaignDm(campaignId, req.user.id)) return res.status(403).json({ error: 'dm_access_required' });
+  if (!(await requireCampaignDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
   const content = dmNote(req.body?.content);
   await pool.query(
     `INSERT INTO campaign_dm_notes (campaign_id, dm_user_id, content)
      VALUES ($1, $2, $3)
      ON CONFLICT (campaign_id, dm_user_id)
      DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()`,
-    [campaignId, req.user.id, content]
+    [campaignId, req.user.id, content],
   );
   return res.status(204).end();
 }
@@ -381,11 +385,11 @@ async function updateDmCharacterNote(req, res) {
   const campaignId = parseId(req.params.campaignId);
   const characterId = parseId(req.params.characterId);
   if (!campaignId || !characterId) return res.status(400).json({ error: 'invalid_campaign_character' });
-  if (!await requireCampaignDm(campaignId, req.user.id)) return res.status(403).json({ error: 'dm_access_required' });
-  const membership = await pool.query(
-    'SELECT 1 FROM campaign_members WHERE campaign_id = $1 AND character_id = $2',
-    [campaignId, characterId]
-  );
+  if (!(await requireCampaignDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
+  const membership = await pool.query('SELECT 1 FROM campaign_members WHERE campaign_id = $1 AND character_id = $2', [
+    campaignId,
+    characterId,
+  ]);
   if (!membership.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   const content = dmNote(req.body?.content);
   await pool.query(
@@ -393,7 +397,7 @@ async function updateDmCharacterNote(req, res) {
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (campaign_id, dm_user_id, character_id)
      DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()`,
-    [campaignId, req.user.id, characterId, content]
+    [campaignId, req.user.id, characterId, content],
   );
   return res.status(204).end();
 }
@@ -402,10 +406,16 @@ async function addDmCharacterInventoryItem(req, res) {
   const campaignId = parseId(req.params.campaignId);
   const characterId = parseId(req.params.characterId);
   if (!campaignId || !characterId) return res.status(400).json({ error: 'invalid_campaign_character' });
-  if (!await requireCampaignDm(campaignId, req.user.id)) return res.status(403).json({ error: 'dm_access_required' });
-  const name = String(req.body?.name || '').trim().replace(/\r?\n/g, ' ').slice(0, 150);
+  if (!(await requireCampaignDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
+  const name = String(req.body?.name || '')
+    .trim()
+    .replace(/\r?\n/g, ' ')
+    .slice(0, 150);
   const quantity = Math.max(1, Math.min(9999, Math.trunc(Number(req.body?.quantity) || 1)));
-  const duration = String(req.body?.duration || '').trim().replace(/\r?\n/g, ' ').slice(0, 100);
+  const duration = String(req.body?.duration || '')
+    .trim()
+    .replace(/\r?\n/g, ' ')
+    .slice(0, 100);
   const icon = /^[a-z_]{1,30}$/.test(req.body?.icon) ? req.body.icon : '';
   if (!name) return res.status(400).json({ error: 'invalid_inventory_item' });
 
@@ -414,7 +424,7 @@ async function addDmCharacterInventoryItem(req, res) {
      FROM campaign_members cm
      JOIN characters ch ON ch.id = cm.character_id
      WHERE cm.campaign_id = $1 AND ch.id = $2`,
-    [campaignId, characterId]
+    [campaignId, characterId],
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   const line = `${name} × ${quantity}${duration ? ` ⏱ ${duration}` : ''}${icon ? ` [icon=${icon}]` : ''}`;
@@ -425,7 +435,7 @@ async function addDmCharacterInventoryItem(req, res) {
      SET data = jsonb_set(COALESCE(data, '{}'::jsonb), '{inventory}', to_jsonb($1::text), true),
          updated_at = NOW()
      WHERE id = $2`,
-    [inventory, characterId]
+    [inventory, characterId],
   );
   return res.status(201).json({ inventory });
 }
@@ -439,7 +449,7 @@ async function getCampaignCharacter(req, res) {
     `SELECT 1
      FROM campaign_members
      WHERE campaign_id = $1 AND user_id = $2 AND character_id IS NOT NULL`,
-    [campaignId, req.user.id]
+    [campaignId, req.user.id],
   );
   if (!access.rows[0]) return res.status(404).json({ error: 'campaign_not_found' });
 
@@ -449,7 +459,7 @@ async function getCampaignCharacter(req, res) {
      JOIN characters ch ON ch.id = cm.character_id
      JOIN users u ON u.id = cm.user_id
      WHERE cm.campaign_id = $1 AND ch.id = $2`,
-    [campaignId, characterId]
+    [campaignId, characterId],
   );
   const row = result.rows[0];
   if (!row) return res.status(404).json({ error: 'character_not_found' });
@@ -490,7 +500,7 @@ async function leaveCampaign(req, res) {
        AND ch.id = cm.character_id
        AND ch.owner_id = $3
      RETURNING cm.campaign_id`,
-    [campaignId, characterId, req.user.id]
+    [campaignId, characterId, req.user.id],
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'campaign_membership_not_found' });
   return res.status(204).end();

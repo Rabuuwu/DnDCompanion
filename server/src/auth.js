@@ -23,9 +23,7 @@ function profileImage(value) {
   const image = String(value || '').trim();
   if (!image) return '';
   if (image.length > 700_000) return null;
-  return /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(image)
-    ? image
-    : null;
+  return /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(image) ? image : null;
 }
 
 function validateCredentials(username, password) {
@@ -48,16 +46,12 @@ function hashRefreshToken(token) {
 }
 
 function createAccessToken(user) {
-  return jwt.sign(
-    { sub: String(user.id), username: user.username },
-    JWT_SECRET,
-    {
-      algorithm: 'HS256',
-      expiresIn: JWT_ACCESS_TTL,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    }
-  );
+  return jwt.sign({ sub: String(user.id), username: user.username }, JWT_SECRET, {
+    algorithm: 'HS256',
+    expiresIn: JWT_ACCESS_TTL,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+  });
 }
 
 async function createRefreshToken(userId, client = pool) {
@@ -68,7 +62,7 @@ async function createRefreshToken(userId, client = pool) {
   await client.query(
     `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
      VALUES ($1, $2, $3)`,
-    [userId, tokenHash, expiresAt]
+    [userId, tokenHash, expiresAt],
   );
 
   return token;
@@ -98,7 +92,7 @@ async function register(req, res) {
       `INSERT INTO users (username, password_hash)
        VALUES ($1, $2)
        RETURNING id, username, avatar`,
-      [credentials.username, passwordHash]
+      [credentials.username, passwordHash],
     );
     const session = await createSession(result.rows[0], client);
     await client.query('COMMIT');
@@ -124,13 +118,10 @@ async function login(req, res) {
     `SELECT id, username, avatar, password_hash
      FROM users
      WHERE LOWER(username) = LOWER($1)`,
-    [credentials.username]
+    [credentials.username],
   );
   const user = result.rows[0];
-  const validPassword = await bcrypt.compare(
-    credentials.password,
-    user?.password_hash || DUMMY_PASSWORD_HASH
-  );
+  const validPassword = await bcrypt.compare(credentials.password, user?.password_hash || DUMMY_PASSWORD_HASH);
 
   if (!user || !validPassword) {
     return res.status(401).json({ error: 'invalid_credentials' });
@@ -156,26 +147,19 @@ async function refresh(req, res) {
        JOIN users u ON u.id = rt.user_id
        WHERE rt.token_hash = $1
        FOR UPDATE`,
-      [tokenHash]
+      [tokenHash],
     );
     const storedToken = result.rows[0];
 
-    if (
-      !storedToken ||
-      storedToken.revoked_at ||
-      new Date(storedToken.expires_at) <= new Date()
-    ) {
+    if (!storedToken || storedToken.revoked_at || new Date(storedToken.expires_at) <= new Date()) {
       await client.query('ROLLBACK');
       return res.status(401).json({ error: 'invalid_refresh_token' });
     }
 
-    await client.query(
-      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1',
-      [storedToken.id]
-    );
+    await client.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1', [storedToken.id]);
     const session = await createSession(
       { id: storedToken.user_id, username: storedToken.username, avatar: storedToken.avatar },
-      client
+      client,
     );
     await client.query('COMMIT');
     return res.json(session);
@@ -194,7 +178,7 @@ async function logout(req, res) {
       `UPDATE refresh_tokens
        SET revoked_at = COALESCE(revoked_at, NOW())
        WHERE token_hash = $1`,
-      [hashRefreshToken(refreshToken)]
+      [hashRefreshToken(refreshToken)],
     );
   }
   return res.status(204).end();
@@ -211,10 +195,7 @@ async function changePassword(req, res) {
     return res.status(400).json({ error: 'password_unchanged' });
   }
 
-  const result = await pool.query(
-    'SELECT password_hash FROM users WHERE id = $1',
-    [req.user.id]
-  );
+  const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
   const user = result.rows[0];
   if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) {
     return res.status(401).json({ error: 'invalid_current_password' });
@@ -229,13 +210,13 @@ async function changePassword(req, res) {
       `UPDATE users
        SET password_hash = $1, updated_at = NOW()
        WHERE id = $2`,
-      [passwordHash, req.user.id]
+      [passwordHash, req.user.id],
     );
     await client.query(
       `UPDATE refresh_tokens
        SET revoked_at = COALESCE(revoked_at, NOW())
        WHERE user_id = $1`,
-      [req.user.id]
+      [req.user.id],
     );
     await client.query('COMMIT');
     return res.status(204).end();
@@ -249,10 +230,7 @@ async function changePassword(req, res) {
 
 async function deleteAccount(req, res) {
   const password = String(req.body?.password || '');
-  const result = await pool.query(
-    'SELECT password_hash FROM users WHERE id = $1',
-    [req.user.id]
-  );
+  const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
   const user = result.rows[0];
 
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
@@ -273,7 +251,7 @@ async function updateAvatar(req, res) {
      SET avatar = $1, updated_at = NOW()
      WHERE id = $2
      RETURNING id, username, avatar`,
-    [avatar, req.user.id]
+    [avatar, req.user.id],
   );
   return res.json(publicUser(result.rows[0]));
 }

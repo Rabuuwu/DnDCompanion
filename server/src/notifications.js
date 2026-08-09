@@ -29,7 +29,9 @@ async function connectNotificationListener() {
     client.on('error', (error) => {
       console.error('[NOTIFICATIONS] listener disconnected:', error.message);
       if (listenerClient === client) listenerClient = null;
-      try { client.release(true); } catch {}
+      try {
+        client.release(true);
+      } catch {}
       scheduleNotificationReconnect();
     });
     await client.query(`LISTEN ${NOTIFICATION_CHANNEL}`);
@@ -60,17 +62,18 @@ async function stopNotificationListener() {
   if (!client) return;
   client.removeAllListeners('notification');
   client.removeAllListeners('error');
-  try { await client.query(`UNLISTEN ${NOTIFICATION_CHANNEL}`); } catch {}
+  try {
+    await client.query(`UNLISTEN ${NOTIFICATION_CHANNEL}`);
+  } catch {}
   client.release();
 }
 
 function publishUserNotification(userId, event = {}) {
   const payload = JSON.stringify({ userId: Number(userId), event });
-  void pool.query('SELECT pg_notify($1, $2)', [NOTIFICATION_CHANNEL, payload])
-    .catch((error) => {
-      console.error('[NOTIFICATIONS] publish failed:', error.message);
-      deliverUserNotification(userId, event);
-    });
+  void pool.query('SELECT pg_notify($1, $2)', [NOTIFICATION_CHANNEL, payload]).catch((error) => {
+    console.error('[NOTIFICATIONS] publish failed:', error.message);
+    deliverUserNotification(userId, event);
+  });
 }
 
 void connectNotificationListener();
@@ -114,7 +117,7 @@ async function listNotifications(req, res) {
          AND dm.read_at IS NULL
        ORDER BY dm.created_at ASC, dm.id ASC
        LIMIT 50`,
-      [req.user.id]
+      [req.user.id],
     ),
     pool.query(
       `SELECT ci.id, ci.created_at,
@@ -128,7 +131,7 @@ async function listNotifications(req, res) {
          AND ci.status = 'pending'
        ORDER BY ci.created_at ASC, ci.id ASC
        LIMIT 50`,
-      [req.user.id]
+      [req.user.id],
     ),
   ]);
 

@@ -44,6 +44,8 @@ jobs:
       - run: npm run check
       - run: npm run release:check
       - run: npm run security:secrets
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm audit
       - run: npm run db:migrate
       - name: Start test API

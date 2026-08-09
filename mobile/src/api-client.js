@@ -36,19 +36,22 @@ let refreshPromise = null;
 export async function authenticatedFetch(path, options = {}) {
   let session = getStoredSession();
   if (!session?.token) throw new Error('session_expired');
-  const send = (token) => fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
-    },
-    cache: 'no-store',
-    signal: requestTimeout(),
-  });
+  const send = (token) =>
+    fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+      signal: requestTimeout(),
+    });
   let response = await send(session.token);
   if (response.status !== 401) return response;
-  refreshPromise ||= refreshSession().finally(() => { refreshPromise = null; });
+  refreshPromise ||= refreshSession().finally(() => {
+    refreshPromise = null;
+  });
   session = await refreshPromise;
   if (!session?.token) throw new Error('session_expired');
   return send(session.token);
@@ -61,7 +64,7 @@ export async function fetchAllPages(path, { pageSize = 100 } = {}) {
     const separator = path.includes('?') ? '&' : '?';
     const response = await authenticatedFetch(`${path}${separator}limit=${pageSize}&offset=${offset}`);
     if (!response.ok) return { response, items };
-    items.push(...await response.json());
+    items.push(...(await response.json()));
     if (response.headers.get('X-Has-More') !== 'true') return { response, items };
     const nextOffset = Number(response.headers.get('X-Next-Offset'));
     if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset) return { response, items };

@@ -22,23 +22,20 @@ async function blockUser(req, res) {
       `INSERT INTO user_blocks (blocker_id, blocked_id)
        VALUES ($1, $2)
        ON CONFLICT DO NOTHING`,
-      [req.user.id, blockedId]
+      [req.user.id, blockedId],
     );
-    await client.query(
-      'DELETE FROM friendships WHERE user_low_id = $1 AND user_high_id = $2',
-      [lowId, highId]
-    );
+    await client.query('DELETE FROM friendships WHERE user_low_id = $1 AND user_high_id = $2', [lowId, highId]);
     await client.query(
       `DELETE FROM friendship_aliases
        WHERE (user_id = $1 AND friend_id = $2)
           OR (user_id = $2 AND friend_id = $1)`,
-      [req.user.id, blockedId]
+      [req.user.id, blockedId],
     );
     await client.query(
       `UPDATE friend_invites
        SET used_at = NOW()
        WHERE used_at IS NULL AND owner_id IN ($1, $2)`,
-      [req.user.id, blockedId]
+      [req.user.id, blockedId],
     );
     await client.query(
       `UPDATE campaign_invitations
@@ -46,7 +43,7 @@ async function blockUser(req, res) {
        WHERE status = 'pending'
          AND ((inviter_id = $1 AND invitee_id = $2)
            OR (inviter_id = $2 AND invitee_id = $1))`,
-      [req.user.id, blockedId]
+      [req.user.id, blockedId],
     );
     await client.query('COMMIT');
     return res.status(204).end();
@@ -77,7 +74,7 @@ async function reportUser(req, res) {
     `INSERT INTO user_reports (reporter_id, reported_id, reason, details)
      VALUES ($1, $2, $3, $4)
      RETURNING id, created_at`,
-    [req.user.id, reportedId, reason, details]
+    [req.user.id, reportedId, reason, details],
   );
   return res.status(201).json({
     reportId: Number(result.rows[0].id),

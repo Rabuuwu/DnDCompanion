@@ -3,8 +3,7 @@ require('dotenv').config({ path: require('node:path').resolve(__dirname, '../../
 const assert = require('node:assert/strict');
 const { pool } = require('../src/db');
 
-const apiBase = process.env.API_BASE
-  || `http://127.0.0.1:${process.env.PORT || 3000}`;
+const apiBase = process.env.API_BASE || `http://127.0.0.1:${process.env.PORT || 3000}`;
 const suffix = Date.now();
 const firstUsername = `friend_a_${suffix}`;
 const secondUsername = `friend_b_${suffix}`;
@@ -190,18 +189,24 @@ async function run() {
     });
     assert.equal(dmNoteResponse.status, 204);
 
-    const characterNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}/note`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${first.token}` },
-      body: JSON.stringify({ content: 'Postać zna ukryte przejście' }),
-    });
+    const characterNoteResponse = await request(
+      `/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}/note`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${first.token}` },
+        body: JSON.stringify({ content: 'Postać zna ukryte przejście' }),
+      },
+    );
     assert.equal(characterNoteResponse.status, 204);
 
-    const dmInventoryResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}/inventory`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${first.token}` },
-      body: JSON.stringify({ name: 'Mikstura testowa', quantity: 2, duration: '3 tury', icon: 'potion' }),
-    });
+    const dmInventoryResponse = await request(
+      `/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}/inventory`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${first.token}` },
+        body: JSON.stringify({ name: 'Mikstura testowa', quantity: 2, duration: '3 tury', icon: 'potion' }),
+      },
+    );
     assert.equal(dmInventoryResponse.status, 201);
     assert.match((await dmInventoryResponse.json()).inventory, /Mikstura testowa × 2/);
 
@@ -214,7 +219,7 @@ async function run() {
     assert.equal(dmPanel.members.length, 2);
     assert.equal(
       dmPanel.members.find((member) => member.id === secondCharacter.id).dmNote,
-      'Postać zna ukryte przejście'
+      'Postać zna ukryte przejście',
     );
 
     const dmCharacterResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}`, {
@@ -276,10 +281,7 @@ async function run() {
 
     console.log('Friends smoke test passed');
   } finally {
-    await pool.query(
-      'DELETE FROM users WHERE username = ANY($1::text[])',
-      [[firstUsername, secondUsername]]
-    );
+    await pool.query('DELETE FROM users WHERE username = ANY($1::text[])', [[firstUsername, secondUsername]]);
     await pool.end();
   }
 }

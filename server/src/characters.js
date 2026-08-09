@@ -35,15 +35,15 @@ const SKILL_BASES = {
 const CUSTOM_SKILL_GROUPS = new Set(ATTRIBUTE_KEYS);
 
 function text(value, maxLength = 200) {
-  return String(value || '').trim().slice(0, maxLength);
+  return String(value || '')
+    .trim()
+    .slice(0, maxLength);
 }
 
 function profileImage(value) {
   const image = String(value || '').trim();
   if (!image || image.length > 700_000) return '';
-  return /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(image)
-    ? image
-    : '';
+  return /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(image) ? image : '';
 }
 
 function integer(value, fallback = 0, min = -999, max = 999) {
@@ -65,7 +65,7 @@ function scaledAuxiliaryAttribute(adventureValue, divisor) {
 function calculatedSkillValue(baseValue, percent) {
   if (percent === 0) return 0;
   if (baseValue <= 0) return baseValue;
-  return Math.max(1, Math.trunc(baseValue * percent / 100));
+  return Math.max(1, Math.trunc((baseValue * percent) / 100));
 }
 
 function calculatedAuxiliary(attributes) {
@@ -91,16 +91,22 @@ function calculatedAuxiliary(attributes) {
 
 function characterAuxiliary(value, attributes) {
   const calculated = calculatedAuxiliary(attributes);
-  return Object.fromEntries(Object.entries(calculated).map(([key, fallback]) => {
-    const submittedValue = value?.[key]?.value;
-    const hasSubmittedFormula = Object.prototype.hasOwnProperty.call(value?.[key] || {}, 'formula');
-    return [key, {
-      value: submittedValue === undefined || submittedValue === null || submittedValue === ''
-        ? fallback.value
-        : String(integer(submittedValue, Number(fallback.value), -999, 999)),
-      formula: hasSubmittedFormula ? text(value[key].formula, 250) : fallback.formula,
-    }];
-  }));
+  return Object.fromEntries(
+    Object.entries(calculated).map(([key, fallback]) => {
+      const submittedValue = value?.[key]?.value;
+      const hasSubmittedFormula = Object.prototype.hasOwnProperty.call(value?.[key] || {}, 'formula');
+      return [
+        key,
+        {
+          value:
+            submittedValue === undefined || submittedValue === null || submittedValue === ''
+              ? fallback.value
+              : String(integer(submittedValue, Number(fallback.value), -999, 999)),
+          formula: hasSubmittedFormula ? text(value[key].formula, 250) : fallback.formula,
+        },
+      ];
+    }),
+  );
 }
 
 function rangedFormulaTerms(value) {
@@ -125,21 +131,24 @@ function rangedFormulaTerms(value) {
 
 function featureList(value, { withToothCost = false, withDuration = false, withRanged = false } = {}) {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 100).map((item) => {
-    const feature = {
-      name: text(item?.name, 100),
-      description: text(item?.description, 1000),
-      cooldown: text(item?.cooldown, 100),
-    };
-    if (withDuration) feature.duration = text(item?.duration, 100);
-    if (withToothCost) feature.toothCost = integer(item?.toothCost, 0, 0, 999);
-    if (withRanged) {
-      feature.ranged = Boolean(item?.ranged);
-      feature.range = feature.ranged ? text(item?.range, 100) : '';
-      feature.formulaTerms = feature.ranged ? rangedFormulaTerms(item?.formulaTerms) : [];
-    }
-    return feature;
-  }).filter((item) => item.name);
+  return value
+    .slice(0, 100)
+    .map((item) => {
+      const feature = {
+        name: text(item?.name, 100),
+        description: text(item?.description, 1000),
+        cooldown: text(item?.cooldown, 100),
+      };
+      if (withDuration) feature.duration = text(item?.duration, 100);
+      if (withToothCost) feature.toothCost = integer(item?.toothCost, 0, 0, 999);
+      if (withRanged) {
+        feature.ranged = Boolean(item?.ranged);
+        feature.range = feature.ranged ? text(item?.range, 100) : '';
+        feature.formulaTerms = feature.ranged ? rangedFormulaTerms(item?.formulaTerms) : [];
+      }
+      return feature;
+    })
+    .filter((item) => item.name);
 }
 
 function guildList(value) {
@@ -158,20 +167,23 @@ function notebookData(value) {
   const source = value && typeof value === 'object' ? value : {};
   let pointCount = 0;
   const strokes = Array.isArray(source.strokes)
-    ? source.strokes.slice(0, 1000).map((stroke) => {
-        const points = Array.isArray(stroke?.points)
-          ? stroke.points.slice(0, Math.max(0, 20_000 - pointCount)).map((point) => ({
-              x: Math.max(-1_000_000, Math.min(1_000_000, Number(point?.x) || 0)),
-              y: Math.max(-1_000_000, Math.min(1_000_000, Number(point?.y) || 0)),
-            }))
-          : [];
-        pointCount += points.length;
-        return {
-          color: /^#[0-9a-f]{6}$/i.test(stroke?.color) ? stroke.color : '#1f2937',
-          width: Math.max(1, Math.min(30, Number(stroke?.width) || 3)),
-          points,
-        };
-      }).filter((stroke) => stroke.points.length)
+    ? source.strokes
+        .slice(0, 1000)
+        .map((stroke) => {
+          const points = Array.isArray(stroke?.points)
+            ? stroke.points.slice(0, Math.max(0, 20_000 - pointCount)).map((point) => ({
+                x: Math.max(-1_000_000, Math.min(1_000_000, Number(point?.x) || 0)),
+                y: Math.max(-1_000_000, Math.min(1_000_000, Number(point?.y) || 0)),
+              }))
+            : [];
+          pointCount += points.length;
+          return {
+            color: /^#[0-9a-f]{6}$/i.test(stroke?.color) ? stroke.color : '#1f2937',
+            width: Math.max(1, Math.min(30, Number(stroke?.width) || 3)),
+            points,
+          };
+        })
+        .filter((stroke) => stroke.points.length)
     : [];
 
   return {
@@ -306,24 +318,34 @@ function serializeCharacter(row) {
     : profile.guildRank
       ? [{ name: 'Dotychczasowa gildia', rank: text(profile.guildRank, 50), profession: '' }]
       : [];
-  const attributes = Object.fromEntries(ATTRIBUTE_KEYS.map((key) => {
-    const storedAttribute = data.attributes?.[key] || {};
-    const adventure = integer(storedAttribute.adventure, 0, -100, 1000);
-    return [key, {
-      ...storedAttribute,
-      adventure,
-      combat: combatAttribute(key, adventure),
-    }];
-  }));
-  const skills = Object.fromEntries(Object.entries(SKILL_BASES).map(([key, baseKey]) => {
-    const storedSkill = data.skills?.[key] || {};
-    const percent = integer(storedSkill.percent, 0, 0, 1000);
-    return [key, {
-      ...storedSkill,
-      percent,
-      result: calculatedSkillValue(attributes[baseKey].adventure, percent),
-    }];
-  }));
+  const attributes = Object.fromEntries(
+    ATTRIBUTE_KEYS.map((key) => {
+      const storedAttribute = data.attributes?.[key] || {};
+      const adventure = integer(storedAttribute.adventure, 0, -100, 1000);
+      return [
+        key,
+        {
+          ...storedAttribute,
+          adventure,
+          combat: combatAttribute(key, adventure),
+        },
+      ];
+    }),
+  );
+  const skills = Object.fromEntries(
+    Object.entries(SKILL_BASES).map(([key, baseKey]) => {
+      const storedSkill = data.skills?.[key] || {};
+      const percent = integer(storedSkill.percent, 0, 0, 1000);
+      return [
+        key,
+        {
+          ...storedSkill,
+          percent,
+          result: calculatedSkillValue(attributes[baseKey].adventure, percent),
+        },
+      ];
+    }),
+  );
   const customSkills = customSkillList(data.customSkills, attributes);
 
   return {
@@ -371,7 +393,7 @@ async function listCharacters(req, res) {
      FROM characters
      WHERE owner_id = $1
      ORDER BY updated_at DESC, id DESC`,
-    [req.user.id]
+    [req.user.id],
   );
   return res.json(result.rows.map(serializeCharacter));
 }
@@ -383,7 +405,7 @@ async function getCharacter(req, res) {
     `SELECT id, name, data, created_at, updated_at
      FROM characters
      WHERE id = $1 AND owner_id = $2`,
-    [id, req.user.id]
+    [id, req.user.id],
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   return res.json(serializeCharacter(result.rows[0]));
@@ -396,7 +418,7 @@ async function createCharacter(req, res) {
     `INSERT INTO characters (owner_id, name, data)
      VALUES ($1, $2, $3::jsonb)
      RETURNING id, name, data, created_at, updated_at`,
-    [req.user.id, character.name, JSON.stringify(character.data)]
+    [req.user.id, character.name, JSON.stringify(character.data)],
   );
   return res.status(201).json(serializeCharacter(result.rows[0]));
 }
@@ -411,7 +433,7 @@ async function updateCharacter(req, res) {
      SET name = $1, data = $2::jsonb, updated_at = NOW()
      WHERE id = $3 AND owner_id = $4
      RETURNING id, name, data, created_at, updated_at`,
-    [character.name, JSON.stringify(character.data), id, req.user.id]
+    [character.name, JSON.stringify(character.data), id, req.user.id],
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   return res.json(serializeCharacter(result.rows[0]));
@@ -420,10 +442,10 @@ async function updateCharacter(req, res) {
 async function deleteCharacter(req, res) {
   const id = parseCharacterId(req.params.id);
   if (!id) return res.status(400).json({ error: 'invalid_character_id' });
-  const result = await pool.query(
-    `DELETE FROM characters WHERE id = $1 AND owner_id = $2 RETURNING id`,
-    [id, req.user.id]
-  );
+  const result = await pool.query(`DELETE FROM characters WHERE id = $1 AND owner_id = $2 RETURNING id`, [
+    id,
+    req.user.id,
+  ]);
   if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   return res.status(204).end();
 }
@@ -438,7 +460,7 @@ async function updateCharacterInventory(req, res) {
          updated_at = NOW()
      WHERE id = $2 AND owner_id = $3
      RETURNING id, name, data, created_at, updated_at`,
-    [inventory, id, req.user.id]
+    [inventory, id, req.user.id],
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   return res.json(serializeCharacter(result.rows[0]));
@@ -454,7 +476,7 @@ async function updateCharacterNotebook(req, res) {
          updated_at = NOW()
      WHERE id = $2 AND owner_id = $3
      RETURNING id, name, data, created_at, updated_at`,
-    [JSON.stringify(notebook), id, req.user.id]
+    [JSON.stringify(notebook), id, req.user.id],
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   return res.json({ notebook: serializeCharacter(result.rows[0]).notebook });
