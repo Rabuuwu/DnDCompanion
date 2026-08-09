@@ -22,12 +22,12 @@ function run(command, args, cwd = mobileDir) {
   if (result.status !== 0) throw new Error(`${command} failed with exit code ${result.status}`);
 }
 
-const indexHtml = await readFile(path.join(mobileDir, 'index.html'), 'utf8');
-const version = indexHtml.match(/window\.__APP_VERSION__\s*=\s*['"]([^'"]+)['"]/)?.[1];
-if (!version) throw new Error('Unable to read application version from mobile/index.html');
+const release = JSON.parse(await readFile(path.resolve(mobileDir, '../release.json'), 'utf8'));
+const version = String(release.version || '');
+if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid version in release.json');
 
 run('npm', ['run', 'build']);
-run('npx', ['cap', 'sync', 'android']);
+run(process.execPath, [path.join(mobileDir, 'node_modules', '@capacitor', 'cli', 'bin', 'capacitor'), 'sync', 'android']);
 run('./gradlew', ['assembleRelease'], path.join(mobileDir, 'android'));
 
 const source = path.join(mobileDir, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');

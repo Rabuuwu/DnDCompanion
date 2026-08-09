@@ -1,14 +1,18 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
 
+def releaseMetadata = new JsonSlurper().parse(file('../../../release.json'))
+
 android {
-    namespace = "pl.rabuuwu.dndcompanion"
+    namespace = releaseMetadata.androidPackageId
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "pl.rabuuwu.dndcompanion"
+        applicationId releaseMetadata.androidPackageId
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 35
-        versionName "1.5.2"
+        versionCode releaseMetadata.androidVersionCode as Integer
+        versionName releaseMetadata.version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

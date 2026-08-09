@@ -31,15 +31,14 @@ Dodatkowo ręcznie sprawdź: logowanie i odświeżenie sesji, CRUD postaci, zapi
 
 ## Wersjonowanie aplikacji
 
-Wersję należy aktualizować spójnie w:
+Jedynym źródłem aktywnej wersji jest główny plik `release.json`:
 
-- `mobile/index.html` (metadane klienta);
-- `mobile/android/app/build.gradle` (`versionName`, rosnący `versionCode`);
-- `.env`/`.env.example` (`ANDROID_APP_VERSION`, adres APK);
-- `server/data/changelog.json`;
-- cache name w `mobile/public/sw.js`, jeśli zmieniają się zasoby PWA.
+- `version` — wersja semantyczna aplikacji i nazwa artefaktu;
+- `androidVersionCode` — rosnąca liczba wymagana przez Androida;
+- `androidPackageId` — finalny identyfikator pakietu;
+- `repository` — repozytorium używane do wygenerowania adresu GitHub Release.
 
-Aktualna wersja: `1.5.2`, Android `versionCode 35`, service worker `v23`.
+Android Gradle, Vite, API, skrypt APK i GitHub Actions odczytują ten plik automatycznie. Przy wydaniu trzeba zmienić `version`, zwiększyć `androidVersionCode` oraz dodać odpowiadający wpis na początku `server/data/changelog.json`. `npm run release:check` sprawdza ich zgodność. Cache name w `mobile/public/sw.js` zmieniaj, jeśli zmieniają się zasoby PWA.
 
 ## Build
 

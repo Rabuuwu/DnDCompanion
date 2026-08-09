@@ -14,6 +14,7 @@ const { auditMiddleware, writeAuditLog } = require('./audit');
 const changelog = require('../data/changelog.json');
 const privacyPolicy = require('../data/privacy.json');
 const helpContent = require('../data/help.json');
+const release = require('../../release.json');
 const { changePassword, deleteAccount, login, logout, refresh, register, requireAuth, updateAvatar } = require('./auth');
 const {
 	createCharacter,
@@ -111,12 +112,13 @@ app.get('/ready', async (req, res) => {
 });
 
 app.get('/api/app/version', (req, res) => {
-	const androidVersion = process.env.ANDROID_APP_VERSION || '1.3.0';
+	const androidVersion = release.version;
+	const androidUrl = `https://github.com/${release.repository}/releases/download/v${release.version}/DnDCompanion-${release.version}.apk`;
 	res.json({
 		version: androidVersion,
 		android: {
 			version: androidVersion,
-			url: process.env.ANDROID_APK_URL || null,
+			url: androidUrl,
 		},
 		ios: {
 			version: process.env.IOS_APP_VERSION || null,

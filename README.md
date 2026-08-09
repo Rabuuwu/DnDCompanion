@@ -82,8 +82,8 @@ Najważniejsze zmienne z `.env`:
 | `JWT_ACCESS_TTL` | czas życia tokenu dostępowego |
 | `REFRESH_TOKEN_DAYS` | czas życia tokenu odświeżającego |
 | `CORS_ORIGINS` | dozwolone originy rozdzielone przecinkami |
-| `ANDROID_APP_VERSION` | wersja zwracana aplikacji |
-| `ANDROID_APK_URL` | adres aktualizacji APK |
+
+Wersja Androida, `versionCode`, identyfikator pakietu i repozytorium wydania znajdują się wyłącznie w `release.json`. API i proces budowania generują z niego numer oraz adres APK automatycznie.
 
 Nie commituj `.env`, certyfikatów, kluczy ani paczek instalacyjnych. Są wykluczone w `.gitignore`.
 

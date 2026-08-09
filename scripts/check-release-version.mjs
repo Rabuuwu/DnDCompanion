@@ -1,28 +1,27 @@
 import { readFile } from 'node:fs/promises';
 
-const files = {
-  html: await readFile(new URL('../mobile/index.html', import.meta.url), 'utf8'),
-  gradle: await readFile(new URL('../mobile/android/app/build.gradle', import.meta.url), 'utf8'),
-  exampleEnv: await readFile(new URL('../.env.example', import.meta.url), 'utf8'),
-  changelog: JSON.parse(await readFile(new URL('../server/data/changelog.json', import.meta.url), 'utf8')),
-};
+const root = new URL('../', import.meta.url);
+const release = JSON.parse(await readFile(new URL('release.json', root), 'utf8'));
+const changelog = JSON.parse(await readFile(new URL('server/data/changelog.json', root), 'utf8'));
+const expected = String(process.env.RELEASE_VERSION || release.version).replace(/^v/, '');
 
-const versions = {
-  html: files.html.match(/window\.__APP_VERSION__\s*=\s*['"]([^'"]+)['"]/)?.[1],
-  android: files.gradle.match(/versionName\s+["']([^"']+)["']/)?.[1],
-  environment: files.exampleEnv.match(/^ANDROID_APP_VERSION=(.+)$/m)?.[1],
-  changelog: files.changelog[0]?.version,
-};
-const expected = process.env.RELEASE_VERSION || versions.html;
-const mismatches = Object.entries(versions).filter(([, version]) => version !== expected);
-if (mismatches.length) {
-  console.error(`Release version mismatch; expected ${expected}:`, versions);
+const errors = [];
+if (!/^\d+\.\d+\.\d+$/.test(release.version)) errors.push('version must use x.y.z format');
+if (!Number.isSafeInteger(release.androidVersionCode) || release.androidVersionCode < 1) {
+  errors.push('androidVersionCode must be a positive integer');
+}
+if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(release.androidPackageId)) {
+  errors.push('androidPackageId is invalid');
+}
+if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(release.repository)) errors.push('repository is invalid');
+if (release.version !== expected) errors.push(`release.json version ${release.version} does not match ${expected}`);
+if (changelog[0]?.version !== release.version) errors.push('latest changelog version does not match release.json');
+
+if (errors.length) {
+  console.error(`Release metadata validation failed:\n- ${errors.join('\n- ')}`);
   process.exit(1);
 }
 
-const expectedUrl = `/releases/download/v${expected}/DnDCompanion-${expected}.apk`;
-if (!files.exampleEnv.includes(expectedUrl)) {
-  console.error(`ANDROID_APK_URL must contain ${expectedUrl}`);
-  process.exit(1);
-}
-console.log(`Release metadata is consistent for ${expected}.`);
+const apkUrl = `https://github.com/${release.repository}/releases/download/v${release.version}/DnDCompanion-${release.version}.apk`;
+console.log(`Release ${release.version} (Android code ${release.androidVersionCode}) is consistent.`);
+console.log(`APK URL: ${apkUrl}`);

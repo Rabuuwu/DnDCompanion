@@ -8,7 +8,7 @@ const app = document.querySelector('#app');
 const DEFAULT_API_BASE = 'https://dndcompanion-api.onrender.com';
 const API_BASE = String(window.__API_BASE__ || DEFAULT_API_BASE).replace(/\/$/, '');
 const SESSION_KEY = 'dnd-mobile-session';
-const WEB_APP_VERSION = window.__APP_VERSION__ || 'dev';
+const WEB_APP_VERSION = typeof __DND_APP_VERSION__ === 'string' ? __DND_APP_VERSION__ : 'dev';
 const PWA_BASE = import.meta.env.BASE_URL;
 let currentAppVersion = WEB_APP_VERSION;
 let availableUpdate = null;

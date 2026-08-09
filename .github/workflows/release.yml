@@ -35,7 +35,7 @@ jobs:
 
       - name: Verify project
         env:
-          RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '1.5.2' }}
+          RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
         run: |
           npm run check
           npm run release:check

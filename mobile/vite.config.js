@@ -7,6 +7,7 @@ const https = process.env.PWA_HTTPS_KEY && process.env.PWA_HTTPS_CERT
       cert: readFileSync(process.env.PWA_HTTPS_CERT),
     }
   : undefined;
+const release = JSON.parse(readFileSync(new URL('../release.json', import.meta.url), 'utf8'));
 
 const proxy = {
   '/api': 'http://127.0.0.1:3000',
@@ -16,6 +17,9 @@ const proxy = {
 
 export default defineConfig({
   base: process.env.PWA_BASE || '/',
+  define: {
+    __DND_APP_VERSION__: JSON.stringify(release.version),
+  },
   build: {
     outDir: process.env.PWA_OUT_DIR || 'dist',
   },
