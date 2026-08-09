@@ -160,6 +160,53 @@ async function run() {
     assert.equal(teams[0].name, 'Testowa kampania');
     assert.equal(teams[0].members.length, 2);
 
+    const forbiddenDmPanel = await request(`/api/campaigns/${campaign.id}/dm`, {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal(forbiddenDmPanel.status, 403);
+
+    const dmNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/note`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ content: 'Sekretna notatka prowadzącego' }),
+    });
+    assert.equal(dmNoteResponse.status, 204);
+
+    const characterNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}/note`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ content: 'Postać zna ukryte przejście' }),
+    });
+    assert.equal(characterNoteResponse.status, 204);
+
+    const dmInventoryResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}/inventory`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ name: 'Mikstura testowa', quantity: 2, duration: '3 tury', icon: 'potion' }),
+    });
+    assert.equal(dmInventoryResponse.status, 201);
+    assert.match((await dmInventoryResponse.json()).inventory, /Mikstura testowa × 2/);
+
+    const dmPanelResponse = await request(`/api/campaigns/${campaign.id}/dm`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(dmPanelResponse.status, 200);
+    const dmPanel = await dmPanelResponse.json();
+    assert.equal(dmPanel.generalNote, 'Sekretna notatka prowadzącego');
+    assert.equal(dmPanel.members.length, 2);
+    assert.equal(
+      dmPanel.members.find((member) => member.id === secondCharacter.id).dmNote,
+      'Postać zna ukryte przejście'
+    );
+
+    const dmCharacterResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(dmCharacterResponse.status, 200);
+    const dmCharacter = await dmCharacterResponse.json();
+    assert.equal(dmCharacter.dmNote, 'Postać zna ukryte przejście');
+    assert.match(dmCharacter.inventory, /Mikstura testowa × 2/);
+
     const teammateResponse = await request(`/api/campaigns/${campaign.id}/characters/${firstCharacter.id}`, {
       headers: { Authorization: `Bearer ${second.token}` },
     });
