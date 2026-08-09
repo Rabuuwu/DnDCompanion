@@ -25,8 +25,7 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 
 ### P0 — przed publicznym udostępnieniem
 
-1. **Licencje ikon.** Kod ma zasadę „wszelkie prawa zastrzeżone”, ale zasoby graficzne bez dowodu pochodzenia nie mogą zostać automatycznie uznane za dopuszczone do publicznej dystrybucji.
-2. **Test wydania na urządzeniu.** Podpisany APK musi przejść czystą instalację i aktualizację poprzedniej wersji bez usuwania danych.
+1. **Test wydania na urządzeniu.** Podpisany APK musi przejść czystą instalację i aktualizację poprzedniej wersji bez usuwania danych.
 
 ### P1 — wysoki priorytet jakości i bezpieczeństwa
 
@@ -45,7 +44,7 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 - DM ma pełny dostęp do kart postaci członków kampanii — polityka aplikacji musi to jasno komunikować;
 - eksport danych użytkownika został świadomie wyłączony z zakresu produktu;
 - kod ma licencję „wszelkie prawa zastrzeżone”;
-- ikona hełmu pochodzi z Flaticon i wymaga weryfikacji dokładnego autora/warunków oraz właściwej atrybucji; również wszystkie ikony dostarczone do `img/` trzeba zinwentaryzować licencyjnie.
+- ikony ekwipunku są grafikami wygenerowanymi przez AI i dopuszczonymi przez właściciela projektu; zewnętrzną ikonę hełmu zastąpiono własnym SVG.
 
 ## Wynik kontroli zależności
 
