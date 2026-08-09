@@ -30,14 +30,14 @@ Przejrzano strukturę repozytorium, konfigurację npm, frontend/PWA/Capacitor, A
 
 ### P1 — wysoki priorytet jakości i bezpieczeństwa
 
-1. Rozszerzać testy UI Playwright wraz z kolejnymi krytycznymi przepływami; obecnie obejmują auth, utworzenie postaci i ekwipunek.
-2. Kontynuować podział widoków `main.js` i stylów na mniejsze moduły; konfiguracja, sesja, API, schemat postaci i style czatu są już wydzielone.
+1. Utrzymywać testy Playwright i testy API razem ze zmianami krytycznych przepływów. Obecny zestaw obejmuje auth, postacie, ekwipunek, notatnik, znajomych, czat, kampanie i Panel DM.
+2. Utrzymywać modułowe granice frontendu: konfiguracja, sesja, API, schemat postaci, ekwipunek, helpery UI i style czatu są wydzielone z głównego widoku.
 3. Utrzymywać alert UptimeRobot dla produkcyjnego `/ready` i kontrolować nieudane backupy GitHub Actions.
 
 ### P2 — utrzymanie i rozwój
 
-1. Opisać kontrakt OpenAPI i utrzymywać go razem z testami endpointów.
-2. Opcjonalnie dodać lokalny hook pre-commit; ESLint, Prettier i EditorConfig są już egzekwowane w CI.
+1. Utrzymywać publiczny kontrakt OpenAPI `/openapi.json` razem z testami endpointów.
+2. Lokalny hook pre-commit oraz CI egzekwują ESLint, Prettier, testy jednostkowe i skan sekretów.
 
 ## Ryzyka prywatności i prawne
 

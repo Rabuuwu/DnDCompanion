@@ -34,4 +34,8 @@ test('użytkownik tworzy postać i dodaje przedmiot do ekwipunku', async ({ page
   await page.locator('#inventory-item-form [name="quantity"]').fill('2');
   await page.locator('#inventory-item-form button[type="submit"]').click();
   await expect(page.getByText('Mikstura leczenia').first()).toBeVisible();
+
+  await page.locator('[data-character-tab="notebook"]').click();
+  await page.locator('#notebook-text').fill('Notatka zapisywana automatycznie');
+  await expect(page.locator('#notebook-text')).toHaveValue('Notatka zapisywana automatycznie');
 });

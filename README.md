@@ -100,9 +100,13 @@ Nie commituj `.env`, certyfikatów, kluczy ani paczek instalacyjnych. Są wykluc
 
 ```bash
 npm run check
+npm run lint
+npm run format:check
+npm run test:unit
 npm run test:auth --workspace server
 npm run test:friends --workspace server
 npm audit
+npm run hooks:install # jednorazowo włącza lokalny pre-commit
 ```
 
 Testy `test:*` są testami integracyjnymi i wymagają działającego API oraz bazy testowej. Nie należy uruchamiać ich przeciw bazie produkcyjnej.

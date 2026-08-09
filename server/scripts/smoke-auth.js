@@ -26,6 +26,11 @@ async function run() {
     assert.equal(openapi.openapi, '3.1.0');
     assert.ok(openapi.paths['/api/auth/login'].post);
     assert.ok(openapi.paths['/api/characters/{id}'].put);
+    assert.ok(openapi.components.schemas.Session);
+    assert.equal(
+      openapi.paths['/api/auth/login'].post.responses['200'].content['application/json'].schema.$ref,
+      '#/components/schemas/Session',
+    );
 
     const registration = await request('/api/auth/register', {
       method: 'POST',

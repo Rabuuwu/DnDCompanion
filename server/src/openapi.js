@@ -58,26 +58,148 @@ function parameters(path) {
   }));
 }
 
+const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
+const json = (schema) => ({ 'application/json': { schema } });
+
+const schemas = {
+  Error: {
+    type: 'object',
+    required: ['error'],
+    properties: { error: { type: 'string' }, details: { type: 'object', additionalProperties: true } },
+  },
+  Credentials: {
+    type: 'object',
+    required: ['username', 'password'],
+    properties: { username: { type: 'string', minLength: 1 }, password: { type: 'string', minLength: 1 } },
+  },
+  User: {
+    type: 'object',
+    required: ['id', 'username'],
+    properties: {
+      id: { type: 'integer' },
+      username: { type: 'string' },
+      avatar: { type: ['string', 'null'] },
+    },
+    additionalProperties: true,
+  },
+  Session: {
+    type: 'object',
+    required: ['token', 'refreshToken'],
+    properties: {
+      token: { type: 'string' },
+      refreshToken: { type: 'string' },
+      user: ref('User'),
+    },
+    additionalProperties: true,
+  },
+  Character: {
+    type: 'object',
+    required: ['id', 'name'],
+    properties: {
+      id: { type: 'integer' },
+      name: { type: 'string' },
+      inventory: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'object' } }] },
+      attributes: { type: 'object', additionalProperties: true },
+      auxiliary: { type: 'object', additionalProperties: true },
+      features: { type: 'object', additionalProperties: true },
+    },
+    additionalProperties: true,
+  },
+  CharacterInput: {
+    type: 'object',
+    required: ['name'],
+    properties: {
+      name: { type: 'string', minLength: 1 },
+      inventory: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'object' } }] },
+      attributes: { type: 'object', additionalProperties: true },
+      features: { type: 'object', additionalProperties: true },
+    },
+    additionalProperties: true,
+  },
+  Message: {
+    type: 'object',
+    required: ['id'],
+    properties: {
+      id: { type: 'integer' },
+      body: { type: 'string' },
+      createdAt: { type: 'string', format: 'date-time' },
+    },
+    additionalProperties: true,
+  },
+  Campaign: {
+    type: 'object',
+    required: ['id', 'name'],
+    properties: { id: { type: 'integer' }, name: { type: 'string' }, ownerId: { type: 'integer' } },
+    additionalProperties: true,
+  },
+};
+
+function requestSchema(method, path) {
+  if (path === '/api/auth/login' || path === '/api/auth/register') return ref('Credentials');
+  if (path === '/api/auth/refresh' || path === '/api/auth/logout') {
+    return {
+      type: 'object',
+      required: ['refreshToken'],
+      properties: { refreshToken: { type: 'string' } },
+    };
+  }
+  if (path === '/api/auth/account') {
+    return { type: 'object', required: ['password'], properties: { password: { type: 'string', minLength: 1 } } };
+  }
+  if (path === '/api/characters' || path === '/api/characters/{id}') return ref('CharacterInput');
+  if (path === '/api/characters/{id}/inventory') {
+    return {
+      type: 'object',
+      required: ['inventory'],
+      properties: { inventory: schemas.CharacterInput.properties.inventory },
+    };
+  }
+  if (path === '/api/characters/{id}/notebook') {
+    return { type: 'object', additionalProperties: true };
+  }
+  if (path === '/api/friends/{id}/messages') {
+    return { type: 'object', required: ['body'], properties: { body: { type: 'string', minLength: 1 } } };
+  }
+  if (path === '/api/campaigns') {
+    return { type: 'object', required: ['name'], properties: { name: { type: 'string', minLength: 1 } } };
+  }
+  return { type: 'object', additionalProperties: true };
+}
+
+function successSchema(method, path) {
+  if (['/api/auth/login', '/api/auth/register', '/api/auth/refresh'].includes(path)) return ref('Session');
+  if (path === '/api/characters')
+    return method === 'get' ? { type: 'array', items: ref('Character') } : ref('Character');
+  if (path === '/api/characters/{id}') return ref('Character');
+  if (path === '/api/friends/{id}/messages') {
+    return method === 'get' ? { type: 'array', items: ref('Message') } : ref('Message');
+  }
+  if (path === '/api/campaigns') return method === 'get' ? { type: 'array', items: ref('Campaign') } : ref('Campaign');
+  return { type: 'object', additionalProperties: true };
+}
+
 const paths = {};
 for (const [method, path, summary, secured = true] of operations) {
+  const hasRequestBody = !['get'].includes(method) && (method !== 'delete' || path === '/api/auth/account');
   paths[path] ||= {};
   paths[path][method] = {
     summary,
     tags: [path.split('/')[2] || 'system'],
     ...(secured ? { security: [{ bearerAuth: [] }] } : {}),
     parameters: parameters(path),
-    ...(method === 'get' || method === 'delete'
+    ...(!hasRequestBody
       ? {}
       : {
-          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+          requestBody: { required: true, content: json(requestSchema(method, path)) },
         }),
     responses: {
-      200: { description: 'Sukces' },
+      200: { description: 'Sukces', content: json(successSchema(method, path)) },
+      ...(method === 'post' ? { 201: { description: 'Utworzono', content: json(successSchema(method, path)) } } : {}),
       204: { description: 'Sukces bez treści' },
-      400: { description: 'Nieprawidłowe dane' },
-      401: { description: 'Brak autoryzacji' },
-      404: { description: 'Nie znaleziono' },
-      500: { description: 'Błąd serwera' },
+      400: { description: 'Nieprawidłowe dane', content: json(ref('Error')) },
+      401: { description: 'Brak autoryzacji', content: json(ref('Error')) },
+      404: { description: 'Nie znaleziono', content: json(ref('Error')) },
+      500: { description: 'Błąd serwera', content: json(ref('Error')) },
     },
   };
 }
@@ -87,7 +209,10 @@ const openapiDocument = {
   info: { title: 'D&D Companion API', version: require('../../release.json').version },
   servers: [{ url: 'https://dndcompanion-api.onrender.com' }],
   paths,
-  components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } } },
+  components: {
+    securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+    schemas,
+  },
 };
 
 module.exports = { openapiDocument };
