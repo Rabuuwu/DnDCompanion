@@ -981,9 +981,55 @@ function renderApp(statusMessage = null) {
       }
       return { type: 'flat', value: Number(field('value')) };
     };
+    const defaultAuxiliaryFormulaTerms = {
+      reflex: [{ type: 'percent', value: 100, attribute: 'dexterity' }],
+      intuition: [{ type: 'percent', value: 50, attribute: 'intelligence' }],
+      arcana: [{ type: 'percent', value: 25, attribute: 'wisdom' }],
+      perception: [{ type: 'percent', value: 50, attribute: 'intelligence' }],
+    };
+    const storedFormulaTerms = (stat, fallback = []) => {
+      if (Array.isArray(stat?.formulaTerms) && stat.formulaTerms.length) return stat.formulaTerms;
+      const legacyValue = Number(stat?.value);
+      return Number.isFinite(legacyValue) && String(stat?.value ?? '').trim()
+        ? [{ type: 'flat', value: legacyValue }]
+        : fallback;
+    };
+    const statFormulaBuilder = (scope, key, stat, fallback = []) => {
+      const terms = storedFormulaTerms(stat, fallback);
+      return `
+        <div class="ranged-formula-builder stat-formula-builder" data-stat-formula-builder="${scope}-${key}">
+          <div>
+            <strong>Wzór</strong>
+            ${stat?.formula && !stat?.formulaTerms?.length ? `<small>Poprzedni opis: ${escapeHtml(stat.formula)}</small>` : '<small>Wynik przelicza się automatycznie ze statystyk głównych.</small>'}
+          </div>
+          <div class="ranged-formula-list" data-ranged-formula-list>
+            ${terms.map(rangedFormulaTermRow).join('')}
+          </div>
+          <button type="button" class="secondary small" data-add-formula-term>Dodaj człon wzoru</button>
+        </div>
+      `;
+    };
+    const evaluateFormulaTerms = (terms, attributes) => Math.trunc(terms.reduce((sum, term) => {
+      if (term.type === 'flat') return sum + (Number(term.value) || 0);
+      const base = Number(attributes[term.attribute]) || 0;
+      if (base < 0) return sum + base;
+      const scaled = term.type === 'percent'
+        ? (base * (Number(term.value) || 0)) / 100
+        : (base * (Number(term.numerator) || 0)) / Math.max(1, Number(term.denominator) || 1);
+      return sum + (scaled > 0 ? Math.max(1, scaled) : scaled);
+    }, 0));
+    const formulaTermsText = (terms = []) => terms.map((term) => {
+      const attribute = CHARACTER_ATTRIBUTES.find(([key]) => key === term.attribute)?.[1] || 'Statystyka';
+      if (term.type === 'percent') return `${Number(term.value) || 0}% ${attribute}`;
+      if (term.type === 'fraction') {
+        return `${Number(term.numerator) || 0}/${Math.max(1, Number(term.denominator) || 1)} ${attribute}`;
+      }
+      return String(Number(term.value) || 0);
+    }).join(' + ').replace(/\+ -/g, '− ');
     const featureRow = (type, item = {}) => `
       <div class="feature-editor-row" data-feature-row="${type}">
         <div class="feature-editor-heading">
+          <button type="button" class="feature-drag-handle" data-feature-drag-handle aria-label="Zmień kolejność wpisu" title="Przeciągnij, aby zmienić kolejność">⠿</button>
           <input data-feature-field="name" maxlength="100" placeholder="Nazwa" value="${fieldValue(item.name)}" />
         </div>
         <textarea data-feature-field="description" maxlength="1000" rows="3" placeholder="Opis działania">${fieldValue(item.description)}</textarea>
@@ -1114,9 +1160,9 @@ function renderApp(statusMessage = null) {
       }).join('');
       const combat = CHARACTER_COMBAT.map(([key, label]) => `
         <div class="formula-row${key === 'initiative' ? ' value-only' : ''}">
-          <label><span>${label}</span><input name="combat-${key}-value" placeholder="Wartość" value="${fieldValue(character?.combat?.[key]?.value)}" /></label>
+          <label><span>${label}</span><input name="combat-${key}-value" data-formula-result="combat-${key}" placeholder="Wartość" value="${fieldValue(character?.combat?.[key]?.value, 0)}" ${key === 'initiative' ? '' : 'readonly'} /></label>
           ${key === 'initiative' ? '' : `
-            <label><span>Wzór / opis</span><input name="combat-${key}-formula" placeholder="np. 2 × KOND + 30" value="${fieldValue(character?.combat?.[key]?.formula)}" /></label>
+            ${statFormulaBuilder('combat', key, character?.combat?.[key])}
           `}
         </div>
       `).join('');
@@ -1129,22 +1175,13 @@ function renderApp(statusMessage = null) {
         key,
         character?.auxiliary?.[key]?.value ?? calculatedCurrentAuxiliary[key],
       ]));
-      const auxiliaryDescriptions = {
-        reflex: '100% zręczności',
-        intuition: '50% inteligencji',
-        arcana: '25% mądrości',
-        perception: '50% inteligencji',
-      };
       const auxiliary = CHARACTER_AUXILIARY.map(([key, label]) => `
         <div class="auxiliary-preview">
           <label class="auxiliary-value" for="auxiliary-${key}">
             <span>${label}</span>
-            <input id="auxiliary-${key}" name="auxiliary-${key}" data-auxiliary-preview="${key}" type="number" min="-999" max="999" value="${fieldValue(currentAuxiliary[key], calculatedCurrentAuxiliary[key])}" />
+            <input id="auxiliary-${key}" name="auxiliary-${key}" data-auxiliary-preview="${key}" data-formula-result="auxiliary-${key}" type="number" min="-99999" max="99999" value="${fieldValue(currentAuxiliary[key], calculatedCurrentAuxiliary[key])}" readonly />
           </label>
-          <label class="auxiliary-formula" for="auxiliary-${key}-formula">
-            <span>Wzór / opis</span>
-            <input id="auxiliary-${key}-formula" name="auxiliary-${key}-formula" maxlength="250" value="${fieldValue(character?.auxiliary?.[key]?.formula, auxiliaryDescriptions[key])}" />
-          </label>
+          ${statFormulaBuilder('auxiliary', key, character?.auxiliary?.[key], defaultAuxiliaryFormulaTerms[key])}
         </div>
       `).join('');
       const skills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
@@ -1277,20 +1314,24 @@ function renderApp(statusMessage = null) {
         removeCharacterAvatar.classList.add('hidden');
       });
 
+      const recalculateStatFormulas = () => {
+        const attributeValues = Object.fromEntries(CHARACTER_ATTRIBUTES.map(([attributeKey]) => [
+          attributeKey,
+          Number(editor.querySelector(`[name="attribute-${attributeKey}"]`)?.value) || 0,
+        ]));
+        editor.querySelectorAll('[data-stat-formula-builder]').forEach((builder) => {
+          const terms = [...builder.querySelectorAll('[data-ranged-formula-term]')].map(rangedFormulaTermValue);
+          const output = editor.querySelector(`[data-formula-result="${builder.dataset.statFormulaBuilder}"]`);
+          if (output) output.value = evaluateFormulaTerms(terms, attributeValues);
+        });
+      };
+
       CHARACTER_ATTRIBUTES.forEach(([key]) => {
         const input = document.querySelector(`[name="attribute-${key}"]`);
         input?.addEventListener('input', () => {
           const preview = document.querySelector(`[data-combat-preview="${key}"]`);
           if (preview) preview.textContent = combatAttribute(key, input.value);
-          const attributeValues = Object.fromEntries(CHARACTER_ATTRIBUTES.map(([attributeKey]) => [
-            attributeKey,
-            document.querySelector(`[name="attribute-${attributeKey}"]`)?.value || 0,
-          ]));
-          const calculatedAuxiliary = auxiliaryValues(attributeValues);
-          Object.entries(calculatedAuxiliary).forEach(([auxiliaryKey, value]) => {
-            const auxiliaryPreview = document.querySelector(`[data-auxiliary-preview="${auxiliaryKey}"]`);
-            if (auxiliaryPreview) auxiliaryPreview.value = value;
-          });
+          recalculateStatFormulas();
         });
       });
 
@@ -1304,6 +1345,71 @@ function renderApp(statusMessage = null) {
       });
       editor.addEventListener('input', (event) => {
         resizeFeatureDescription(event.target);
+        if (event.target.matches('[data-formula-field]')) recalculateStatFormulas();
+      });
+      editor.addEventListener('keydown', (event) => {
+        const handle = event.target.closest('[data-feature-drag-handle]');
+        if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        const row = handle.closest('[data-feature-row]');
+        const sibling = event.key === 'ArrowUp' ? row?.previousElementSibling : row?.nextElementSibling;
+        if (!row || !sibling?.matches('[data-feature-row]')) return;
+        event.preventDefault();
+        if (event.key === 'ArrowUp') row.parentElement.insertBefore(row, sibling);
+        else row.parentElement.insertBefore(sibling, row);
+        handle.focus();
+      });
+      editor.addEventListener('pointerdown', (event) => {
+        const handle = event.target.closest('[data-feature-drag-handle]');
+        if (!handle || event.isPrimary === false) return;
+        const draggedRow = handle.closest('[data-feature-row]');
+        const featureList = draggedRow?.closest('[data-feature-list]');
+        if (!draggedRow || !featureList) return;
+
+        event.preventDefault();
+        const originalNextSibling = draggedRow.nextElementSibling;
+        try {
+          handle.setPointerCapture(event.pointerId);
+        } catch {
+          // Niektóre wersje iOS nie pozwalają przechwycić wskaźnika od razu.
+        }
+        draggedRow.classList.add('dragging');
+        featureList.classList.add('reordering');
+
+        const moveFeature = (moveEvent) => {
+          if (moveEvent.pointerId !== event.pointerId) return;
+          moveEvent.preventDefault();
+          const siblings = [...featureList.querySelectorAll(':scope > [data-feature-row]')]
+            .filter((row) => row !== draggedRow);
+          const nextRow = siblings.find((row) => {
+            const bounds = row.getBoundingClientRect();
+            return moveEvent.clientY < bounds.top + bounds.height / 2;
+          });
+          if (nextRow) featureList.insertBefore(draggedRow, nextRow);
+          else featureList.appendChild(draggedRow);
+
+          const scrollBounds = contentPanel.getBoundingClientRect();
+          const scrollEdge = Math.min(80, scrollBounds.height * 0.18);
+          if (moveEvent.clientY < scrollBounds.top + scrollEdge) contentPanel.scrollBy({ top: -18 });
+          else if (moveEvent.clientY > scrollBounds.bottom - scrollEdge) contentPanel.scrollBy({ top: 18 });
+        };
+        const cleanup = (finishEvent) => {
+          window.removeEventListener('pointermove', moveFeature);
+          window.removeEventListener('pointerup', finishFeatureReorder);
+          window.removeEventListener('pointercancel', cancelFeatureReorder);
+          if (handle.hasPointerCapture?.(finishEvent.pointerId)) handle.releasePointerCapture(finishEvent.pointerId);
+          draggedRow.classList.remove('dragging');
+          featureList.classList.remove('reordering');
+        };
+        const finishFeatureReorder = (finishEvent) => cleanup(finishEvent);
+        const cancelFeatureReorder = (cancelEvent) => {
+          cleanup(cancelEvent);
+          if (originalNextSibling?.parentElement === featureList) featureList.insertBefore(draggedRow, originalNextSibling);
+          else featureList.appendChild(draggedRow);
+        };
+
+        window.addEventListener('pointermove', moveFeature, { passive: false });
+        window.addEventListener('pointerup', finishFeatureReorder);
+        window.addEventListener('pointercancel', cancelFeatureReorder);
       });
       editor.addEventListener('change', (event) => {
         if (event.target.matches('[data-feature-field="ranged"]')) {
@@ -1327,6 +1433,7 @@ function renderApp(statusMessage = null) {
             : { type: nextType, value: Number.isFinite(previousValue) ? previousValue : (nextType === 'percent' ? 100 : 0), attribute };
           row.insertAdjacentHTML('beforebegin', rangedFormulaTermRow(nextTerm));
           row.remove();
+          recalculateStatFormulas();
         }
       });
       editor.addEventListener('click', (event) => {
@@ -1337,11 +1444,15 @@ function renderApp(statusMessage = null) {
         const removeCustomSkillButton = event.target.closest('[data-remove-custom-skill]');
         if (removeCustomSkillButton) removeCustomSkillButton.closest('[data-custom-skill-row]')?.remove();
         const removeFormulaTerm = event.target.closest('[data-remove-formula-term]');
-        if (removeFormulaTerm) removeFormulaTerm.closest('[data-ranged-formula-term]')?.remove();
+        if (removeFormulaTerm) {
+          removeFormulaTerm.closest('[data-ranged-formula-term]')?.remove();
+          recalculateStatFormulas();
+        }
         const addFormulaTerm = event.target.closest('[data-add-formula-term]');
         if (addFormulaTerm) {
-          addFormulaTerm.closest('[data-feature-row]')?.querySelector('[data-ranged-formula-list]')
+          addFormulaTerm.closest('.ranged-formula-builder')?.querySelector('[data-ranged-formula-list]')
             ?.insertAdjacentHTML('beforeend', rangedFormulaTermRow());
+          recalculateStatFormulas();
         }
       });
       editor.querySelector('[data-add-guild]')?.addEventListener('click', () => {
@@ -1356,6 +1467,7 @@ function renderApp(statusMessage = null) {
       });
       window.requestAnimationFrame(() => {
         editor.querySelectorAll('[data-feature-field="description"]').forEach(resizeFeatureDescription);
+        recalculateStatFormulas();
       });
 
       document.querySelector('#character-form')?.addEventListener('submit', async (event) => {
@@ -1386,11 +1498,13 @@ function renderApp(statusMessage = null) {
           attributes: Object.fromEntries(CHARACTER_ATTRIBUTES.map(([key]) => [key, Number(formData.get(`attribute-${key}`))])),
           combat: Object.fromEntries(CHARACTER_COMBAT.map(([key]) => [key, {
             value: formData.get(`combat-${key}-value`),
-            formula: key === 'initiative' ? '' : formData.get(`combat-${key}-formula`),
+            formula: '',
+            formulaTerms: key === 'initiative' ? [] : [...form.querySelectorAll(`[data-stat-formula-builder="combat-${key}"] [data-ranged-formula-term]`)].map(rangedFormulaTermValue),
           }])),
           auxiliary: Object.fromEntries(CHARACTER_AUXILIARY.map(([key]) => [key, {
             value: Number(formData.get(`auxiliary-${key}`)),
-            formula: formData.get(`auxiliary-${key}-formula`),
+            formula: '',
+            formulaTerms: [...form.querySelectorAll(`[data-stat-formula-builder="auxiliary-${key}"] [data-ranged-formula-term]`)].map(rangedFormulaTermValue),
           }])),
           skills: Object.fromEntries(CHARACTER_SKILL_GROUPS.flatMap(([, entries]) => entries).map(([key]) => [key, {
             percent: Number(formData.get(`skill-${key}-percent`)),
@@ -1458,7 +1572,8 @@ function renderApp(statusMessage = null) {
       }).join('');
       const formulaRows = (definitions, values) => definitions.map(([key, label]) => {
         const stat = values?.[key] || {};
-        return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && stat.formula ? `<small>${escapeHtml(stat.formula)}</small>` : ''}</div>`;
+        const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
+        return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
       }).join('');
       const skillRows = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
         <div class="sheet-skill-group"><h4>${group}</h4>${entries.map(([key, label]) => {
@@ -1473,29 +1588,27 @@ function renderApp(statusMessage = null) {
         const value = character.special?.[key] || {};
         return `<div class="sheet-row"><span>${label}</span><strong>${value.current ?? 0} / ${value.max ?? 0}</strong></div>`;
       }).join('');
-      const rangedFormulaText = (terms = []) => terms.map((term) => {
-        const attribute = CHARACTER_ATTRIBUTES.find(([key]) => key === term.attribute)?.[1] || 'Statystyka';
-        if (term.type === 'percent') return `${Number(term.value) || 0}% ${attribute}`;
-        if (term.type === 'fraction') return `${Number(term.numerator) || 0}/${Math.max(1, Number(term.denominator) || 1)} ${attribute}`;
-        return String(Number(term.value) || 0);
-      }).join(' + ').replace(/\+ -/g, '− ');
       const featureLists = CHARACTER_FEATURES.map(([type, label]) => {
         const items = character.features?.[type] || [];
         const content = items.length
-          ? `<div class="feature-sheet-list">${items.map((item) => `
-              <article class="feature-sheet-item">
-                <div class="feature-sheet-heading"><h4>${escapeHtml(item.name)}</h4>${type === 'abilities' ? `<strong>${Number(item.toothCost) || 0} ⏱️</strong>` : ''}</div>
+          ? `<div class="feature-sheet-list" data-feature-order-list="${type}">${items.map((item, index) => `
+              <article class="feature-sheet-item" data-feature-order-item="${index}">
+                <div class="feature-sheet-heading">
+                  <button type="button" class="feature-sheet-drag-handle" data-feature-sheet-drag aria-label="Zmień kolejność ${escapeHtml(item.name)}" title="Przeciągnij, aby zmienić kolejność">⠿</button>
+                  <h4>${escapeHtml(item.name)}</h4>
+                  ${type === 'abilities' ? `<strong>${Number(item.toothCost) || 0} ⏱️</strong>` : ''}
+                </div>
                 ${(item.duration || item.cooldown || item.ranged) ? `
                   <div class="feature-sheet-meta">
                     ${item.duration ? `<span>Czas trwania: <strong>${escapeHtml(item.duration)}</strong></span>` : ''}
                     ${item.cooldown ? `<span>Cooldown: <strong>${escapeHtml(item.cooldown)}</strong></span>` : ''}
                     ${item.ranged ? `<span>Zasięg: <strong>${escapeHtml(item.range || 'Nie podano')}</strong></span>` : ''}
-                    ${item.ranged && item.formulaTerms?.length ? `<span class="wide">Wzór: <strong>${escapeHtml(rangedFormulaText(item.formulaTerms))}</strong></span>` : ''}
+                    ${item.ranged && item.formulaTerms?.length ? `<span class="wide">Wzór: <strong>${escapeHtml(formulaTermsText(item.formulaTerms))}</strong></span>` : ''}
                   </div>
                 ` : ''}
                 ${item.description ? `<div class="formatted-feature-description">${formatFeatureText(item.description)}</div>` : ''}
               </article>
-            `).join('')}</div>`
+            `).join('')}</div><p class="feature-order-status" data-feature-order-status="${type}" role="status"></p>`
           : '<p class="section-note">Brak wpisów.</p>';
         return section(label, content, true, `character.features.${type}`);
       }).join('');
@@ -1690,6 +1803,103 @@ function renderApp(statusMessage = null) {
             contentPanel.querySelector('.character-dashboard')?.classList.remove('notebook-active');
           }
         });
+      });
+
+      const persistFeatureOrder = async (featureList) => {
+        const type = featureList.dataset.featureOrderList;
+        const status = contentPanel.querySelector(`[data-feature-order-status="${type}"]`);
+        const orderedIndices = [...featureList.querySelectorAll(':scope > [data-feature-order-item]')]
+          .map((item) => Number(item.dataset.featureOrderItem));
+        const nextItems = orderedIndices.map((index) => character.features[type][index]);
+        if (status) status.textContent = 'Zapisywanie kolejności…';
+        try {
+          const response = await authenticatedFetch(`/api/characters/${character.id}/features/order`, {
+            method: 'PATCH',
+            body: JSON.stringify({ type, items: nextItems }),
+          });
+          if (!response.ok) throw new Error('feature_order_save_failed');
+          const updated = await response.json();
+          character.features = updated.features;
+          [...featureList.querySelectorAll(':scope > [data-feature-order-item]')].forEach((item, index) => {
+            item.dataset.featureOrderItem = String(index);
+          });
+          if (status) status.textContent = 'Kolejność została zapisana.';
+        } catch {
+          [...featureList.querySelectorAll(':scope > [data-feature-order-item]')]
+            .sort((left, right) => Number(left.dataset.featureOrderItem) - Number(right.dataset.featureOrderItem))
+            .forEach((item) => featureList.appendChild(item));
+          if (status) status.textContent = 'Nie udało się zapisać kolejności.';
+        }
+      };
+
+      contentPanel.querySelector('[data-character-panel="features"]')?.addEventListener('keydown', (event) => {
+        const handle = event.target.closest('[data-feature-sheet-drag]');
+        if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        const item = handle.closest('[data-feature-order-item]');
+        const sibling = event.key === 'ArrowUp' ? item?.previousElementSibling : item?.nextElementSibling;
+        if (!item || !sibling?.matches('[data-feature-order-item]')) return;
+        event.preventDefault();
+        if (event.key === 'ArrowUp') item.parentElement.insertBefore(item, sibling);
+        else item.parentElement.insertBefore(sibling, item);
+        handle.focus();
+        void persistFeatureOrder(item.parentElement);
+      });
+
+      contentPanel.querySelector('[data-character-panel="features"]')?.addEventListener('pointerdown', (event) => {
+        const handle = event.target.closest('[data-feature-sheet-drag]');
+        if (!handle || event.isPrimary === false) return;
+        const draggedItem = handle.closest('[data-feature-order-item]');
+        const featureList = draggedItem?.closest('[data-feature-order-list]');
+        if (!draggedItem || !featureList) return;
+        event.preventDefault();
+        try {
+          handle.setPointerCapture(event.pointerId);
+        } catch {
+          // Niektóre wersje iOS nie pozwalają przechwycić wskaźnika od razu.
+        }
+        draggedItem.classList.add('dragging');
+        featureList.classList.add('reordering');
+
+        const moveFeature = (moveEvent) => {
+          if (moveEvent.pointerId !== event.pointerId) return;
+          moveEvent.preventDefault();
+          const siblings = [...featureList.querySelectorAll(':scope > [data-feature-order-item]')]
+            .filter((item) => item !== draggedItem);
+          const nextItem = siblings.find((item) => {
+            const bounds = item.getBoundingClientRect();
+            return moveEvent.clientY < bounds.top + bounds.height / 2;
+          });
+          if (nextItem) featureList.insertBefore(draggedItem, nextItem);
+          else featureList.appendChild(draggedItem);
+
+          const scrollBounds = contentPanel.getBoundingClientRect();
+          const scrollEdge = Math.min(80, scrollBounds.height * 0.18);
+          if (moveEvent.clientY < scrollBounds.top + scrollEdge) contentPanel.scrollBy({ top: -18 });
+          else if (moveEvent.clientY > scrollBounds.bottom - scrollEdge) contentPanel.scrollBy({ top: 18 });
+        };
+        const finishFeatureReorder = (finishEvent) => {
+          window.removeEventListener('pointermove', moveFeature);
+          window.removeEventListener('pointerup', finishFeatureReorder);
+          window.removeEventListener('pointercancel', cancelFeatureReorder);
+          if (handle.hasPointerCapture?.(finishEvent.pointerId)) handle.releasePointerCapture(finishEvent.pointerId);
+          draggedItem.classList.remove('dragging');
+          featureList.classList.remove('reordering');
+          void persistFeatureOrder(featureList);
+        };
+        const cancelFeatureReorder = (cancelEvent) => {
+          window.removeEventListener('pointermove', moveFeature);
+          window.removeEventListener('pointerup', finishFeatureReorder);
+          window.removeEventListener('pointercancel', cancelFeatureReorder);
+          if (handle.hasPointerCapture?.(cancelEvent.pointerId)) handle.releasePointerCapture(cancelEvent.pointerId);
+          draggedItem.classList.remove('dragging');
+          featureList.classList.remove('reordering');
+          [...featureList.querySelectorAll(':scope > [data-feature-order-item]')]
+            .sort((left, right) => Number(left.dataset.featureOrderItem) - Number(right.dataset.featureOrderItem))
+            .forEach((item) => featureList.appendChild(item));
+        };
+        window.addEventListener('pointermove', moveFeature, { passive: false });
+        window.addEventListener('pointerup', finishFeatureReorder);
+        window.addEventListener('pointercancel', cancelFeatureReorder);
       });
 
       const notebook = {
@@ -2102,7 +2312,8 @@ function renderApp(statusMessage = null) {
           }).join('');
           const teammateFormulaRows = (definitions, values) => definitions.map(([key, label]) => {
             const stat = values?.[key] || {};
-            return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && stat.formula ? `<small>${escapeHtml(stat.formula)}</small>` : ''}</div>`;
+            const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
+            return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
           }).join('');
           const teammateSkills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
             <div class="sheet-skill-group">
@@ -2157,7 +2368,7 @@ function renderApp(statusMessage = null) {
                 ${item.duration ? `<span>Czas trwania: <strong>${escapeHtml(item.duration)}</strong></span>` : ''}
                 ${item.cooldown ? `<span>Cooldown: <strong>${escapeHtml(item.cooldown)}</strong></span>` : ''}
                 ${item.ranged ? `<span>Zasięg: <strong>${escapeHtml(item.range || 'Nie podano')}</strong></span>` : ''}
-                ${item.ranged && item.formulaTerms?.length ? `<span class="wide">Wzór: <strong>${escapeHtml(rangedFormulaText(item.formulaTerms))}</strong></span>` : ''}
+                ${item.ranged && item.formulaTerms?.length ? `<span class="wide">Wzór: <strong>${escapeHtml(formulaTermsText(item.formulaTerms))}</strong></span>` : ''}
               </div>
               ${item.description ? `<div class="formatted-feature-description">${formatFeatureText(item.description)}</div>` : ''}
             </article>
@@ -2214,7 +2425,8 @@ function renderApp(statusMessage = null) {
         }).join('');
         const formulas = (definitions, values) => definitions.map(([key, label]) => {
           const stat = values?.[key] || {};
-          return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && stat.formula ? `<small>${escapeHtml(stat.formula)}</small>` : ''}</div>`;
+          const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
+          return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
         }).join('');
         const skills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
           <div class="sheet-skill-group"><h4>${group}</h4>
@@ -2294,7 +2506,8 @@ function renderApp(statusMessage = null) {
           }).join('');
           const formulaRows = (definitions, values) => definitions.map(([key, label]) => {
             const stat = values?.[key] || {};
-            return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && stat.formula ? `<small>${escapeHtml(stat.formula)}</small>` : ''}</div>`;
+            const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
+            return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
           }).join('');
           const skills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
             <div class="sheet-skill-group"><h4>${group}</h4>

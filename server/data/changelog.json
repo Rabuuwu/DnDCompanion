@@ -1,5 +1,18 @@
 [
   {
+    "version": "1.5.5",
+    "date": "2026-08-14",
+    "title": "Talenty, kolejność umiejętności i kreatory wzorów",
+    "changes": [
+      "Dodano osobne kategorie Talenty oraz Dodatkowe umiejętności w formularzu i karcie postaci.",
+      "Dodano zmianę kolejności wpisów we wszystkich kategoriach umiejętności z trwałym zapisem na serwerze.",
+      "Kolejność można zmieniać dotykiem, myszą oraz klawiaturą i jest zachowywana podczas edycji.",
+      "Zastąpiono tekstowe pola wzorów statystyk walki i pomocniczych wieloczłonowym kreatorem.",
+      "Wyniki wzorów są aktywnie przeliczane po zmianie statystyk głównych i ponownie weryfikowane przez API.",
+      "Zachowano zgodność ze starszymi kartami postaci i dotychczasowe reguły wartości zerowych oraz ujemnych."
+    ]
+  },
+  {
     "version": "1.5.4",
     "date": "2026-08-09",
     "title": "Hotfix logowania w aplikacji Android",

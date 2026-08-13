@@ -97,4 +97,6 @@ export const CHARACTER_FEATURES = [
   ['passives', 'Pasywki', 'Dodaj pasywkę'],
   ['campActions', 'Obozówki', 'Dodaj obozówkę'],
   ['abilities', 'Umiejętności', 'Dodaj umiejętność'],
+  ['talents', 'Talenty', 'Dodaj talent'],
+  ['additionalSkills', 'Dodatkowe umiejętności', 'Dodaj dodatkową umiejętność'],
 ];

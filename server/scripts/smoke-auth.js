@@ -81,7 +81,12 @@ async function run() {
           charisma: 8,
         },
         combat: {
-          hp: { value: '62', formula: '2 × KOND + 30' },
+          hp: {
+            formulaTerms: [
+              { type: 'percent', value: 200, attribute: 'constitution' },
+              { type: 'flat', value: 30 },
+            ],
+          },
         },
         skills: {
           strengthPower: { percent: 150 },
@@ -101,6 +106,11 @@ async function run() {
             { name: 'Naprawa ekwipunku', description: 'Naprawia wyposażenie podczas obozu.', duration: '1 godzina' },
           ],
           abilities: [{ name: 'Uderzenie tarczą', description: 'Atak i próba odepchnięcia celu.', toothCost: 3 }],
+          talents: [
+            { name: 'Czujność', description: 'Postać rzadziej daje się zaskoczyć.' },
+            { name: 'Pamięć map', description: 'Łatwiejsze odtwarzanie przebytej drogi.' },
+          ],
+          additionalSkills: [{ name: 'Kartografia', description: 'Tworzenie dokładnych map.' }],
         },
       }),
     });
@@ -116,6 +126,7 @@ async function run() {
     assert.equal(character.auxiliary.intuition.value, '-6');
     assert.equal(character.auxiliary.arcana.value, '1');
     assert.equal(character.auxiliary.perception.value, '-6');
+    assert.equal(character.combat.hp.value, '62');
     assert.equal(character.skills.strengthPower.result, 15);
     assert.equal(character.skills.intuition.result, -6);
     assert.equal(character.skills.alchemy.result, 0);
@@ -130,6 +141,32 @@ async function run() {
       description: 'Stała odporność na obrażenia.',
       cooldown: '',
     });
+    assert.deepEqual(character.features.talents[0], {
+      name: 'Czujność',
+      description: 'Postać rzadziej daje się zaskoczyć.',
+      cooldown: '',
+    });
+    assert.deepEqual(
+      character.features.talents.map((talent) => talent.name),
+      ['Czujność', 'Pamięć map'],
+    );
+    assert.deepEqual(character.features.additionalSkills[0], {
+      name: 'Kartografia',
+      description: 'Tworzenie dokładnych map.',
+      cooldown: '',
+    });
+
+    const featureOrderUpdate = await request(`/api/characters/${character.id}/features/order`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${firstSession.token}` },
+      body: JSON.stringify({ type: 'talents', items: [...character.features.talents].reverse() }),
+    });
+    assert.equal(featureOrderUpdate.status, 200);
+    const reorderedFeatures = (await featureOrderUpdate.json()).features;
+    assert.deepEqual(
+      reorderedFeatures.talents.map((talent) => talent.name),
+      ['Pamięć map', 'Czujność'],
+    );
     assert.equal(character.inventory, 'Młot kowalski\nTarcza');
 
     const inventoryUpdate = await request(`/api/characters/${character.id}/inventory`, {
@@ -150,8 +187,17 @@ async function run() {
         level: 4,
         attributes: {
           strength: 11,
+          constitution: 16,
           intelligence: -7,
           charisma: 9,
+        },
+        combat: {
+          hp: {
+            formulaTerms: [
+              { type: 'percent', value: 200, attribute: 'constitution' },
+              { type: 'flat', value: 30 },
+            ],
+          },
         },
       }),
     });
@@ -161,6 +207,7 @@ async function run() {
     assert.equal(updatedCharacter.attributes.strength.combat, 5);
     assert.equal(updatedCharacter.attributes.intelligence.combat, -7);
     assert.equal(updatedCharacter.attributes.charisma.combat, 9);
+    assert.equal(updatedCharacter.combat.hp.value, '62');
 
     const refresh = await request('/api/auth/refresh', {
       method: 'POST',

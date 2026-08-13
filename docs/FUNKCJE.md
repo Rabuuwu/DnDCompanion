@@ -16,12 +16,14 @@
 - statystyki główne z wartościami przygodowymi i bojowymi;
 - statystyki walki, pomocnicze oraz własne podstatystyki;
 - automatyczne przeliczniki z obsługą zer i wartości ujemnych;
+- wieloczłonowe kreatory wzorów statystyk z aktywnym przeliczaniem po zmianie statystyk głównych;
 - rozwój specjalny, wiele gildii, rangi i profesje;
 - karta postaci z sekcjami, których stan rozwinięcia jest zapamiętywany.
 
 ## Umiejętności
 
-- dowolne listy umiejętności, pasywek i obozówek;
+- dowolne listy umiejętności, pasywek, obozówek, talentów i dodatkowych umiejętności;
+- zmiana kolejności wpisów gestem przeciągania, zapisywana osobno w każdej kategorii;
 - opisy automatycznie dopasowujące wysokość;
 - pogrubienie, kursywa i kolory w opisach;
 - koszt, cooldown i czas trwania;

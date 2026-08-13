@@ -33,6 +33,13 @@ const SKILL_BASES = {
   performance: 'charisma',
 };
 const CUSTOM_SKILL_GROUPS = new Set(ATTRIBUTE_KEYS);
+const FEATURE_TYPES = {
+  passives: {},
+  campActions: { withDuration: true },
+  abilities: { withToothCost: true, withRanged: true },
+  talents: {},
+  additionalSkills: {},
+};
 
 function text(value, maxLength = 200) {
   return String(value || '')
@@ -90,19 +97,23 @@ function calculatedAuxiliary(attributes) {
 }
 
 function characterAuxiliary(value, attributes) {
+  const defaultTerms = {
+    reflex: [{ type: 'percent', value: 100, attribute: 'dexterity' }],
+    intuition: [{ type: 'percent', value: 50, attribute: 'intelligence' }],
+    arcana: [{ type: 'percent', value: 25, attribute: 'wisdom' }],
+    perception: [{ type: 'percent', value: 50, attribute: 'intelligence' }],
+  };
   const calculated = calculatedAuxiliary(attributes);
   return Object.fromEntries(
     Object.entries(calculated).map(([key, fallback]) => {
-      const submittedValue = value?.[key]?.value;
-      const hasSubmittedFormula = Object.prototype.hasOwnProperty.call(value?.[key] || {}, 'formula');
+      const hasStoredTerms = Array.isArray(value?.[key]?.formulaTerms);
+      const terms = rangedFormulaTerms(hasStoredTerms ? value[key].formulaTerms : defaultTerms[key]);
       return [
         key,
         {
-          value:
-            submittedValue === undefined || submittedValue === null || submittedValue === ''
-              ? fallback.value
-              : String(integer(submittedValue, Number(fallback.value), -999, 999)),
-          formula: hasSubmittedFormula ? text(value[key].formula, 250) : fallback.formula,
+          value: terms.length ? String(Math.trunc(formulaValue(terms, attributes))) : fallback.value,
+          formula: text(value?.[key]?.formula, 250) || fallback.formula,
+          formulaTerms: terms,
         },
       ];
     }),
@@ -127,6 +138,25 @@ function rangedFormulaTerms(value) {
       attribute,
     };
   });
+}
+
+function formulaValue(terms, attributes) {
+  return terms.reduce((sum, term) => {
+    if (term.type === 'flat') return sum + term.value;
+    const base = attributes[term.attribute]?.adventure || 0;
+    if (base < 0) return sum + base;
+    const scaled = term.type === 'percent' ? (base * term.value) / 100 : (base * term.numerator) / term.denominator;
+    return sum + (scaled > 0 ? Math.max(1, scaled) : scaled);
+  }, 0);
+}
+
+function formulaStat(value, attributes) {
+  const terms = rangedFormulaTerms(value?.formulaTerms);
+  return {
+    value: terms.length ? String(Math.trunc(formulaValue(terms, attributes))) : text(value?.value, 100),
+    formula: text(value?.formula, 250),
+    formulaTerms: terms,
+  };
 }
 
 function featureList(value, { withToothCost = false, withDuration = false, withRanged = false } = {}) {
@@ -231,10 +261,10 @@ function parseCharacterPayload(body = {}) {
 
   const combat = {};
   for (const key of COMBAT_KEYS) {
-    combat[key] = {
-      value: text(body.combat?.[key]?.value, 100),
-      formula: text(body.combat?.[key]?.formula, 250),
-    };
+    combat[key] =
+      key === 'initiative'
+        ? { value: text(body.combat?.[key]?.value, 100), formula: '', formulaTerms: [] }
+        : formulaStat(body.combat?.[key], attributes);
   }
 
   const auxiliary = characterAuxiliary(body.auxiliary, attributes);
@@ -292,6 +322,8 @@ function parseCharacterPayload(body = {}) {
         passives: featureList(body.features?.passives),
         campActions,
         abilities: featureList(body.features?.abilities, { withToothCost: true, withRanged: true }),
+        talents: featureList(body.features?.talents),
+        additionalSkills: featureList(body.features?.additionalSkills),
       },
       inventory: text(body.inventory, 10000),
       notebook: notebookData(body.notebook),
@@ -347,6 +379,14 @@ function serializeCharacter(row) {
     }),
   );
   const customSkills = customSkillList(data.customSkills, attributes);
+  const combat = Object.fromEntries(
+    COMBAT_KEYS.map((key) => [
+      key,
+      key === 'initiative'
+        ? { ...(data.combat?.[key] || {}), formula: '', formulaTerms: [] }
+        : formulaStat(data.combat?.[key], attributes),
+    ]),
+  );
 
   return {
     id: Number(row.id),
@@ -365,7 +405,7 @@ function serializeCharacter(row) {
     guildRank: profile.guildRank || '',
     guilds,
     attributes,
-    combat: data.combat || {},
+    combat,
     auxiliary: characterAuxiliary(data.auxiliary, attributes),
     skills,
     customSkills,
@@ -374,6 +414,8 @@ function serializeCharacter(row) {
       passives: featureList(data.features?.passives),
       campActions: featureList(data.features?.campActions, { withDuration: true }),
       abilities: featureList(data.features?.abilities, { withToothCost: true, withRanged: true }),
+      talents: featureList(data.features?.talents),
+      additionalSkills: featureList(data.features?.additionalSkills),
     },
     inventory: data.inventory || '',
     notebook: notebookData(data.notebook),
@@ -482,6 +524,33 @@ async function updateCharacterNotebook(req, res) {
   return res.json({ notebook: serializeCharacter(result.rows[0]).notebook });
 }
 
+async function updateCharacterFeatureOrder(req, res) {
+  const id = parseCharacterId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'invalid_character_id' });
+  const type = text(req.body?.type, 40);
+  if (!Object.prototype.hasOwnProperty.call(FEATURE_TYPES, type)) {
+    return res.status(400).json({ error: 'invalid_feature_type' });
+  }
+  const items = featureList(req.body?.items, FEATURE_TYPES[type]);
+  if (type === 'campActions' && items.some((item) => !item.duration)) {
+    return res.status(400).json({ error: 'camp_action_duration_required' });
+  }
+  const result = await pool.query(
+    `UPDATE characters
+     SET data = jsonb_set(
+       COALESCE(data, '{}'::jsonb),
+       '{features}',
+       COALESCE(data->'features', '{}'::jsonb) || jsonb_build_object($1::text, $2::jsonb),
+       true
+     ), updated_at = NOW()
+     WHERE id = $3 AND owner_id = $4
+     RETURNING id, name, data, created_at, updated_at`,
+    [type, JSON.stringify(items), id, req.user.id],
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
+  return res.json({ features: serializeCharacter(result.rows[0]).features });
+}
+
 module.exports = {
   createCharacter,
   deleteCharacter,
@@ -489,6 +558,7 @@ module.exports = {
   listCharacters,
   updateCharacter,
   updateCharacterInventory,
+  updateCharacterFeatureOrder,
   updateCharacterNotebook,
   serializeCharacter,
 };

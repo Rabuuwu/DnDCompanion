@@ -19,6 +19,7 @@ const operations = [
   ['post', '/api/characters', 'Utworzenie postaci'],
   ['get', '/api/characters/{id}', 'Pobranie postaci'],
   ['put', '/api/characters/{id}', 'Aktualizacja postaci'],
+  ['patch', '/api/characters/{id}/features/order', 'Zapis kolejności umiejętności'],
   ['patch', '/api/characters/{id}/inventory', 'Zapis ekwipunku'],
   ['patch', '/api/characters/{id}/notebook', 'Zapis notatnika'],
   ['delete', '/api/characters/{id}', 'Usunięcie postaci'],

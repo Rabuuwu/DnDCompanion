@@ -32,6 +32,7 @@ const {
   getCharacter,
   listCharacters,
   updateCharacter,
+  updateCharacterFeatureOrder,
   updateCharacterInventory,
   updateCharacterNotebook,
 } = require('./characters');
@@ -178,6 +179,7 @@ app.get('/api/characters', requireAuth, listCharacters);
 app.post('/api/characters', requireAuth, createCharacter);
 app.get('/api/characters/:id', requireAuth, getCharacter);
 app.put('/api/characters/:id', requireAuth, updateCharacter);
+app.patch('/api/characters/:id/features/order', requireAuth, updateCharacterFeatureOrder);
 app.patch('/api/characters/:id/inventory', requireAuth, updateCharacterInventory);
 app.patch('/api/characters/:id/notebook', requireAuth, updateCharacterNotebook);
 app.delete('/api/characters/:id', requireAuth, deleteCharacter);
