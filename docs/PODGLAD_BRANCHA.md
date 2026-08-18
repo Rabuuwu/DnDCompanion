@@ -13,7 +13,7 @@ npm run dev:branch-preview
 Skrypt:
 
 1. stosuje brakujące migracje;
-2. uruchamia API na `127.0.0.1:3000`;
+2. uruchamia API na `127.0.0.1:3010`, niezależnie od głównej usługi na porcie `3000`;
 3. uruchamia frontend na `0.0.0.0:5173`;
 4. wyświetla adres komputera i adresy dostępne w LAN;
 5. przekazuje `/api`, `/health` i `/ready` przez proxy Vite do lokalnego API.
@@ -31,6 +31,8 @@ http://192.168.1.5:5173
 ```
 
 Zmiany w plikach frontendu pojawiają się automatycznie. Po zmianie backendu należy ponownie uruchomić polecenie. Podgląd kończy `Ctrl+C`.
+
+Port API podglądu można zmienić przez `BRANCH_PREVIEW_API_PORT`; proxy Vite zostanie ustawione automatycznie.
 
 ## Baza danych
 

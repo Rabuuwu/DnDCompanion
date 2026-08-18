@@ -185,7 +185,7 @@ async function run() {
     const forbiddenDmDashboard = await request(`/api/campaigns/${campaign.id}/dm/dashboard`, {
       headers: { Authorization: `Bearer ${second.token}` },
     });
-    assert.equal(forbiddenDmDashboard.status, 403);
+    assert.equal(forbiddenDmDashboard.status, 403, await forbiddenDmDashboard.clone().text());
 
     const dmNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/note`, {
       method: 'PUT',

@@ -3,6 +3,7 @@ import { networkInterfaces } from 'node:os';
 
 const root = new URL('..', import.meta.url).pathname;
 const children = new Set();
+const apiPort = process.env.BRANCH_PREVIEW_API_PORT || '3010';
 
 function run(command, args, options = {}) {
   const child = spawn(command, args, {
@@ -43,20 +44,13 @@ try {
   await wait(run('npm', ['run', 'db:migrate']));
 
   const api = run('npm', ['run', 'start', '--workspace', 'server'], {
-    env: { PORT: '3000', HOST: '127.0.0.1' },
+    env: { PORT: apiPort, HOST: '127.0.0.1' },
   });
-  const frontend = run('npm', [
-    'run',
-    'dev',
-    '--workspace',
-    'mobile',
-    '--',
-    '--host',
-    '0.0.0.0',
-    '--port',
-    '5173',
-    '--strictPort',
-  ]);
+  const frontend = run(
+    'npm',
+    ['run', 'dev', '--workspace', 'mobile', '--', '--host', '0.0.0.0', '--port', '5173', '--strictPort'],
+    { env: { VITE_API_PROXY_TARGET: `http://127.0.0.1:${apiPort}` } },
+  );
 
   const addresses = Object.values(networkInterfaces())
     .flat()
