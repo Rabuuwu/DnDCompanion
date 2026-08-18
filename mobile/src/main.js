@@ -2853,6 +2853,7 @@ function renderApp(statusMessage = null) {
             target
               .querySelectorAll('[data-dm-character-panel]')
               .forEach((panel) => panel.classList.toggle('active', panel.dataset.dmCharacterPanel === tab));
+            target.scrollTop = 0;
           };
           target.querySelectorAll('[data-dm-character-tab]').forEach((button) => {
             button.addEventListener('click', () => setCharacterTab(button.dataset.dmCharacterTab));
