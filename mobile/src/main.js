@@ -2988,7 +2988,7 @@ function renderApp(statusMessage = null) {
               <div class="dm-form-row"><label><span>Kategoria</span><select name="category">${noteCategories.map((category) => `<option${(note?.category || 'Luźne') === category ? ' selected' : ''}>${category}</option>`).join('')}</select></label><label><span>Tagi, po przecinku</span><input name="tags" value="${escapeHtml((note?.tags || []).join(', '))}"></label></div>
               <label class="dm-check-row"><input type="checkbox" name="isPinned"${note?.is_pinned ? ' checked' : ''}><span>Przypnij notatkę</span></label>
               <label class="dm-grow-field"><span>Treść</span><textarea name="content" maxlength="50000">${escapeHtml(note?.content || '')}</textarea></label>
-              <div class="dm-form-actions"><small data-save-state>${note ? 'Zmiany zapisują się automatycznie.' : 'Uzupełnij tytuł i treść.'}</small>${note ? '<button type="button" class="danger small" data-archive-note>Archiwizuj</button>' : '<button type="submit">Utwórz notatkę</button>'}</div>
+              <div class="dm-form-actions"><small data-save-state>${note ? 'Zmiany zapisują się automatycznie.' : 'Uzupełnij tytuł i treść.'}</small>${note ? '<button type="button" class="danger small" data-archive-note>Archiwizuj</button>' : '<div class="dm-form-actions"><button type="button" class="secondary" data-cancel-note>Anuluj</button><button type="submit">Utwórz notatkę</button></div>'}</div>
             </form>`;
             const form = editor.querySelector('[data-dm-note-form]');
             if (!note) {
@@ -3010,6 +3010,9 @@ function renderApp(statusMessage = null) {
                 });
                 if (!result.ok) return window.alert('Nie udało się utworzyć notatki.');
                 await loadNotes();
+              });
+              form.querySelector('[data-cancel-note]')?.addEventListener('click', () => {
+                editor.innerHTML = '<div class="empty-state"><p>Wybierz notatkę albo utwórz nową.</p></div>';
               });
               form.querySelector('input[name="title"]')?.focus();
               return;
