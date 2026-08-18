@@ -305,7 +305,11 @@ async function run() {
           title: name,
           publicContent: 'Opis publiczny',
           privateContent: 'Sekret DM',
-          visibility: 'dm',
+          visibility: module === 'quests' ? 'party' : 'dm',
+          data:
+            module === 'quests'
+              ? { mainGoal: 'Odnaleźć list', commissioner: 'Karczmarz', rewards: '50 sztuk złota', resolution: 'Tajne' }
+              : {},
         }),
       });
       assert.equal(entityResponse.status, 201);
@@ -368,7 +372,11 @@ async function run() {
     const shared = await sharedResponse.json();
     assert.equal(shared.materials[0].title, 'List gończy');
     assert.equal(shared.secrets[0].title, 'Ukryta prawda');
-    assert.ok(shared.timeline.some((event) => event.title === 'Wybór drogi'));
+    assert.equal(shared.quests[0].name, 'Zaginiony list');
+    assert.equal(shared.quests[0].main_goal, 'Odnaleźć list');
+    assert.equal(shared.quests[0].steps[0].title, 'Odnajdź świadka');
+    assert.equal(shared.quests[0].private_content, undefined);
+    assert.equal(shared.quests[0].resolution, undefined);
 
     const roleResponse = await request(`/api/campaigns/${campaign.id}/dm/members/${second.user.id}/role`, {
       method: 'PUT',

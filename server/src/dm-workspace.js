@@ -61,6 +61,11 @@ function jsonValue(value, fallback) {
   }
 }
 
+function jsonArray(value) {
+  const parsed = jsonValue(value, []);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
 function pagination(query) {
   const requestedLimit = Number(query.limit || 50);
   const requestedOffset = Number(query.offset || 0);
@@ -245,14 +250,14 @@ function sessionPayload(body) {
     plannedAt: body?.plannedAt || null,
     actualAt: body?.actualAt || null,
     status,
-    participants: jsonValue(body?.participants, []).map(parseId).filter(Boolean).slice(0, 100),
+    participants: jsonArray(body?.participants).map(parseId).filter(Boolean).slice(0, 100),
     summary: optionalText(body?.summary, 10_000),
     publicSummary: optionalText(body?.publicSummary, 10_000),
     privateSummary: optionalText(body?.privateSummary, 10_000),
     plan: optionalText(body?.plan, 50_000),
     liveNotes: optionalText(body?.liveNotes, 50_000),
     rewards: optionalText(body?.rewards, 10_000),
-    checklist: jsonValue(body?.checklist, []).slice(0, 100),
+    checklist: jsonArray(body?.checklist).slice(0, 100),
   };
 }
 
@@ -688,7 +693,7 @@ async function archiveSecret(req, res) {
 async function revealSecret(req, res) {
   const campaignId = requireCampaignId(req, res);
   const secretId = parseId(req.params.secretId);
-  const recipients = jsonValue(req.body?.characterIds, []).map(parseId).filter(Boolean).slice(0, 100);
+  const recipients = jsonArray(req.body?.characterIds).map(parseId).filter(Boolean).slice(0, 100);
   if (!campaignId || !secretId || !recipients.length || req.body?.confirmed !== true) {
     return res.status(400).json({ error: 'secret_reveal_confirmation_required' });
   }
@@ -887,7 +892,7 @@ async function deleteQuestStep(req, res) {
 async function shareMaterial(req, res) {
   const campaignId = requireCampaignId(req, res);
   const materialId = parseId(req.params.materialId);
-  const recipients = jsonValue(req.body?.characterIds, []).map(parseId).filter(Boolean).slice(0, 100);
+  const recipients = jsonArray(req.body?.characterIds).map(parseId).filter(Boolean).slice(0, 100);
   if (!campaignId || !materialId || !recipients.length || req.body?.confirmed !== true) {
     return res.status(400).json({ error: 'material_share_confirmation_required' });
   }
@@ -933,7 +938,7 @@ async function listSharedCampaignContent(req, res) {
   ]);
   const characterId = membership.rows[0]?.character_id;
   if (!characterId) return res.status(404).json({ error: 'campaign_not_found' });
-  const [materials, secrets, timeline] = await Promise.all([
+  const [materials, secrets, quests] = await Promise.all([
     pool.query(
       `SELECT DISTINCT material.id,material.title,material.material_type,material.content,
               material.external_url,material.updated_at
@@ -954,13 +959,30 @@ async function listSharedCampaignContent(req, res) {
       [campaignId, characterId],
     ),
     pool.query(
-      `SELECT id,occurred_at,world_date,event_type,title,content
-       FROM campaign_timeline_events WHERE campaign_id=$1 AND visibility='party'
-       ORDER BY occurred_at DESC,id DESC LIMIT 100`,
+      `SELECT quest.id,quest.name,quest.public_content,quest.status,quest.updated_at,
+              quest.data->>'mainGoal' AS main_goal,
+              quest.data->>'commissioner' AS commissioner,
+              quest.data->>'rewards' AS rewards,
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'id',step.id,
+                    'title',step.title,
+                    'is_completed',step.is_completed,
+                    'sort_order',step.sort_order
+                  ) ORDER BY step.sort_order,step.id
+                ) FILTER (WHERE step.id IS NOT NULL),
+                '[]'::json
+              ) AS steps
+       FROM campaign_quests quest
+       LEFT JOIN quest_steps step ON step.quest_id=quest.id
+       WHERE quest.campaign_id=$1 AND quest.archived_at IS NULL AND quest.visibility='party'
+       GROUP BY quest.id
+       ORDER BY quest.updated_at DESC,quest.id DESC`,
       [campaignId],
     ),
   ]);
-  return res.json({ materials: materials.rows, secrets: secrets.rows, timeline: timeline.rows });
+  return res.json({ materials: materials.rows, secrets: secrets.rows, quests: quests.rows });
 }
 
 async function listTimeline(req, res) {

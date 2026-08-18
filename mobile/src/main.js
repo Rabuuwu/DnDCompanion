@@ -1913,7 +1913,10 @@ function renderApp(statusMessage = null) {
                   </label>
                   ${inventoryDurationControl()}
                   ${inventoryIconPicker()}
-                  <button type="submit">Dodaj do ekwipunku</button>
+                  <div class="dm-form-actions">
+                    <button type="button" class="secondary" data-cancel-inventory-add>Anuluj</button>
+                    <button type="submit">Dodaj do ekwipunku</button>
+                  </div>
                   </form>
                 </section>
                 <p id="inventory-status" class="inventory-status" role="status"></p>
@@ -2699,6 +2702,11 @@ function renderApp(statusMessage = null) {
           inventoryForm?.classList.toggle('hidden');
           event.currentTarget.classList.toggle('open');
         });
+        inventoryForm?.querySelector('[data-cancel-dm-inventory]')?.addEventListener('click', () => {
+          inventoryForm.reset();
+          inventoryForm.classList.add('hidden');
+          container.querySelector('[data-dm-open-inventory]')?.classList.remove('open');
+        });
         inventoryForm
           ?.querySelector('input[name="name"]')
           ?.addEventListener('input', () => selectAutomaticInventoryIcon(inventoryForm));
@@ -2839,7 +2847,7 @@ function renderApp(statusMessage = null) {
               ${section('Notatnik postaci', `<div class="dm-character-notebook">${teammate.notebook?.text ? `<p>${escapeHtml(teammate.notebook.text).replace(/\r?\n/g, '<br>')}</p>` : '<p class="section-note">Brak notatek tekstowych.</p>'}<canvas class="dm-notebook-preview" data-dm-notebook-preview aria-label="Podgląd rysunku z notatnika"></canvas><small>Kreski na kartce: ${teammate.notebook?.strokes?.length || 0}</small></div>`, true)}
             </div>
             <div class="dm-character-panel" data-dm-character-panel="inventory">
-              ${section('Ekwipunek', `${inventoryRows}<section class="inventory-add-card"><button class="inventory-add-trigger" type="button" data-dm-open-inventory><span class="inventory-icon add">+</span><span><strong>Dodaj przedmiot</strong><small>Dodaj przedmiot jako DM</small></span></button><form class="inventory-item-form dm-inventory-add-form hidden" data-dm-add-inventory><label><span>Nazwa przedmiotu</span><input name="name" maxlength="150" required></label><label><span>Ilość</span><input name="quantity" type="number" min="1" max="9999" value="1" required></label>${inventoryDurationControl()}${inventoryIconPicker()}<button type="submit" class="small">Dodaj do ekwipunku</button></form></section>`, true)}
+              ${section('Ekwipunek', `${inventoryRows}<section class="inventory-add-card"><button class="inventory-add-trigger" type="button" data-dm-open-inventory><span class="inventory-icon add">+</span><span><strong>Dodaj przedmiot</strong><small>Dodaj przedmiot jako DM</small></span></button><form class="inventory-item-form dm-inventory-add-form hidden" data-dm-add-inventory><label><span>Nazwa przedmiotu</span><input name="name" maxlength="150" required></label><label><span>Ilość</span><input name="quantity" type="number" min="1" max="9999" value="1" required></label>${inventoryDurationControl()}${inventoryIconPicker()}<div class="dm-form-actions"><button type="button" class="secondary small" data-cancel-dm-inventory>Anuluj</button><button type="submit" class="small">Dodaj do ekwipunku</button></div></form></section>`, true)}
             </div>
             <div class="dm-character-panel" data-dm-character-panel="notes">
               <label class="dm-note-field general"><span>Prywatne notatki DM o tej postaci</span><textarea data-dm-character-note maxlength="50000" placeholder="Twoje prywatne notatki…">${escapeHtml(teammate.dmNote)}</textarea></label>
@@ -3287,8 +3295,11 @@ function renderApp(statusMessage = null) {
                   `<label><span>${label}</span><textarea data-extra-field="${key}" maxlength="5000">${escapeHtml(record?.data?.[key] || record?.[key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)] || '')}</textarea></label>`,
               )
               .join('');
-            editor.innerHTML = `<form class="dm-workspace-form" data-record-form><label><span>Nazwa</span><input name="name" maxlength="200" value="${escapeHtml(record?.name || record?.title || '')}" required></label>${config.statuses.length ? `<label><span>Status</span><select name="status">${config.statuses.map(([value, label]) => `<option value="${value}"${record?.status === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}<label><span>Opis dla graczy</span><textarea name="publicContent" maxlength="10000">${escapeHtml(record?.public_content || '')}</textarea></label><label><span>Prywatne informacje DM</span><textarea name="privateContent" maxlength="20000">${escapeHtml(record?.private_content || '')}</textarea></label>${extraFields}<label><span>Widoczność</span><select name="visibility"><option value="dm">Tylko DM</option><option value="party"${record?.visibility === 'party' ? ' selected' : ''}>Cała drużyna</option><option value="selected"${record?.visibility === 'selected' ? ' selected' : ''}>Wybrane postacie</option></select></label><div class="dm-form-actions"><button type="submit">${record ? 'Zapisz' : 'Utwórz'}</button>${record ? '<button type="button" class="danger" data-archive-record>Archiwizuj</button>' : ''}</div></form>`;
+            editor.innerHTML = `<form class="dm-workspace-form" data-record-form><label><span>Nazwa</span><input name="name" maxlength="200" value="${escapeHtml(record?.name || record?.title || '')}" required></label>${config.statuses.length ? `<label><span>Status</span><select name="status">${config.statuses.map(([value, label]) => `<option value="${value}"${record?.status === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}<label><span>Opis dla graczy</span><textarea name="publicContent" maxlength="10000">${escapeHtml(record?.public_content || '')}</textarea></label><label><span>Prywatne informacje DM</span><textarea name="privateContent" maxlength="20000">${escapeHtml(record?.private_content || '')}</textarea></label>${extraFields}<label><span>Widoczność</span><select name="visibility"><option value="dm">Tylko DM</option><option value="party"${record?.visibility === 'party' ? ' selected' : ''}>Cała drużyna</option></select></label><div class="dm-form-actions"><button type="button" class="secondary" data-cancel-record>Anuluj</button><button type="submit">${record ? 'Zapisz' : 'Utwórz'}</button>${record ? '<button type="button" class="danger" data-archive-record>Archiwizuj</button>' : ''}</div></form>`;
             const form = editor.querySelector('[data-record-form]');
+            form.querySelector('[data-cancel-record]')?.addEventListener('click', () => {
+              editor.innerHTML = '<div class="empty-state"><p>Wybierz wpis albo dodaj nowy.</p></div>';
+            });
             form.addEventListener('submit', async (event) => {
               event.preventDefault();
               const data = new FormData(form);
@@ -3558,12 +3569,20 @@ function renderApp(statusMessage = null) {
               <label><span>Opis</span><textarea name="description" maxlength="2000"${isOwner ? '' : ' disabled'}>${escapeHtml(settings.campaign.description || '')}</textarea></label>
               <label><span>Grafika kampanii</span><input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp"${isOwner ? '' : ' disabled'}></label>
               <div data-campaign-image-preview>${settings.campaign.image ? `<img class="dm-settings-image" src="${escapeHtml(settings.campaign.image)}" alt="Aktualna grafika kampanii">` : '<small>Brak grafiki kampanii.</small>'}</div>
-              ${isOwner ? '<button type="submit">Zapisz ustawienia</button>' : '<p class="section-note">Ustawienia kampanii może zmienić wyłącznie właściciel.</p>'}
+              ${isOwner ? '<div class="dm-form-actions"><button type="reset" class="secondary">Anuluj zmiany</button><button type="submit">Zapisz ustawienia</button></div>' : '<p class="section-note">Ustawienia kampanii może zmienić wyłącznie właściciel.</p>'}
             </form>
             <section><h3>Role i członkowie</h3><div class="dm-record-list">${settings.members.map((member) => `<article class="dm-member-role"><span><strong>${escapeHtml(member.username)}</strong><small>${escapeHtml(member.character_name || 'Bez postaci')}</small></span>${Number(member.user_id) === Number(settings.campaign.owner_id) ? '<strong>Właściciel</strong>' : `<div class="dm-member-role-actions"><select data-member-role="${member.user_id}"${isOwner ? '' : ' disabled'}><option value="player">Gracz</option><option value="co_dm"${member.role === 'co_dm' ? ' selected' : ''}>Współprowadzący</option></select>${isOwner ? `<button type="button" class="danger small" data-remove-campaign-member="${member.user_id}">Usuń</button>` : ''}</div>`}</article>`).join('')}</div></section>
             ${isOwner ? '<button type="button" class="danger" data-archive-campaign>Archiwizuj kampanię</button>' : ''}`;
           const form = target.querySelector('[data-campaign-settings]');
           let campaignImage = settings.campaign.image || '';
+          form.addEventListener('reset', () => {
+            campaignImage = settings.campaign.image || '';
+            window.requestAnimationFrame(() => {
+              target.querySelector('[data-campaign-image-preview]').innerHTML = campaignImage
+                ? `<img class="dm-settings-image" src="${escapeHtml(campaignImage)}" alt="Aktualna grafika kampanii">`
+                : '<small>Brak grafiki kampanii.</small>';
+            });
+          });
           form.querySelector('input[name="imageFile"]')?.addEventListener('change', async (event) => {
             try {
               campaignImage = await prepareProfileImage(event.target.files?.[0]);
@@ -3707,7 +3726,7 @@ function renderApp(statusMessage = null) {
                       )
                       .join('')}
                   </div>
-                  <button type="button" class="secondary character-team-shared-action" data-open-campaign-shared="${campaign.id}" data-campaign-name="${escapeHtml(campaign.name)}">Materiały i informacje kampanii</button>
+                  <button type="button" class="secondary character-team-shared-action" data-open-campaign-shared="${campaign.id}" data-campaign-name="${escapeHtml(campaign.name)}">Zadania, materiały i informacje</button>
                   ${campaign.isDm ? `<button type="button" class="character-team-dm-action" data-open-dm-panel="${campaign.id}" data-campaign-name="${escapeHtml(campaign.name)}">Panel DM</button>` : ''}
                 </section>
               `,
@@ -3739,7 +3758,16 @@ function renderApp(statusMessage = null) {
                 const response = await authenticatedFetch(`/api/campaigns/${campaignId}/shared`);
                 if (!response.ok) throw new Error('shared_content_load_failed');
                 const shared = await response.json();
-                sharedTarget.innerHTML = `<section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section>`;
+                const questStatus = {
+                  prepared: 'Przygotowane',
+                  available: 'Dostępne',
+                  active: 'Aktywne',
+                  paused: 'Wstrzymane',
+                  completed: 'Ukończone',
+                  failed: 'Nieudane',
+                  hidden: 'Ukryte',
+                };
+                sharedTarget.innerHTML = `<section><h3>Zadania drużyny</h3><div class="dm-record-list">${(shared.quests || []).map((quest) => `<article class="dm-record-card campaign-shared-quest"><div class="dm-module-toolbar"><strong>${escapeHtml(quest.name)}</strong><small>${escapeHtml(questStatus[quest.status] || quest.status)}</small></div>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : ''}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}${quest.commissioner ? `<small>Zleceniodawca: ${escapeHtml(quest.commissioner)}</small>` : ''}${quest.steps?.length ? `<ul>${quest.steps.map((step) => `<li${step.is_completed ? ' class="completed"' : ''}>${step.is_completed ? '✓' : '○'} ${escapeHtml(step.title)}</li>`).join('')}</ul>` : ''}${quest.rewards ? `<p><strong>Nagrody:</strong> ${escapeHtml(quest.rewards)}</p>` : ''}</article>`).join('') || '<p class="section-note">DM nie udostępnił jeszcze żadnych zadań.</p>'}</div></section><section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section>`;
               } catch {
                 sharedTarget.innerHTML =
                   '<div class="empty-state"><p>Nie udało się pobrać materiałów kampanii.</p></div>';
@@ -3856,6 +3884,12 @@ function renderApp(statusMessage = null) {
         if (!inventoryForm?.classList.contains('hidden')) {
           inventoryForm.querySelector('input[name="name"]')?.focus();
         }
+      });
+      inventoryForm?.querySelector('[data-cancel-inventory-add]')?.addEventListener('click', () => {
+        inventoryForm.reset();
+        delete inventoryForm.dataset.iconManuallySelected;
+        inventoryForm.classList.add('hidden');
+        document.querySelector('#open-add-inventory-item')?.classList.remove('open');
       });
 
       inventoryList?.addEventListener('click', async (event) => {

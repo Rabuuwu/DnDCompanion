@@ -1654,6 +1654,19 @@ select {
   background: rgba(255, 255, 255, 0.045);
 }
 
+.campaign-shared-quest ul {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.25rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.campaign-shared-quest li.completed {
+  color: var(--text-soft);
+  text-decoration: line-through;
+}
+
 button.dm-record-card {
   display: grid;
   width: 100%;
