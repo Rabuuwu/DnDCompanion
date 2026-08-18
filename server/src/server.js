@@ -259,7 +259,7 @@ app.delete('/api/friends/:id', requireAuth, removeFriend);
 app.put('/api/friends/:id/nickname', requireAuth, setFriendNickname);
 app.post('/api/users/:id/block', authLimiter, requireAuth, blockUser);
 app.post('/api/users/:id/report', authLimiter, requireAuth, reportUser);
-app.get('/api/notifications', requireAuth, listNotifications);
+app.get('/api/notifications', readLimiter, requireAuth, listNotifications);
 app.get('/api/notifications/stream', requireAuth, streamNotifications);
 app.post('/api/notifications/campaign-content/:id/read', mutationLimiter, requireAuth, readCampaignContentNotification);
 
