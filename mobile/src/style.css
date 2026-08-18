@@ -1220,6 +1220,10 @@ select {
   background: linear-gradient(135deg, var(--accent), #4f46e5);
 }
 
+.character-team-shared-action {
+  width: 100%;
+}
+
 .team-member {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1420,6 +1424,7 @@ select {
   background: linear-gradient(145deg, var(--accent), #4338ca);
   font-family: Georgia, serif;
   font-weight: 800;
+  object-fit: cover;
 }
 
 .dm-campaign-meta,
@@ -1577,6 +1582,192 @@ select {
   min-height: min(32rem, 60vh);
 }
 
+.dm-module-toolbar,
+.dm-form-actions,
+.dm-member-role,
+.dm-scene-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.dm-module-toolbar h3,
+.dm-module-toolbar p,
+.dm-material-card h4,
+.dm-material-card p,
+.dm-timeline p {
+  margin: 0;
+}
+
+.dm-subnav {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scrollbar-width: thin;
+}
+
+.dm-subnav button {
+  min-width: max-content;
+}
+
+.dm-subnav button.active {
+  background: linear-gradient(135deg, var(--accent), #4f46e5);
+}
+
+.dm-notes-layout,
+.dm-content-layout {
+  display: grid;
+  min-height: min(32rem, 60vh);
+  gap: 0.7rem;
+}
+
+.dm-record-list,
+.dm-note-editor,
+.dm-record-editor,
+.dm-workspace-form,
+.dm-session-columns {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+}
+
+.dm-record-card,
+.dm-material-card,
+.dm-scene-row,
+.dm-member-role {
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  color: var(--text);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+button.dm-record-card {
+  display: grid;
+  width: 100%;
+  gap: 0.2rem;
+}
+
+.dm-record-card small,
+.dm-record-card p,
+.dm-member-role small,
+.dm-scene-row small,
+.dm-material-card > span,
+.dm-timeline small {
+  color: var(--text-soft);
+  font-size: 0.74rem;
+}
+
+.dm-record-card.pinned {
+  border-color: rgba(251, 191, 36, 0.6);
+}
+
+.dm-workspace-form {
+  min-height: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 0.85rem;
+  background: rgba(124, 58, 237, 0.07);
+}
+
+.dm-workspace-form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.dm-workspace-form label > span {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.dm-workspace-form textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.dm-grow-field textarea {
+  min-height: 18rem;
+}
+
+.dm-check-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.dm-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.dm-session-columns textarea {
+  min-height: 12rem;
+}
+
+.dm-scene-row > div:first-child,
+.dm-member-role > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.dm-member-role-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dm-settings-image {
+  display: block;
+  width: min(100%, 28rem);
+  max-height: 14rem;
+  border-radius: 0.8rem;
+  object-fit: cover;
+}
+
+.dm-material-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.dm-material-card {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dm-timeline {
+  display: grid;
+  gap: 0;
+}
+
+.dm-timeline article {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.dm-timeline article > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.65rem;
+  color: #fff;
+  text-decoration: none;
+  background: var(--accent);
+}
+
 @media (min-width: 800px) {
   .dm-workspace {
     grid-template-columns: 11rem minmax(0, 1fr);
@@ -1617,6 +1808,19 @@ select {
 
   .dm-member-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dm-notes-layout,
+  .dm-content-layout {
+    grid-template-columns: minmax(14rem, 0.8fr) minmax(20rem, 1.4fr);
+  }
+
+  .dm-session-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dm-material-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

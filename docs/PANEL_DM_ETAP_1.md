@@ -29,20 +29,20 @@ Aktualizacja: 2026-08-18
 - na telefonie nawigacja jest poziomo przewijana, a na szerokim ekranie działa jako lewy pasek;
 - rozszerzono test integracyjny o autoryzację i kontrakt lekkiego Pulpitu.
 
-## Świadomie pozostawione na dalsze etapy
+## Dalsze etapy
 
-- system wielu notatek DM i migracja starej notatki — Etap 2;
-- sesje, sceny i wydarzenia — Etap 3;
-- NPC, zadania i wątki — Etap 4;
-- lokacje, frakcje i sekrety — Etap 5;
-- handouty i pliki — Etap 6;
-- historia kampanii, współprowadzący, eksport i archiwizacja — Etap 7.
+- system wielu notatek DM i migracja starej notatki — Etap 2: **wykonano**;
+- sesje, sceny i wydarzenia — Etap 3: **wykonano**;
+- NPC, zadania i wątki — Etap 4: **wykonano**;
+- lokacje, frakcje i sekrety — Etap 5: **wykonano**;
+- handouty tekstowe i linki — Etap 6: **wykonano**;
+- historia kampanii, współprowadzący, eksport i archiwizacja — Etap 7: **wykonano**.
 
-Sekcje te mają przygotowaną nawigację oraz uczciwy pusty stan. Nie dodano dla nich prowizorycznych tabel, endpointów ani danych udających działające moduły.
+Upload plików binarnych nie został włączony, ponieważ obecna infrastruktura nie ma prywatnego magazynu obiektowego. Etap 6 zgodnie ze specyfikacją zaczyna się od treści tekstowych i bezpiecznych linków. Obrazy kampanii są kompresowane po stronie klienta i przechowywane w istniejącym modelu Data URL.
 
 ## Migracje
 
-Etap 1 nie wymaga migracji bazy. Wykorzystuje istniejące kampanie, członkostwo, postacie i notatki DM. Pierwsza migracja danych będzie potrzebna dopiero w Etapie 2 i musi zachować obecną ogólną notatkę.
+Etap 1 nie wymagał migracji bazy. Etapy 2–7 wykorzystują `010_campaign_dm_workspace.sql`. Migracja tworzy nowe encje i idempotentnie kopiuje obecną ogólną notatkę do `dm_notes`; nie usuwa starej tabeli ani danych źródłowych.
 
 ## Walidacja
 

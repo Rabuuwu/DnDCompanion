@@ -7,7 +7,14 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { API_BASE, PWA_BASE, WEB_APP_VERSION } from './config.js';
 import { clearSession, getStoredSession, initializeSessionStore, saveSession } from './session-store.js';
 import { authenticatedFetch, fetchAllPages, refreshSession, requestTimeout } from './api-client.js';
-import { CHARACTER_ATTRIBUTES, CHARACTER_AUXILIARY, CHARACTER_COMBAT, CHARACTER_FEATURES, CHARACTER_SKILL_GROUPS, CHARACTER_SPECIAL } from './character-schema.js';
+import {
+  CHARACTER_ATTRIBUTES,
+  CHARACTER_AUXILIARY,
+  CHARACTER_COMBAT,
+  CHARACTER_FEATURES,
+  CHARACTER_SKILL_GROUPS,
+  CHARACTER_SPECIAL,
+} from './character-schema.js';
 import { automaticInventoryIcon, INVENTORY_ICON_KEYS, INVENTORY_ICONS } from './inventory-schema.js';
 import { avatarMarkup, escapeHtml, formatFeatureText, prepareProfileImage } from './ui-utils.js';
 
@@ -49,17 +56,22 @@ function readNotificationState(userId) {
     return {
       messages: Array.isArray(state.messages) ? state.messages : [],
       invitations: Array.isArray(state.invitations) ? state.invitations : [],
+      campaignContent: Array.isArray(state.campaignContent) ? state.campaignContent : [],
     };
   } catch {
-    return { messages: [], invitations: [] };
+    return { messages: [], invitations: [], campaignContent: [] };
   }
 }
 
 function saveNotificationState(userId, state) {
-  localStorage.setItem(notificationStateKey(userId), JSON.stringify({
-    messages: state.messages.slice(-200),
-    invitations: state.invitations.slice(-200),
-  }));
+  localStorage.setItem(
+    notificationStateKey(userId),
+    JSON.stringify({
+      messages: state.messages.slice(-200),
+      invitations: state.invitations.slice(-200),
+      campaignContent: state.campaignContent.slice(-200),
+    }),
+  );
 }
 
 function stopNotificationStream() {
@@ -127,14 +139,16 @@ async function showSystemNotification({ id, title, body, route, avatar = '', cam
     }
     if (permission.display !== 'granted') return false;
     await LocalNotifications.schedule({
-      notifications: [{
-        id,
-        title,
-        body,
-        schedule: { at: new Date(Date.now() + 250), allowWhileIdle: true },
-        ...(campaignActions ? { actionTypeId: 'CAMPAIGN_INVITATION' } : {}),
-        extra: route,
-      }],
+      notifications: [
+        {
+          id,
+          title,
+          body,
+          schedule: { at: new Date(Date.now() + 250), allowWhileIdle: true },
+          ...(campaignActions ? { actionTypeId: 'CAMPAIGN_INVITATION' } : {}),
+          extra: route,
+        },
+      ],
     });
     return true;
   }
@@ -150,10 +164,12 @@ async function showSystemNotification({ id, title, body, route, avatar = '', cam
     tag: `${route.type}-${route.messageId || route.invitationId}`,
     renotify: false,
     data: route,
-    actions: campaignActions ? [
-      { action: 'accept', title: 'Dołącz' },
-      { action: 'decline', title: 'Odrzuć' },
-    ] : [],
+    actions: campaignActions
+      ? [
+          { action: 'accept', title: 'Dołącz' },
+          { action: 'decline', title: 'Odrzuć' },
+        ]
+      : [],
   });
   return true;
 }
@@ -167,7 +183,7 @@ function showInAppNotification({ id, title, body, route, avatar = '', campaignAc
   toast.className = 'in-app-notification';
   toast.dataset.inAppNotification = toastId;
   toast.innerHTML = `
-    <button type="button" aria-label="${escapeHtml(campaignActions ? 'Otwórz zaproszenie do kampanii' : `Otwórz rozmowę z ${title}`)}">
+    <button type="button" aria-label="${escapeHtml(campaignActions ? 'Otwórz zaproszenie do kampanii' : route.type === 'message' ? `Otwórz rozmowę z ${title}` : 'Otwórz powiadomienie')}">
       ${avatarMarkup(avatar, title, 'notification-avatar')}
       <span>
         <strong>${escapeHtml(title)}</strong>
@@ -190,13 +206,15 @@ function showInAppNotification({ id, title, body, route, avatar = '', campaignAc
 async function initializeNativeNotifications() {
   if (!Capacitor.isNativePlatform()) return;
   await LocalNotifications.registerActionTypes({
-    types: [{
-      id: 'CAMPAIGN_INVITATION',
-      actions: [
-        { id: 'accept', title: 'Dołącz' },
-        { id: 'decline', title: 'Odrzuć', destructive: true },
-      ],
-    }],
+    types: [
+      {
+        id: 'CAMPAIGN_INVITATION',
+        actions: [
+          { id: 'accept', title: 'Dołącz' },
+          { id: 'decline', title: 'Odrzuć', destructive: true },
+        ],
+      },
+    ],
   });
   await LocalNotifications.addListener('localNotificationActionPerformed', (event) => {
     dispatchNotificationRoute({
@@ -231,6 +249,8 @@ if (initialNotificationParams.has('notification')) {
     friendId: Number(initialNotificationParams.get('friendId')) || undefined,
     username: initialNotificationParams.get('username') || undefined,
     invitationId: Number(initialNotificationParams.get('invitationId')) || undefined,
+    notificationId: Number(initialNotificationParams.get('notificationId')) || undefined,
+    campaignId: Number(initialNotificationParams.get('campaignId')) || undefined,
     campaignName: initialNotificationParams.get('campaignName') || undefined,
     inviterUsername: initialNotificationParams.get('inviterUsername') || undefined,
     action: initialNotificationParams.get('action') || undefined,
@@ -239,8 +259,7 @@ if (initialNotificationParams.has('notification')) {
 }
 
 function isStandalonePwa() {
-  return window.matchMedia('(display-mode: standalone)').matches
-    || window.navigator.standalone === true;
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
 async function installPwa() {
@@ -257,9 +276,11 @@ async function installPwa() {
   }
 
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  window.alert(isIos
-    ? 'W Safari wybierz Udostępnij, a następnie „Dodaj do ekranu początkowego”.'
-    : 'Otwórz menu przeglądarki i wybierz „Zainstaluj aplikację” lub „Dodaj do ekranu głównego”.');
+  window.alert(
+    isIos
+      ? 'W Safari wybierz Udostępnij, a następnie „Dodaj do ekranu początkowego”.'
+      : 'Otwórz menu przeglądarki i wybierz „Zainstaluj aplikację” lub „Dodaj do ekranu głównego”.',
+  );
 }
 
 function bustCache(url) {
@@ -268,7 +289,9 @@ function bustCache(url) {
 }
 
 function parseVersion(version) {
-  return String(version || '0').split('.').map((part) => Number.parseInt(part, 10) || 0);
+  return String(version || '0')
+    .split('.')
+    .map((part) => Number.parseInt(part, 10) || 0);
 }
 
 function compareVersions(a, b) {
@@ -287,9 +310,7 @@ function compareVersions(a, b) {
 }
 
 function inventoryIconKey(item) {
-  return INVENTORY_ICON_KEYS.has(item?.icon)
-    ? item.icon
-    : automaticInventoryIcon(item?.name) || 'backpack';
+  return INVENTORY_ICON_KEYS.has(item?.icon) ? item.icon : automaticInventoryIcon(item?.name) || 'backpack';
 }
 
 function inventoryIconMarkup(item) {
@@ -305,13 +326,15 @@ function inventoryIconPicker(selected = 'backpack') {
       <legend>Ikona przedmiotu</legend>
       <small>Dla rozpoznanych przedmiotów aplikacja wybierze ikonę automatycznie.</small>
       <div>
-        ${INVENTORY_ICONS.map(([key, label]) => `
+        ${INVENTORY_ICONS.map(
+          ([key, label]) => `
           <label title="${escapeHtml(label)}">
             <input type="radio" name="icon" value="${key}" ${key === selectedKey ? 'checked' : ''} />
             <span><img src="./img/${key}.png" alt="" /></span>
             <small>${escapeHtml(label)}</small>
           </label>
-        `).join('')}
+        `,
+        ).join('')}
       </div>
     </fieldset>
   `;
@@ -366,7 +389,10 @@ function serializeInventory(items) {
     .map((item) => {
       const name = String(item.name || '').trim();
       const quantity = Math.max(1, Math.min(9999, Number(item.quantity) || 1));
-      const duration = String(item.duration || '').trim().replace(/\r?\n/g, ' ').slice(0, 100);
+      const duration = String(item.duration || '')
+        .trim()
+        .replace(/\r?\n/g, ' ')
+        .slice(0, 100);
       const icon = INVENTORY_ICON_KEYS.has(item.icon) ? item.icon : '';
       return `${name} × ${quantity}${duration ? ` ⏱ ${duration}` : ''}${icon ? ` [icon=${icon}]` : ''}`;
     })
@@ -504,7 +530,10 @@ function renderApp(statusMessage = null) {
   document.body.classList.toggle('authenticated', Boolean(storedSession));
   app.innerHTML = `
     <main class="app-shell${storedSession ? ' authenticated-shell' : ''}">
-      ${storedSession ? '' : `
+      ${
+        storedSession
+          ? ''
+          : `
       <div class="hero-band">
         <img class="brand-icon" src="./app-icon-192.png" alt="" />
         <div>
@@ -512,9 +541,12 @@ function renderApp(statusMessage = null) {
           <h1>D&amp;D Companion</h1>
         </div>
       </div>
-      `}
+      `
+      }
 
-      ${storedSession ? `
+      ${
+        storedSession
+          ? `
         <section class="app-main-screen">
           <header class="app-header">
             <div id="app-header-identity" class="header-identity">
@@ -549,7 +581,8 @@ function renderApp(statusMessage = null) {
             </button>
           </section>
         </section>
-      ` : `
+      `
+          : `
         <section class="auth-screen">
           <div class="auth-card compact">
             <div class="auth-switch">
@@ -572,7 +605,8 @@ function renderApp(statusMessage = null) {
 
           </div>
         </section>
-      `}
+      `
+      }
 
     </main>
   `;
@@ -670,7 +704,7 @@ function renderApp(statusMessage = null) {
       { username: loginUsernameInput.value, password: loginPasswordInput.value },
       loginBtn,
       (username) => `Zalogowano jako ${username}`,
-      'Błąd logowania'
+      'Błąd logowania',
     );
   }
 
@@ -681,7 +715,7 @@ function renderApp(statusMessage = null) {
       { username: registerUsernameInput.value, password: registerPasswordInput.value },
       registerBtn,
       (username) => `Konto utworzone dla ${username}`,
-      'Błąd rejestracji'
+      'Błąd rejestracji',
     );
   }
 
@@ -719,9 +753,9 @@ function renderApp(statusMessage = null) {
         return;
       }
       const permission = await Notification.requestPermission();
-      window.alert(permission === 'granted'
-        ? 'Powiadomienia dla PWA zostały włączone.'
-        : 'Nie udzielono zgody na powiadomienia.');
+      window.alert(
+        permission === 'granted' ? 'Powiadomienia dla PWA zostały włączone.' : 'Nie udzielono zgody na powiadomienia.',
+      );
       return;
     }
 
@@ -737,7 +771,7 @@ function renderApp(statusMessage = null) {
       window.alert(
         Capacitor.getPlatform() === 'ios'
           ? 'Ustawienia powiadomień będą dostępne po przygotowaniu natywnej wersji iOS.'
-          : 'Nie udało się otworzyć ustawień powiadomień.'
+          : 'Nie udało się otworzyć ustawień powiadomień.',
       );
     }
   }
@@ -754,6 +788,7 @@ function renderApp(statusMessage = null) {
       const state = readNotificationState(session.user.id);
       const knownMessages = new Set(state.messages);
       const knownInvitations = new Set(state.invitations);
+      const knownCampaignContent = new Set(state.campaignContent);
       let activeConversationUpdated = false;
 
       for (const message of notifications.messages || []) {
@@ -812,6 +847,27 @@ function renderApp(statusMessage = null) {
         }
       }
 
+      for (const item of notifications.campaignContent || []) {
+        if (knownCampaignContent.has(item.id)) continue;
+        const notification = {
+          id: 1_500_000_000 + item.id,
+          title: item.type === 'campaign_secret' ? 'Odkryto nową informację' : 'Nowy materiał kampanii',
+          body: `${item.campaign.name}: ${item.title}`,
+          route: {
+            type: 'campaign_content',
+            notificationId: item.id,
+            campaignId: item.campaign.id,
+            campaignName: item.campaign.name,
+          },
+        };
+        const shownInApp = showInAppNotification(notification);
+        const shownSystem = await showSystemNotification(notification);
+        if (shownInApp || shownSystem) {
+          state.campaignContent.push(item.id);
+          knownCampaignContent.add(item.id);
+        }
+      }
+
       saveNotificationState(session.user.id, state);
     } catch (error) {
       if (error.message !== 'session_expired') console.error('Notification polling failed', error);
@@ -847,9 +903,13 @@ function renderApp(statusMessage = null) {
           <label>
             <span>Postać</span>
             <select name="characterId" required>
-              ${characters.map((character) => `
+              ${characters
+                .map(
+                  (character) => `
                 <option value="${character.id}">${escapeHtml(character.name)} — ${escapeHtml(character.race)}, poziom ${character.level}</option>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </select>
           </label>
           <div>
@@ -933,9 +993,10 @@ function renderApp(statusMessage = null) {
       </details>
     `;
     };
-    const rangedAttributeOptions = (selected = 'strength') => CHARACTER_ATTRIBUTES.map(([key, label]) => (
-      `<option value="${key}" ${key === selected ? 'selected' : ''}>${label}</option>`
-    )).join('');
+    const rangedAttributeOptions = (selected = 'strength') =>
+      CHARACTER_ATTRIBUTES.map(
+        ([key, label]) => `<option value="${key}" ${key === selected ? 'selected' : ''}>${label}</option>`,
+      ).join('');
     const rangedFormulaTermRow = (term = {}) => {
       const type = ['percent', 'fraction', 'flat'].includes(term.type) ? term.type : 'percent';
       return `
@@ -945,18 +1006,24 @@ function renderApp(statusMessage = null) {
             <option value="fraction" ${type === 'fraction' ? 'selected' : ''}>Ułamek statystyki</option>
             <option value="flat" ${type === 'flat' ? 'selected' : ''}>Stała liczba</option>
           </select>
-          ${type === 'percent' ? `
+          ${
+            type === 'percent'
+              ? `
             <input data-formula-field="value" type="number" min="-1000" max="1000" value="${fieldValue(term.value, 100)}" aria-label="Procent" />
             <span>%</span>
             <select data-formula-field="attribute" aria-label="Statystyka">${rangedAttributeOptions(term.attribute)}</select>
-          ` : type === 'fraction' ? `
+          `
+              : type === 'fraction'
+                ? `
             <input data-formula-field="numerator" type="number" min="-100" max="100" value="${fieldValue(term.numerator, 1)}" aria-label="Licznik" />
             <span>/</span>
             <input data-formula-field="denominator" type="number" min="1" max="100" value="${fieldValue(term.denominator, 2)}" aria-label="Mianownik" />
             <select data-formula-field="attribute" aria-label="Statystyka">${rangedAttributeOptions(term.attribute)}</select>
-          ` : `
+          `
+                : `
             <input data-formula-field="value" type="number" min="-99999" max="99999" value="${fieldValue(term.value, 0)}" aria-label="Stała wartość" />
-          `}
+          `
+          }
           <button type="button" class="icon-button delete" data-remove-formula-term aria-label="Usuń człon wzoru" title="Usuń człon">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 7h16" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M5 7l1 13h12l1-13" /><path d="M9 7V4h6v3" />
@@ -1009,23 +1076,31 @@ function renderApp(statusMessage = null) {
         </div>
       `;
     };
-    const evaluateFormulaTerms = (terms, attributes) => Math.trunc(terms.reduce((sum, term) => {
-      if (term.type === 'flat') return sum + (Number(term.value) || 0);
-      const base = Number(attributes[term.attribute]) || 0;
-      if (base < 0) return sum + base;
-      const scaled = term.type === 'percent'
-        ? (base * (Number(term.value) || 0)) / 100
-        : (base * (Number(term.numerator) || 0)) / Math.max(1, Number(term.denominator) || 1);
-      return sum + (scaled > 0 ? Math.max(1, scaled) : scaled);
-    }, 0));
-    const formulaTermsText = (terms = []) => terms.map((term) => {
-      const attribute = CHARACTER_ATTRIBUTES.find(([key]) => key === term.attribute)?.[1] || 'Statystyka';
-      if (term.type === 'percent') return `${Number(term.value) || 0}% ${attribute}`;
-      if (term.type === 'fraction') {
-        return `${Number(term.numerator) || 0}/${Math.max(1, Number(term.denominator) || 1)} ${attribute}`;
-      }
-      return String(Number(term.value) || 0);
-    }).join(' + ').replace(/\+ -/g, '− ');
+    const evaluateFormulaTerms = (terms, attributes) =>
+      Math.trunc(
+        terms.reduce((sum, term) => {
+          if (term.type === 'flat') return sum + (Number(term.value) || 0);
+          const base = Number(attributes[term.attribute]) || 0;
+          if (base < 0) return sum + base;
+          const scaled =
+            term.type === 'percent'
+              ? (base * (Number(term.value) || 0)) / 100
+              : (base * (Number(term.numerator) || 0)) / Math.max(1, Number(term.denominator) || 1);
+          return sum + (scaled > 0 ? Math.max(1, scaled) : scaled);
+        }, 0),
+      );
+    const formulaTermsText = (terms = []) =>
+      terms
+        .map((term) => {
+          const attribute = CHARACTER_ATTRIBUTES.find(([key]) => key === term.attribute)?.[1] || 'Statystyka';
+          if (term.type === 'percent') return `${Number(term.value) || 0}% ${attribute}`;
+          if (term.type === 'fraction') {
+            return `${Number(term.numerator) || 0}/${Math.max(1, Number(term.denominator) || 1)} ${attribute}`;
+          }
+          return String(Number(term.value) || 0);
+        })
+        .join(' + ')
+        .replace(/\+ -/g, '− ');
     const featureRow = (type, item = {}) => `
       <div class="feature-editor-row" data-feature-row="${type}">
         <div class="feature-editor-heading">
@@ -1034,18 +1109,24 @@ function renderApp(statusMessage = null) {
         </div>
         <textarea data-feature-field="description" maxlength="1000" rows="3" placeholder="Opis działania">${fieldValue(item.description)}</textarea>
         <div class="feature-timing-fields">
-          ${type === 'campActions' ? `
+          ${
+            type === 'campActions'
+              ? `
             <label>
               <span>Czas trwania</span>
               <input data-feature-field="duration" maxlength="100" placeholder="np. 2 godziny" value="${fieldValue(item.duration)}" required />
             </label>
-          ` : ''}
+          `
+              : ''
+          }
           <label>
             <span>Cooldown (CD)</span>
             <input data-feature-field="cooldown" maxlength="100" placeholder="np. 3 tury lub raz na dzień" value="${fieldValue(item.cooldown)}" />
           </label>
         </div>
-        ${type === 'abilities' ? `
+        ${
+          type === 'abilities'
+            ? `
           <div class="ranged-spell-editor">
             <label class="ranged-spell-toggle">
               <input data-feature-field="ranged" type="checkbox" ${item.ranged ? 'checked' : ''} />
@@ -1068,15 +1149,21 @@ function renderApp(statusMessage = null) {
               </div>
             </div>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
         <div class="feature-editor-actions">
-          ${type === 'abilities' ? `
+          ${
+            type === 'abilities'
+              ? `
             <label class="tooth-cost-input">
               <span>Koszt</span>
               <input data-feature-field="toothCost" type="number" min="0" max="999" value="${fieldValue(item.toothCost, 0)}" />
               <span aria-hidden="true">⚙</span>
             </label>
-          ` : ''}
+          `
+              : ''
+          }
           <button type="button" class="icon-button delete" data-remove-feature aria-label="Usuń wpis" title="Usuń">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 7h16" />
@@ -1158,24 +1245,32 @@ function renderApp(statusMessage = null) {
           </label>
         `;
       }).join('');
-      const combat = CHARACTER_COMBAT.map(([key, label]) => `
+      const combat = CHARACTER_COMBAT.map(
+        ([key, label]) => `
         <div class="formula-row${key === 'initiative' ? ' value-only' : ''}">
           <label><span>${label}</span><input name="combat-${key}-value" data-formula-result="combat-${key}" placeholder="Wartość" value="${fieldValue(character?.combat?.[key]?.value, 0)}" ${key === 'initiative' ? '' : 'readonly'} /></label>
-          ${key === 'initiative' ? '' : `
+          ${
+            key === 'initiative'
+              ? ''
+              : `
             ${statFormulaBuilder('combat', key, character?.combat?.[key])}
-          `}
+          `
+          }
         </div>
-      `).join('');
-      const currentAttributeValues = Object.fromEntries(CHARACTER_ATTRIBUTES.map(([key]) => [
-        key,
-        character?.attributes?.[key]?.adventure ?? 0,
-      ]));
+      `,
+      ).join('');
+      const currentAttributeValues = Object.fromEntries(
+        CHARACTER_ATTRIBUTES.map(([key]) => [key, character?.attributes?.[key]?.adventure ?? 0]),
+      );
       const calculatedCurrentAuxiliary = auxiliaryValues(currentAttributeValues);
-      const currentAuxiliary = Object.fromEntries(CHARACTER_AUXILIARY.map(([key]) => [
-        key,
-        character?.auxiliary?.[key]?.value ?? calculatedCurrentAuxiliary[key],
-      ]));
-      const auxiliary = CHARACTER_AUXILIARY.map(([key, label]) => `
+      const currentAuxiliary = Object.fromEntries(
+        CHARACTER_AUXILIARY.map(([key]) => [
+          key,
+          character?.auxiliary?.[key]?.value ?? calculatedCurrentAuxiliary[key],
+        ]),
+      );
+      const auxiliary = CHARACTER_AUXILIARY.map(
+        ([key, label]) => `
         <div class="auxiliary-preview">
           <label class="auxiliary-value" for="auxiliary-${key}">
             <span>${label}</span>
@@ -1183,17 +1278,23 @@ function renderApp(statusMessage = null) {
           </label>
           ${statFormulaBuilder('auxiliary', key, character?.auxiliary?.[key], defaultAuxiliaryFormulaTerms[key])}
         </div>
-      `).join('');
-      const skills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
+      `,
+      ).join('');
+      const skills = CHARACTER_SKILL_GROUPS.map(
+        ([group, entries, groupKey]) => `
         <div class="skill-group">
           <h4>${group}</h4>
-          ${entries.map(([key, label]) => `
+          ${entries
+            .map(
+              ([key, label]) => `
             <div class="skill-row">
               <label><span>${label}</span><input name="skill-${key}-percent" type="number" min="0" max="1000" value="${fieldValue(character?.skills?.[key]?.percent, character ? 0 : 100)}" /></label>
               <span class="percent-mark">%</span>
               <input name="skill-${key}-note" placeholder="Notatka (opcjonalnie)" value="${fieldValue(character?.skills?.[key]?.note)}" />
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
           <div class="custom-skill-list" data-custom-skill-list="${groupKey}">
             ${(character?.customSkills || [])
               .filter((item) => item.group === groupKey)
@@ -1202,33 +1303,46 @@ function renderApp(statusMessage = null) {
           </div>
           <button type="button" class="secondary small" data-add-custom-skill="${groupKey}">Dodaj własną podstatystykę</button>
         </div>
-      `).join('');
-      const special = CHARACTER_SPECIAL.map(([key, label]) => `
+      `,
+      ).join('');
+      const special = CHARACTER_SPECIAL.map(
+        ([key, label]) => `
         <div class="special-row">
           <span>${label}</span>
           <input name="special-${key}-current" type="number" min="0" max="999" value="${fieldValue(character?.special?.[key]?.current, 0)}" aria-label="${label} obecnie" />
           <span>/</span>
           <input name="special-${key}-max" type="number" min="0" max="999" value="${fieldValue(character?.special?.[key]?.max, character ? 0 : 11)}" aria-label="${label} maksimum" />
         </div>
-      `).join('');
-      const features = CHARACTER_FEATURES.map(([type, label, addLabel]) => `
-        ${section(label, `
+      `,
+      ).join('');
+      const features = CHARACTER_FEATURES.map(
+        ([type, label, addLabel]) => `
+        ${section(
+          label,
+          `
           <div class="feature-editor-list" data-feature-list="${type}">
             ${(character?.features?.[type] || []).map((item) => featureRow(type, item)).join('')}
           </div>
           <button type="button" class="secondary small" data-add-feature="${type}">${addLabel}</button>
-        `, false, `editor.features.${type}`)}
-      `).join('');
-      const characterGuilds = Array.isArray(character?.guilds) && character.guilds.length
-        ? character.guilds
-        : character?.guildRank
-          ? [{ name: 'Dotychczasowa gildia', rank: character.guildRank }]
-          : [];
+        `,
+          false,
+          `editor.features.${type}`,
+        )}
+      `,
+      ).join('');
+      const characterGuilds =
+        Array.isArray(character?.guilds) && character.guilds.length
+          ? character.guilds
+          : character?.guildRank
+            ? [{ name: 'Dotychczasowa gildia', rank: character.guildRank }]
+            : [];
 
       editor.innerHTML = `
         <form id="character-form" class="character-form">
           <h3>${character ? 'Edytuj postać' : 'Nowa postać'}</h3>
-          ${section('Dane podstawowe', `
+          ${section(
+            'Dane podstawowe',
+            `
             <div class="avatar-editor">
               <div id="character-avatar-preview">
                 ${avatarMarkup(characterAvatar, character?.name || 'Postać', 'character-avatar')}
@@ -1258,13 +1372,21 @@ function renderApp(statusMessage = null) {
               <label><span>Punkty</span><input name="points" type="number" value="${fieldValue(character?.points, 0)}" /></label>
               <label><span>Minimum punktów</span><input name="minimumPoints" type="number" value="${fieldValue(character?.minimumPoints, -10)}" /></label>
             </div>
-          `, true, 'editor.basic')}
-          ${section('Gildie', `
+          `,
+            true,
+            'editor.basic',
+          )}
+          ${section(
+            'Gildie',
+            `
             <div class="guild-editor-list" data-guild-list>
               ${characterGuilds.map((guild) => guildRow(guild)).join('')}
             </div>
             <button type="button" class="secondary small" data-add-guild>Dodaj gildię</button>
-          `, true, 'editor.guilds')}
+          `,
+            true,
+            'editor.guilds',
+          )}
           ${section('Statystyki główne', `<p class="section-note">Wartość bojowa oblicza się automatycznie.</p><div class="attribute-grid">${attributes}</div>`, true, 'editor.stats.main')}
           ${section('Statystyki walki', combat, false, 'editor.stats.combat')}
           ${section('Statystyki pomocnicze', `<div class="auxiliary-grid">${auxiliary}</div>`, false, 'editor.stats.auxiliary')}
@@ -1315,10 +1437,12 @@ function renderApp(statusMessage = null) {
       });
 
       const recalculateStatFormulas = () => {
-        const attributeValues = Object.fromEntries(CHARACTER_ATTRIBUTES.map(([attributeKey]) => [
-          attributeKey,
-          Number(editor.querySelector(`[name="attribute-${attributeKey}"]`)?.value) || 0,
-        ]));
+        const attributeValues = Object.fromEntries(
+          CHARACTER_ATTRIBUTES.map(([attributeKey]) => [
+            attributeKey,
+            Number(editor.querySelector(`[name="attribute-${attributeKey}"]`)?.value) || 0,
+          ]),
+        );
         editor.querySelectorAll('[data-stat-formula-builder]').forEach((builder) => {
           const terms = [...builder.querySelectorAll('[data-ranged-formula-term]')].map(rangedFormulaTermValue);
           const output = editor.querySelector(`[data-formula-result="${builder.dataset.statFormulaBuilder}"]`);
@@ -1378,8 +1502,9 @@ function renderApp(statusMessage = null) {
         const moveFeature = (moveEvent) => {
           if (moveEvent.pointerId !== event.pointerId) return;
           moveEvent.preventDefault();
-          const siblings = [...featureList.querySelectorAll(':scope > [data-feature-row]')]
-            .filter((row) => row !== draggedRow);
+          const siblings = [...featureList.querySelectorAll(':scope > [data-feature-row]')].filter(
+            (row) => row !== draggedRow,
+          );
           const nextRow = siblings.find((row) => {
             const bounds = row.getBoundingClientRect();
             return moveEvent.clientY < bounds.top + bounds.height / 2;
@@ -1403,7 +1528,8 @@ function renderApp(statusMessage = null) {
         const finishFeatureReorder = (finishEvent) => cleanup(finishEvent);
         const cancelFeatureReorder = (cancelEvent) => {
           cleanup(cancelEvent);
-          if (originalNextSibling?.parentElement === featureList) featureList.insertBefore(draggedRow, originalNextSibling);
+          if (originalNextSibling?.parentElement === featureList)
+            featureList.insertBefore(draggedRow, originalNextSibling);
           else featureList.appendChild(draggedRow);
         };
 
@@ -1428,9 +1554,14 @@ function renderApp(statusMessage = null) {
           const nextType = event.target.value;
           const attribute = row.querySelector('[data-formula-field="attribute"]')?.value || 'strength';
           const previousValue = Number(row.querySelector('[data-formula-field="value"]')?.value);
-          const nextTerm = nextType === 'fraction'
-            ? { type: nextType, numerator: 1, denominator: 2, attribute }
-            : { type: nextType, value: Number.isFinite(previousValue) ? previousValue : (nextType === 'percent' ? 100 : 0), attribute };
+          const nextTerm =
+            nextType === 'fraction'
+              ? { type: nextType, numerator: 1, denominator: 2, attribute }
+              : {
+                  type: nextType,
+                  value: Number.isFinite(previousValue) ? previousValue : nextType === 'percent' ? 100 : 0,
+                  attribute,
+                };
           row.insertAdjacentHTML('beforebegin', rangedFormulaTermRow(nextTerm));
           row.remove();
           recalculateStatFormulas();
@@ -1450,7 +1581,9 @@ function renderApp(statusMessage = null) {
         }
         const addFormulaTerm = event.target.closest('[data-add-formula-term]');
         if (addFormulaTerm) {
-          addFormulaTerm.closest('.ranged-formula-builder')?.querySelector('[data-ranged-formula-list]')
+          addFormulaTerm
+            .closest('.ranged-formula-builder')
+            ?.querySelector('[data-ranged-formula-list]')
             ?.insertAdjacentHTML('beforeend', rangedFormulaTermRow());
           recalculateStatFormulas();
         }
@@ -1461,7 +1594,8 @@ function renderApp(statusMessage = null) {
       editor.querySelectorAll('[data-add-custom-skill]').forEach((button) => {
         button.addEventListener('click', () => {
           const group = button.dataset.addCustomSkill;
-          editor.querySelector(`[data-custom-skill-list="${group}"]`)
+          editor
+            .querySelector(`[data-custom-skill-list="${group}"]`)
             ?.insertAdjacentHTML('beforeend', customSkillRow(group));
         });
       });
@@ -1495,55 +1629,96 @@ function renderApp(statusMessage = null) {
           })),
           inventory: character?.inventory || '',
           notebook: character?.notebook || { mode: 'text', text: '', strokes: [] },
-          attributes: Object.fromEntries(CHARACTER_ATTRIBUTES.map(([key]) => [key, Number(formData.get(`attribute-${key}`))])),
-          combat: Object.fromEntries(CHARACTER_COMBAT.map(([key]) => [key, {
-            value: formData.get(`combat-${key}-value`),
-            formula: '',
-            formulaTerms: key === 'initiative' ? [] : [...form.querySelectorAll(`[data-stat-formula-builder="combat-${key}"] [data-ranged-formula-term]`)].map(rangedFormulaTermValue),
-          }])),
-          auxiliary: Object.fromEntries(CHARACTER_AUXILIARY.map(([key]) => [key, {
-            value: Number(formData.get(`auxiliary-${key}`)),
-            formula: '',
-            formulaTerms: [...form.querySelectorAll(`[data-stat-formula-builder="auxiliary-${key}"] [data-ranged-formula-term]`)].map(rangedFormulaTermValue),
-          }])),
-          skills: Object.fromEntries(CHARACTER_SKILL_GROUPS.flatMap(([, entries]) => entries).map(([key]) => [key, {
-            percent: Number(formData.get(`skill-${key}-percent`)),
-            note: formData.get(`skill-${key}-note`),
-          }])),
-          customSkills: Array.from(form.querySelectorAll('[data-custom-skill-row]')).map((row) => ({
-            group: row.dataset.customSkillGroup,
-            name: row.querySelector('[data-custom-skill-field="name"]').value,
-            percent: Number(row.querySelector('[data-custom-skill-field="percent"]').value),
-          })).filter((item) => item.name.trim()),
-          special: Object.fromEntries(CHARACTER_SPECIAL.map(([key]) => [key, {
-            current: Number(formData.get(`special-${key}-current`)),
-            max: Number(formData.get(`special-${key}-max`)),
-          }])),
-          features: Object.fromEntries(CHARACTER_FEATURES.map(([type]) => [
-            type,
-            [...form.querySelectorAll(`[data-feature-row="${type}"]`)].map((row) => ({
-              name: row.querySelector('[data-feature-field="name"]').value,
-              description: row.querySelector('[data-feature-field="description"]').value,
-              cooldown: row.querySelector('[data-feature-field="cooldown"]').value,
-              ...(type === 'campActions' ? {
-                duration: row.querySelector('[data-feature-field="duration"]').value,
-              } : {}),
-              ...(type === 'abilities' ? {
-                toothCost: Number(row.querySelector('[data-feature-field="toothCost"]').value),
-                ranged: row.querySelector('[data-feature-field="ranged"]').checked,
-                range: row.querySelector('[data-feature-field="range"]').value,
-                formulaTerms: [...row.querySelectorAll('[data-ranged-formula-term]')].map(rangedFormulaTermValue),
-              } : {}),
-            })).filter((item) => item.name.trim()),
-          ])),
+          attributes: Object.fromEntries(
+            CHARACTER_ATTRIBUTES.map(([key]) => [key, Number(formData.get(`attribute-${key}`))]),
+          ),
+          combat: Object.fromEntries(
+            CHARACTER_COMBAT.map(([key]) => [
+              key,
+              {
+                value: formData.get(`combat-${key}-value`),
+                formula: '',
+                formulaTerms:
+                  key === 'initiative'
+                    ? []
+                    : [
+                        ...form.querySelectorAll(
+                          `[data-stat-formula-builder="combat-${key}"] [data-ranged-formula-term]`,
+                        ),
+                      ].map(rangedFormulaTermValue),
+              },
+            ]),
+          ),
+          auxiliary: Object.fromEntries(
+            CHARACTER_AUXILIARY.map(([key]) => [
+              key,
+              {
+                value: Number(formData.get(`auxiliary-${key}`)),
+                formula: '',
+                formulaTerms: [
+                  ...form.querySelectorAll(`[data-stat-formula-builder="auxiliary-${key}"] [data-ranged-formula-term]`),
+                ].map(rangedFormulaTermValue),
+              },
+            ]),
+          ),
+          skills: Object.fromEntries(
+            CHARACTER_SKILL_GROUPS.flatMap(([, entries]) => entries).map(([key]) => [
+              key,
+              {
+                percent: Number(formData.get(`skill-${key}-percent`)),
+                note: formData.get(`skill-${key}-note`),
+              },
+            ]),
+          ),
+          customSkills: Array.from(form.querySelectorAll('[data-custom-skill-row]'))
+            .map((row) => ({
+              group: row.dataset.customSkillGroup,
+              name: row.querySelector('[data-custom-skill-field="name"]').value,
+              percent: Number(row.querySelector('[data-custom-skill-field="percent"]').value),
+            }))
+            .filter((item) => item.name.trim()),
+          special: Object.fromEntries(
+            CHARACTER_SPECIAL.map(([key]) => [
+              key,
+              {
+                current: Number(formData.get(`special-${key}-current`)),
+                max: Number(formData.get(`special-${key}-max`)),
+              },
+            ]),
+          ),
+          features: Object.fromEntries(
+            CHARACTER_FEATURES.map(([type]) => [
+              type,
+              [...form.querySelectorAll(`[data-feature-row="${type}"]`)]
+                .map((row) => ({
+                  name: row.querySelector('[data-feature-field="name"]').value,
+                  description: row.querySelector('[data-feature-field="description"]').value,
+                  cooldown: row.querySelector('[data-feature-field="cooldown"]').value,
+                  ...(type === 'campActions'
+                    ? {
+                        duration: row.querySelector('[data-feature-field="duration"]').value,
+                      }
+                    : {}),
+                  ...(type === 'abilities'
+                    ? {
+                        toothCost: Number(row.querySelector('[data-feature-field="toothCost"]').value),
+                        ranged: row.querySelector('[data-feature-field="ranged"]').checked,
+                        range: row.querySelector('[data-feature-field="range"]').value,
+                        formulaTerms: [...row.querySelectorAll('[data-ranged-formula-term]')].map(
+                          rangedFormulaTermValue,
+                        ),
+                      }
+                    : {}),
+                }))
+                .filter((item) => item.name.trim()),
+            ]),
+          ),
         };
 
         submitButton.disabled = true;
         errorElement.textContent = '';
         try {
-          const path = character
-            ? `/api/characters/${character.id}`
-            : '/api/characters';
+          const path = character ? `/api/characters/${character.id}` : '/api/characters';
           const response = await authenticatedFetch(path, {
             method: character ? 'PUT' : 'POST',
             body: JSON.stringify(payload),
@@ -1553,9 +1728,10 @@ function renderApp(statusMessage = null) {
           leaveEditor();
           await renderCharacters();
         } catch (error) {
-          errorElement.textContent = error.message === 'session_expired'
-            ? 'Sesja wygasła. Zaloguj się ponownie.'
-            : 'Nie udało się zapisać postaci.';
+          errorElement.textContent =
+            error.message === 'session_expired'
+              ? 'Sesja wygasła. Zaloguj się ponownie.'
+              : 'Nie udało się zapisać postaci.';
           submitButton.disabled = false;
         }
       });
@@ -1570,20 +1746,30 @@ function renderApp(statusMessage = null) {
         const stat = character.attributes?.[key] || { adventure: 0, combat: 0 };
         return `<div class="sheet-row"><span>${label}</span><strong>${stat.adventure} / ${stat.combat}</strong></div>`;
       }).join('');
-      const formulaRows = (definitions, values) => definitions.map(([key, label]) => {
-        const stat = values?.[key] || {};
-        const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
-        return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
-      }).join('');
-      const skillRows = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
-        <div class="sheet-skill-group"><h4>${group}</h4>${entries.map(([key, label]) => {
-          const skill = character.skills?.[key] || {};
-          return `<div class="sheet-row"><span>${label}${skill.note ? ` <small>(${escapeHtml(skill.note)})</small>` : ''}</span><strong>${skill.percent ?? 0}% = ${skill.result ?? 0}</strong></div>`;
-        }).join('')}${(character.customSkills || [])
+      const formulaRows = (definitions, values) =>
+        definitions
+          .map(([key, label]) => {
+            const stat = values?.[key] || {};
+            const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
+            return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
+          })
+          .join('');
+      const skillRows = CHARACTER_SKILL_GROUPS.map(
+        ([group, entries, groupKey]) => `
+        <div class="sheet-skill-group"><h4>${group}</h4>${entries
+          .map(([key, label]) => {
+            const skill = character.skills?.[key] || {};
+            return `<div class="sheet-row"><span>${label}${skill.note ? ` <small>(${escapeHtml(skill.note)})</small>` : ''}</span><strong>${skill.percent ?? 0}% = ${skill.result ?? 0}</strong></div>`;
+          })
+          .join('')}${(character.customSkills || [])
           .filter((item) => item.group === groupKey)
-          .map((item) => `<div class="sheet-row custom"><span>${escapeHtml(item.name)}</span><strong>${item.percent ?? 0}% = ${item.result ?? 0}</strong></div>`)
+          .map(
+            (item) =>
+              `<div class="sheet-row custom"><span>${escapeHtml(item.name)}</span><strong>${item.percent ?? 0}% = ${item.result ?? 0}</strong></div>`,
+          )
           .join('')}</div>
-      `).join('');
+      `,
+      ).join('');
       const specialRows = CHARACTER_SPECIAL.map(([key, label]) => {
         const value = character.special?.[key] || {};
         return `<div class="sheet-row"><span>${label}</span><strong>${value.current ?? 0} / ${value.max ?? 0}</strong></div>`;
@@ -1591,29 +1777,39 @@ function renderApp(statusMessage = null) {
       const featureLists = CHARACTER_FEATURES.map(([type, label]) => {
         const items = character.features?.[type] || [];
         const content = items.length
-          ? `<div class="feature-sheet-list" data-feature-order-list="${type}">${items.map((item, index) => `
+          ? `<div class="feature-sheet-list" data-feature-order-list="${type}">${items
+              .map(
+                (item, index) => `
               <article class="feature-sheet-item" data-feature-order-item="${index}">
                 <div class="feature-sheet-heading">
                   <button type="button" class="feature-sheet-drag-handle" data-feature-sheet-drag aria-label="Zmień kolejność ${escapeHtml(item.name)}" title="Przeciągnij, aby zmienić kolejność">⠿</button>
                   <h4>${escapeHtml(item.name)}</h4>
                   ${type === 'abilities' ? `<strong>${Number(item.toothCost) || 0} ⏱️</strong>` : ''}
                 </div>
-                ${(item.duration || item.cooldown || item.ranged) ? `
+                ${
+                  item.duration || item.cooldown || item.ranged
+                    ? `
                   <div class="feature-sheet-meta">
                     ${item.duration ? `<span>Czas trwania: <strong>${escapeHtml(item.duration)}</strong></span>` : ''}
                     ${item.cooldown ? `<span>Cooldown: <strong>${escapeHtml(item.cooldown)}</strong></span>` : ''}
                     ${item.ranged ? `<span>Zasięg: <strong>${escapeHtml(item.range || 'Nie podano')}</strong></span>` : ''}
                     ${item.ranged && item.formulaTerms?.length ? `<span class="wide">Wzór: <strong>${escapeHtml(formulaTermsText(item.formulaTerms))}</strong></span>` : ''}
                   </div>
-                ` : ''}
+                `
+                    : ''
+                }
                 ${item.description ? `<div class="formatted-feature-description">${formatFeatureText(item.description)}</div>` : ''}
               </article>
-            `).join('')}</div><p class="feature-order-status" data-feature-order-status="${type}" role="status"></p>`
+            `,
+              )
+              .join('')}</div><p class="feature-order-status" data-feature-order-status="${type}" role="status"></p>`
           : '<p class="section-note">Brak wpisów.</p>';
         return section(label, content, true, `character.features.${type}`);
       }).join('');
       const guildRows = (character.guilds || []).length
-        ? `<div class="character-guild-list">${character.guilds.map((guild) => `
+        ? `<div class="character-guild-list">${character.guilds
+            .map(
+              (guild) => `
             <div class="character-guild">
               <span aria-hidden="true">🛡️</span>
               <div>
@@ -1622,7 +1818,9 @@ function renderApp(statusMessage = null) {
                 ${guild.profession ? `<small>Profesja: ${escapeHtml(guild.profession)}</small>` : ''}
               </div>
             </div>
-          `).join('')}</div>`
+          `,
+            )
+            .join('')}</div>`
         : '<p class="section-note">Postać nie należy do żadnej gildii.</p>';
 
       if (headerIdentity) {
@@ -1792,7 +1990,9 @@ function renderApp(statusMessage = null) {
       });
       characterTabs?.querySelectorAll('[data-character-tab]').forEach((button) => {
         button.addEventListener('click', () => {
-          characterTabs.querySelectorAll('[data-character-tab]').forEach((item) => item.classList.toggle('active', item === button));
+          characterTabs
+            .querySelectorAll('[data-character-tab]')
+            .forEach((item) => item.classList.toggle('active', item === button));
           contentPanel.querySelectorAll('[data-character-panel]').forEach((panel) => {
             panel.classList.toggle('active', panel.dataset.characterPanel === button.dataset.characterTab);
           });
@@ -1808,8 +2008,9 @@ function renderApp(statusMessage = null) {
       const persistFeatureOrder = async (featureList) => {
         const type = featureList.dataset.featureOrderList;
         const status = contentPanel.querySelector(`[data-feature-order-status="${type}"]`);
-        const orderedIndices = [...featureList.querySelectorAll(':scope > [data-feature-order-item]')]
-          .map((item) => Number(item.dataset.featureOrderItem));
+        const orderedIndices = [...featureList.querySelectorAll(':scope > [data-feature-order-item]')].map((item) =>
+          Number(item.dataset.featureOrderItem),
+        );
         const nextItems = orderedIndices.map((index) => character.features[type][index]);
         if (status) status.textContent = 'Zapisywanie kolejności…';
         try {
@@ -1863,8 +2064,9 @@ function renderApp(statusMessage = null) {
         const moveFeature = (moveEvent) => {
           if (moveEvent.pointerId !== event.pointerId) return;
           moveEvent.preventDefault();
-          const siblings = [...featureList.querySelectorAll(':scope > [data-feature-order-item]')]
-            .filter((item) => item !== draggedItem);
+          const siblings = [...featureList.querySelectorAll(':scope > [data-feature-order-item]')].filter(
+            (item) => item !== draggedItem,
+          );
           const nextItem = siblings.find((item) => {
             const bounds = item.getBoundingClientRect();
             return moveEvent.clientY < bounds.top + bounds.height / 2;
@@ -2004,13 +2206,19 @@ function renderApp(statusMessage = null) {
       function hsvToRgb(hue, saturation, value) {
         const chroma = value * saturation;
         const section = hue / 60;
-        const intermediate = chroma * (1 - Math.abs(section % 2 - 1));
-        const [red, green, blue] = section < 1 ? [chroma, intermediate, 0]
-          : section < 2 ? [intermediate, chroma, 0]
-            : section < 3 ? [0, chroma, intermediate]
-              : section < 4 ? [0, intermediate, chroma]
-                : section < 5 ? [intermediate, 0, chroma]
-                  : [chroma, 0, intermediate];
+        const intermediate = chroma * (1 - Math.abs((section % 2) - 1));
+        const [red, green, blue] =
+          section < 1
+            ? [chroma, intermediate, 0]
+            : section < 2
+              ? [intermediate, chroma, 0]
+              : section < 3
+                ? [0, chroma, intermediate]
+                : section < 4
+                  ? [0, intermediate, chroma]
+                  : section < 5
+                    ? [intermediate, 0, chroma]
+                    : [chroma, 0, intermediate];
         const match = value - chroma;
         return [red, green, blue].map((channel) => Math.round((channel + match) * 255));
       }
@@ -2035,7 +2243,7 @@ function renderApp(statusMessage = null) {
               image.data[index + 3] = 0;
               continue;
             }
-            const hue = (Math.atan2(offsetY, offsetX) * 180 / Math.PI + 360) % 360;
+            const hue = ((Math.atan2(offsetY, offsetX) * 180) / Math.PI + 360) % 360;
             const saturation = Math.min(1, distance / (radius - 2));
             const [red, green, blue] = hsvToRgb(hue, saturation, 0.88);
             image.data[index] = red;
@@ -2068,7 +2276,7 @@ function renderApp(statusMessage = null) {
         const offsetY = point.y - radius;
         const distance = Math.hypot(offsetX, offsetY);
         if (distance > radius) return;
-        const hue = (Math.atan2(offsetY, offsetX) * 180 / Math.PI + 360) % 360;
+        const hue = ((Math.atan2(offsetY, offsetX) * 180) / Math.PI + 360) % 360;
         const saturation = Math.min(1, distance / (radius - 2));
         notebookPenColor = rgbHex(...hsvToRgb(hue, saturation, 0.88));
         notebookColorMarker = point;
@@ -2133,9 +2341,13 @@ function renderApp(statusMessage = null) {
         const deltaX = end.x - start.x;
         const deltaY = end.y - start.y;
         if (!deltaX && !deltaY) return Math.hypot(point.x - start.x, point.y - start.y);
-        const position = Math.max(0, Math.min(1,
-          ((point.x - start.x) * deltaX + (point.y - start.y) * deltaY) / (deltaX * deltaX + deltaY * deltaY)
-        ));
+        const position = Math.max(
+          0,
+          Math.min(
+            1,
+            ((point.x - start.x) * deltaX + (point.y - start.y) * deltaY) / (deltaX * deltaX + deltaY * deltaY),
+          ),
+        );
         return Math.hypot(point.x - (start.x + position * deltaX), point.y - (start.y + position * deltaY));
       }
 
@@ -2169,7 +2381,10 @@ function renderApp(statusMessage = null) {
       notebookMenuToggle?.addEventListener('click', () => {
         const isOpen = notebookFloatingMenu?.classList.toggle('open') || false;
         notebookMenuToggle.setAttribute('aria-expanded', String(isOpen));
-        notebookMenuToggle.setAttribute('aria-label', isOpen ? 'Zamknij narzędzia notatnika' : 'Otwórz narzędzia notatnika');
+        notebookMenuToggle.setAttribute(
+          'aria-label',
+          isOpen ? 'Zamknij narzędzia notatnika' : 'Otwórz narzędzia notatnika',
+        );
         if (!isOpen) notebookColorPopover?.classList.add('hidden');
       });
       contentPanel.querySelectorAll('[data-notebook-tool]').forEach((button) => {
@@ -2197,11 +2412,15 @@ function renderApp(statusMessage = null) {
           setNotebookZoom(notebookView.scale * factor, bounds.width / 2, bounds.height / 2);
         });
       });
-      notebookCanvas?.addEventListener('wheel', (event) => {
-        event.preventDefault();
-        const point = notebookScreenPoint(event);
-        setNotebookZoom(notebookView.scale * (event.deltaY < 0 ? 1.1 : 0.9), point.x, point.y);
-      }, { passive: false });
+      notebookCanvas?.addEventListener(
+        'wheel',
+        (event) => {
+          event.preventDefault();
+          const point = notebookScreenPoint(event);
+          setNotebookZoom(notebookView.scale * (event.deltaY < 0 ? 1.1 : 0.9), point.x, point.y);
+        },
+        { passive: false },
+      );
       notebookColorWheel?.addEventListener('pointerdown', (event) => {
         event.preventDefault();
         notebookColorWheel.setPointerCapture?.(event.pointerId);
@@ -2253,7 +2472,10 @@ function renderApp(statusMessage = null) {
           const [first, second] = [...notebookPointers.values()];
           const center = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
           const distance = Math.hypot(second.x - first.x, second.y - first.y);
-          const scale = Math.max(0.2, Math.min(5, notebookPinch.scale * distance / Math.max(1, notebookPinch.distance)));
+          const scale = Math.max(
+            0.2,
+            Math.min(5, (notebookPinch.scale * distance) / Math.max(1, notebookPinch.distance)),
+          );
           notebookView.scale = scale;
           notebookView.x = center.x - notebookPinch.world.x * scale;
           notebookView.y = center.y - notebookPinch.world.y * scale;
@@ -2310,25 +2532,42 @@ function renderApp(statusMessage = null) {
             const stat = teammate.attributes?.[key] || { adventure: 0, combat: 0 };
             return `<div class="sheet-row"><span>${label}</span><strong>${stat.adventure} / ${stat.combat}</strong></div>`;
           }).join('');
-          const teammateFormulaRows = (definitions, values) => definitions.map(([key, label]) => {
-            const stat = values?.[key] || {};
-            const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
-            return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
-          }).join('');
-          const teammateSkills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
+          const teammateFormulaRows = (definitions, values) =>
+            definitions
+              .map(([key, label]) => {
+                const stat = values?.[key] || {};
+                const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
+                return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
+              })
+              .join('');
+          const teammateSkills = CHARACTER_SKILL_GROUPS.map(
+            ([group, entries, groupKey]) => `
             <div class="sheet-skill-group">
               <h4>${group}</h4>
-              ${entries.map(([key, label]) => {
-                const skill = teammate.skills?.[key] || {};
-                return `<div class="sheet-row"><span>${label}</span><strong>${skill.percent ?? 0}% = ${skill.result ?? 0}</strong></div>`;
-              }).join('')}
-              ${(teammate.customSkills || []).filter((item) => item.group === groupKey).map((item) => `
+              ${entries
+                .map(([key, label]) => {
+                  const skill = teammate.skills?.[key] || {};
+                  return `<div class="sheet-row"><span>${label}</span><strong>${skill.percent ?? 0}% = ${skill.result ?? 0}</strong></div>`;
+                })
+                .join('')}
+              ${(teammate.customSkills || [])
+                .filter((item) => item.group === groupKey)
+                .map(
+                  (item) => `
                 <div class="sheet-row custom"><span>${escapeHtml(item.name)}</span><strong>${item.percent}% = ${item.result}</strong></div>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </div>
-          `).join('');
+          `,
+          ).join('');
           const teammateGuilds = (teammate.guilds || []).length
-            ? teammate.guilds.map((guild) => `<div class="sheet-row"><span>${escapeHtml(guild.name)}</span><strong>${escapeHtml([guild.rank || 'Bez rangi', guild.profession].filter(Boolean).join(' • '))}</strong></div>`).join('')
+            ? teammate.guilds
+                .map(
+                  (guild) =>
+                    `<div class="sheet-row"><span>${escapeHtml(guild.name)}</span><strong>${escapeHtml([guild.rank || 'Bez rangi', guild.profession].filter(Boolean).join(' • '))}</strong></div>`,
+                )
+                .join('')
             : '<p class="section-note">Brak gildii.</p>';
           details.innerHTML = `
             <div class="character-profile-banner">
@@ -2361,7 +2600,10 @@ function renderApp(statusMessage = null) {
       function dmFeatureSections(teammate) {
         return CHARACTER_FEATURES.map(([type, label]) => {
           const items = teammate.features?.[type] || [];
-          const content = items.length ? `<div class="feature-sheet-list">${items.map((item) => `
+          const content = items.length
+            ? `<div class="feature-sheet-list">${items
+                .map(
+                  (item) => `
             <article class="feature-sheet-item">
               <div class="feature-sheet-heading"><h4>${escapeHtml(item.name)}</h4>${type === 'abilities' ? `<strong>${Number(item.toothCost) || 0} ⏱️</strong>` : ''}</div>
               <div class="feature-sheet-meta">
@@ -2372,7 +2614,10 @@ function renderApp(statusMessage = null) {
               </div>
               ${item.description ? `<div class="formatted-feature-description">${formatFeatureText(item.description)}</div>` : ''}
             </article>
-          `).join('')}</div>` : '<p class="section-note">Brak wpisów.</p>';
+          `,
+                )
+                .join('')}</div>`
+            : '<p class="section-note">Brak wpisów.</p>';
           return section(label, content, true);
         }).join('');
       }
@@ -2391,9 +2636,19 @@ function renderApp(statusMessage = null) {
         context.fillRect(0, 0, width, height);
         context.strokeStyle = 'rgba(148, 163, 184, 0.18)';
         context.lineWidth = 1;
-        for (let x = 20; x < width; x += 20) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke(); }
-        for (let y = 20; y < height; y += 20) { context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke(); }
-        const points = strokes.flatMap((stroke) => Array.isArray(stroke.points) ? stroke.points : []);
+        for (let x = 20; x < width; x += 20) {
+          context.beginPath();
+          context.moveTo(x, 0);
+          context.lineTo(x, height);
+          context.stroke();
+        }
+        for (let y = 20; y < height; y += 20) {
+          context.beginPath();
+          context.moveTo(0, y);
+          context.lineTo(width, y);
+          context.stroke();
+        }
+        const points = strokes.flatMap((stroke) => (Array.isArray(stroke.points) ? stroke.points : []));
         if (!points.length) return;
         const minX = Math.min(...points.map((point) => Number(point.x) || 0));
         const maxX = Math.max(...points.map((point) => Number(point.x) || 0));
@@ -2408,7 +2663,8 @@ function renderApp(statusMessage = null) {
           stroke.points.forEach((point, index) => {
             const x = (Number(point.x) || 0) * scale + offsetX;
             const y = (Number(point.y) || 0) * scale + offsetY;
-            if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+            if (index === 0) context.moveTo(x, y);
+            else context.lineTo(x, y);
           });
           context.strokeStyle = /^#[0-9a-f]{6}$/i.test(stroke.color) ? stroke.color : '#1f2937';
           context.lineWidth = Math.max(1, (Number(stroke.width) || 3) * scale);
@@ -2428,10 +2684,14 @@ function renderApp(statusMessage = null) {
               if (other !== textarea) other.value = textarea.value;
             });
             window.clearTimeout(noteTimer);
-            noteTimer = window.setTimeout(() => authenticatedFetch(
-              `/api/campaigns/${campaignId}/dm/characters/${memberId}/note`,
-              { method: 'PUT', body: JSON.stringify({ content: textarea.value }) },
-            ).catch(() => {}), 500);
+            noteTimer = window.setTimeout(
+              () =>
+                authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${memberId}/note`, {
+                  method: 'PUT',
+                  body: JSON.stringify({ content: textarea.value }),
+                }).catch(() => {}),
+              500,
+            );
           });
         });
         const inventoryForm = container.querySelector('[data-dm-add-inventory]');
@@ -2439,29 +2699,43 @@ function renderApp(statusMessage = null) {
           inventoryForm?.classList.toggle('hidden');
           event.currentTarget.classList.toggle('open');
         });
-        inventoryForm?.querySelector('input[name="name"]')?.addEventListener('input', () => selectAutomaticInventoryIcon(inventoryForm));
-        inventoryForm?.querySelectorAll('input[name="icon"]').forEach((input) => input.addEventListener('change', () => {
-          inventoryForm.dataset.iconManuallySelected = 'true';
-        }));
-        inventoryForm?.querySelector('input[name="hasDuration"]')?.addEventListener('change', (event) => toggleInventoryDuration(event.target));
+        inventoryForm
+          ?.querySelector('input[name="name"]')
+          ?.addEventListener('input', () => selectAutomaticInventoryIcon(inventoryForm));
+        inventoryForm?.querySelectorAll('input[name="icon"]').forEach((input) =>
+          input.addEventListener('change', () => {
+            inventoryForm.dataset.iconManuallySelected = 'true';
+          }),
+        );
+        inventoryForm
+          ?.querySelector('input[name="hasDuration"]')
+          ?.addEventListener('change', (event) => toggleInventoryDuration(event.target));
         inventoryForm?.addEventListener('submit', async (event) => {
           event.preventDefault();
           const submit = inventoryForm.querySelector('button[type="submit"]');
           const data = new FormData(inventoryForm);
           submit.disabled = true;
           try {
-            const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${memberId}/inventory`, {
-              method: 'POST',
-              body: JSON.stringify({
-                name: data.get('name'),
-                quantity: Number(data.get('quantity')) || 1,
-                duration: data.get('duration') || '',
-                icon: data.get('icon') || '',
-              }),
-            });
+            const response = await authenticatedFetch(
+              `/api/campaigns/${campaignId}/dm/characters/${memberId}/inventory`,
+              {
+                method: 'POST',
+                body: JSON.stringify({
+                  name: data.get('name'),
+                  quantity: Number(data.get('quantity')) || 1,
+                  duration: data.get('duration') || '',
+                  icon: data.get('icon') || '',
+                }),
+              },
+            );
             if (!response.ok) throw new Error('dm_inventory_add_failed');
             teammate.inventory = (await response.json()).inventory;
-            await showDmCharacter(campaignId, teammate.campaignName || '', { id: memberId, name: teammate.name }, 'inventory');
+            await showDmCharacter(
+              campaignId,
+              teammate.campaignName || '',
+              { id: memberId, name: teammate.name },
+              'inventory',
+            );
           } catch {
             submit.disabled = false;
           }
@@ -2477,7 +2751,9 @@ function renderApp(statusMessage = null) {
             </div>
             <div id="dm-character-content"><p class="loading-copy">Pobieranie pełnej karty postaci…</p></div>
           </div>`;
-        document.querySelector('#dm-character-back')?.addEventListener('click', () => openDmPanel(campaignId, campaignName, 'team'));
+        document
+          .querySelector('#dm-character-back')
+          ?.addEventListener('click', () => openDmPanel(campaignId, campaignName, 'team'));
         const target = document.querySelector('#dm-character-content');
         try {
           const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${member.id}`);
@@ -2487,23 +2763,52 @@ function renderApp(statusMessage = null) {
             const stat = teammate.attributes?.[key] || { adventure: 0, combat: 0 };
             return `<div class="sheet-row"><span>${label}</span><strong>${stat.adventure} / ${stat.combat}</strong></div>`;
           }).join('');
-          const formulaRows = (definitions, values) => definitions.map(([key, label]) => {
-            const stat = values?.[key] || {};
-            const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
-            return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
-          }).join('');
-          const skills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
+          const formulaRows = (definitions, values) =>
+            definitions
+              .map(([key, label]) => {
+                const stat = values?.[key] || {};
+                const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
+                return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
+              })
+              .join('');
+          const skills = CHARACTER_SKILL_GROUPS.map(
+            ([group, entries, groupKey]) => `
             <div class="sheet-skill-group"><h4>${group}</h4>
-              ${entries.map(([key, label]) => { const skill = teammate.skills?.[key] || {}; return `<div class="sheet-row"><span>${label}</span><strong>${skill.percent ?? 0}% = ${skill.result ?? 0}</strong></div>`; }).join('')}
-              ${(teammate.customSkills || []).filter((item) => item.group === groupKey).map((item) => `<div class="sheet-row custom"><span>${escapeHtml(item.name)}</span><strong>${item.percent ?? 0}% = ${item.result ?? 0}</strong></div>`).join('')}
-            </div>`).join('');
-          const special = CHARACTER_SPECIAL.map(([key, label]) => { const value = teammate.special?.[key] || {}; return `<div class="sheet-row"><span>${label}</span><strong>${value.current ?? 0} / ${value.max ?? 0}</strong></div>`; }).join('');
+              ${entries
+                .map(([key, label]) => {
+                  const skill = teammate.skills?.[key] || {};
+                  return `<div class="sheet-row"><span>${label}</span><strong>${skill.percent ?? 0}% = ${skill.result ?? 0}</strong></div>`;
+                })
+                .join('')}
+              ${(teammate.customSkills || [])
+                .filter((item) => item.group === groupKey)
+                .map(
+                  (item) =>
+                    `<div class="sheet-row custom"><span>${escapeHtml(item.name)}</span><strong>${item.percent ?? 0}% = ${item.result ?? 0}</strong></div>`,
+                )
+                .join('')}
+            </div>`,
+          ).join('');
+          const special = CHARACTER_SPECIAL.map(([key, label]) => {
+            const value = teammate.special?.[key] || {};
+            return `<div class="sheet-row"><span>${label}</span><strong>${value.current ?? 0} / ${value.max ?? 0}</strong></div>`;
+          }).join('');
           const guilds = (teammate.guilds || []).length
-            ? teammate.guilds.map((guild) => `<div class="sheet-row"><span>${escapeHtml(guild.name)}</span><strong>${escapeHtml([guild.rank, guild.profession].filter(Boolean).join(' • ') || 'Bez rangi')}</strong></div>`).join('')
+            ? teammate.guilds
+                .map(
+                  (guild) =>
+                    `<div class="sheet-row"><span>${escapeHtml(guild.name)}</span><strong>${escapeHtml([guild.rank, guild.profession].filter(Boolean).join(' • ') || 'Bez rangi')}</strong></div>`,
+                )
+                .join('')
             : '<p class="section-note">Brak gildii.</p>';
           const inventory = parseInventory(teammate.inventory);
           const inventoryRows = inventory.length
-            ? inventory.map((item) => `<div class="sheet-row"><span>${escapeHtml(item.name)}${item.duration ? ` • ${escapeHtml(item.duration)}` : ''}</span><strong>× ${item.quantity}</strong></div>`).join('')
+            ? inventory
+                .map(
+                  (item) =>
+                    `<div class="sheet-row"><span>${escapeHtml(item.name)}${item.duration ? ` • ${escapeHtml(item.duration)}` : ''}</span><strong>× ${item.quantity}</strong></div>`,
+                )
+                .join('')
             : '<p class="section-note">Ekwipunek jest pusty.</p>';
           teammate.campaignName = campaignName;
           target.innerHTML = `
@@ -2544,8 +2849,12 @@ function renderApp(statusMessage = null) {
             <div class="dm-character-panel" data-dm-character-panel="history"><div class="empty-state"><h3>Historia postaci w kampanii</h3><p>Historia działań zostanie uruchomiona razem z osią kampanii.</p></div></div>
           `;
           const setCharacterTab = (tab) => {
-            target.querySelectorAll('[data-dm-character-tab]').forEach((button) => button.classList.toggle('active', button.dataset.dmCharacterTab === tab));
-            target.querySelectorAll('[data-dm-character-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.dmCharacterPanel === tab));
+            target
+              .querySelectorAll('[data-dm-character-tab]')
+              .forEach((button) => button.classList.toggle('active', button.dataset.dmCharacterTab === tab));
+            target
+              .querySelectorAll('[data-dm-character-panel]')
+              .forEach((panel) => panel.classList.toggle('active', panel.dataset.dmCharacterPanel === tab));
           };
           target.querySelectorAll('[data-dm-character-tab]').forEach((button) => {
             button.addEventListener('click', () => setCharacterTab(button.dataset.dmCharacterTab));
@@ -2592,8 +2901,7 @@ function renderApp(statusMessage = null) {
           </div>`;
         headerAction?.querySelector('#dm-panel-back')?.addEventListener('click', () => showCharacter(character));
         const target = document.querySelector('#dm-panel-content');
-        const formatDate = (value) => value ? new Date(value).toLocaleDateString('pl-PL') : 'Brak';
-        const unavailable = (title, description) => `<div class="empty-state dm-module-empty"><h3>${title}</h3><p>${description}</p><small>Moduł jest przewidziany w następnym etapie przebudowy.</small></div>`;
+        const formatDate = (value) => (value ? new Date(value).toLocaleDateString('pl-PL') : 'Brak');
         let generalNoteTimer;
         const loadDashboard = async () => {
           const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/dashboard`);
@@ -2601,22 +2909,22 @@ function renderApp(statusMessage = null) {
           const dashboard = await response.json();
           target.innerHTML = `
             <section class="dm-dashboard-header">
-              <div class="dm-campaign-image" aria-hidden="true">D&amp;D</div>
+              ${dashboard.campaign.image ? `<img class="dm-campaign-image" src="${escapeHtml(dashboard.campaign.image)}" alt="Grafika kampanii ${escapeHtml(dashboard.campaign.name)}">` : '<div class="dm-campaign-image" aria-hidden="true">D&amp;D</div>'}
               <div><p class="eyebrow">Pulpit kampanii</p><h3>${escapeHtml(dashboard.campaign.name)}</h3><p>${dashboard.memberCount} ${dashboard.memberCount === 1 ? 'członek' : 'członków'} drużyny</p></div>
               <button type="button" class="primary" data-dm-section-link="sessions">Przygotuj sesję</button>
             </section>
-            <div class="dm-campaign-meta"><span>Ostatnia sesja <strong>${formatDate(dashboard.lastSession?.actualDate)}</strong></span><span>Następna sesja <strong>${formatDate(dashboard.nextSession?.plannedDate)}</strong></span></div>
+            <div class="dm-campaign-meta"><span>Ostatnia sesja <strong>${formatDate(dashboard.lastSession?.actual_at)}</strong></span><span>Następna sesja <strong>${formatDate(dashboard.nextSession?.planned_at)}</strong></span></div>
             <section><div class="section-heading"><div><p class="eyebrow">Drużyna</p><h3>Szybki podgląd</h3></div><button class="secondary small" data-dm-section-link="team">Zobacz całą</button></div>
               <div class="dm-dashboard-team">${dashboard.members.length ? dashboard.members.map((item) => `<button type="button" class="dm-dashboard-member" data-dm-member="${item.id}">${avatarMarkup(item.avatar, item.name, 'friend-avatar')}<span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.user.username)} • ${escapeHtml(item.race || 'brak rasy')} • ${escapeHtml(item.classes || 'brak klasy')} • poz. ${item.level}</small></span>${item.hasDmNote ? '<span class="dm-note-indicator" title="Ma prywatną notatkę DM">●</span>' : ''}</button>`).join('') : '<div class="empty-state"><p>W kampanii nie ma jeszcze przypisanych postaci.</p></div>'}</div>
             </section>
             <section><div class="section-heading"><div><p class="eyebrow">Stan kampanii</p><h3>Najważniejsze obszary</h3></div></div>
               <div class="dm-status-grid">
-                <button data-dm-section-link="campaign"><strong>Aktywne zadania</strong><span>Moduł w przygotowaniu</span></button>
-                <button data-dm-section-link="campaign"><strong>Otwarte wątki</strong><span>Moduł w przygotowaniu</span></button>
+                <button data-dm-section-link="campaign"><strong>Aktywne zadania</strong><span>${dashboard.counts?.activeQuests || 0}</span></button>
+                <button data-dm-section-link="campaign"><strong>Otwarte wątki</strong><span>${dashboard.counts?.activeThreads || 0}</span></button>
                 <button data-dm-section-link="team"><strong>Notatki DM</strong><span>${dashboard.lastNoteUpdate ? `Ostatnia zmiana ${formatDate(dashboard.lastNoteUpdate)}` : 'Brak zapisanych notatek'}</span></button>
-                <button data-dm-section-link="campaign"><strong>Ostatnio poznani NPC</strong><span>Moduł w przygotowaniu</span></button>
-                <button data-dm-section-link="sessions"><strong>Następna sesja</strong><span>Nie zaplanowano</span></button>
-                <button data-dm-section-link="sessions"><strong>Ostatnia sesja</strong><span>Brak zakończonych sesji</span></button>
+                <button data-dm-section-link="campaign"><strong>NPC kampanii</strong><span>${dashboard.counts?.npcs || 0}</span></button>
+                <button data-dm-section-link="sessions"><strong>Następna sesja</strong><span>${dashboard.nextSession ? escapeHtml(dashboard.nextSession.title) : 'Nie zaplanowano'}</span></button>
+                <button data-dm-section-link="sessions"><strong>Ostatnia sesja</strong><span>${dashboard.lastSession ? escapeHtml(dashboard.lastSession.title) : 'Brak zakończonych sesji'}</span></button>
               </div>
             </section>`;
           target.querySelectorAll('[data-dm-member]').forEach((button) => {
@@ -2643,7 +2951,10 @@ function renderApp(statusMessage = null) {
             window.clearTimeout(generalNoteTimer);
             generalNoteTimer = window.setTimeout(async () => {
               try {
-                const saveResponse = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/note`, { method: 'PUT', body: JSON.stringify({ content: event.target.value }) });
+                const saveResponse = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/note`, {
+                  method: 'PUT',
+                  body: JSON.stringify({ content: event.target.value }),
+                });
                 if (!saveResponse.ok) throw new Error('dm_note_save_failed');
                 if (status) status.textContent = 'Zapisano.';
               } catch {
@@ -2652,40 +2963,722 @@ function renderApp(statusMessage = null) {
             }, 500);
           });
         };
+        const noteCategories = [
+          'Pomysły',
+          'Przygotowanie sesji',
+          'Fabuła',
+          'Gracze',
+          'Zasady własne',
+          'Luźne',
+          'Archiwum',
+        ];
+        const loadNotes = async () => {
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/notes`);
+          if (!response.ok) throw new Error('dm_notes_load_failed');
+          const notes = await response.json();
+          target.innerHTML = `
+            <div class="dm-module-toolbar"><div><p class="eyebrow">Kampania</p><h3>Notatki DM</h3></div><button type="button" data-new-dm-note>+ Nowa notatka</button></div>
+            <div class="dm-notes-layout"><div class="dm-record-list">${notes.length ? notes.map((note) => `<button type="button" class="dm-record-card${note.is_pinned ? ' pinned' : ''}" data-dm-note-id="${note.id}"><strong>${escapeHtml(note.title)}</strong><small>${escapeHtml(note.category)} • ${formatDate(note.updated_at)}</small></button>`).join('') : '<div class="empty-state"><p>Nie masz jeszcze uporządkowanych notatek.</p></div>'}</div><div class="dm-note-editor"><div class="empty-state"><p>Wybierz notatkę albo utwórz nową.</p></div></div></div>`;
+          const editor = target.querySelector('.dm-note-editor');
+          const openEditor = (note = null) => {
+            editor.innerHTML = `<form class="dm-workspace-form" data-dm-note-form>
+              <label><span>Tytuł</span><input name="title" maxlength="200" value="${escapeHtml(note?.title || '')}" required></label>
+              <div class="dm-form-row"><label><span>Kategoria</span><select name="category">${noteCategories.map((category) => `<option${(note?.category || 'Luźne') === category ? ' selected' : ''}>${category}</option>`).join('')}</select></label><label><span>Tagi, po przecinku</span><input name="tags" value="${escapeHtml((note?.tags || []).join(', '))}"></label></div>
+              <label class="dm-check-row"><input type="checkbox" name="isPinned"${note?.is_pinned ? ' checked' : ''}><span>Przypnij notatkę</span></label>
+              <label class="dm-grow-field"><span>Treść</span><textarea name="content" maxlength="50000">${escapeHtml(note?.content || '')}</textarea></label>
+              <div class="dm-form-actions"><small data-save-state>${note ? 'Zmiany zapisują się automatycznie.' : 'Uzupełnij tytuł i treść.'}</small>${note ? '<button type="button" class="danger small" data-archive-note>Archiwizuj</button>' : '<button type="submit">Utwórz notatkę</button>'}</div>
+            </form>`;
+            const form = editor.querySelector('[data-dm-note-form]');
+            if (!note) {
+              form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const data = new FormData(form);
+                const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/notes`, {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    title: data.get('title'),
+                    content: data.get('content'),
+                    category: data.get('category'),
+                    tags: String(data.get('tags') || '')
+                      .split(',')
+                      .map((tag) => tag.trim())
+                      .filter(Boolean),
+                    isPinned: data.get('isPinned') === 'on',
+                  }),
+                });
+                if (!result.ok) return window.alert('Nie udało się utworzyć notatki.');
+                await loadNotes();
+              });
+              form.querySelector('input[name="title"]')?.focus();
+              return;
+            }
+            let saveTimer;
+            form.addEventListener('input', () => {
+              const state = form.querySelector('[data-save-state]');
+              state.textContent = 'Zapisywanie…';
+              window.clearTimeout(saveTimer);
+              saveTimer = window.setTimeout(async () => {
+                const data = new FormData(form);
+                const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/notes/${note.id}`, {
+                  method: 'PUT',
+                  body: JSON.stringify({
+                    title: data.get('title'),
+                    content: data.get('content'),
+                    category: data.get('category'),
+                    tags: String(data.get('tags') || '')
+                      .split(',')
+                      .map((tag) => tag.trim())
+                      .filter(Boolean),
+                    isPinned: data.get('isPinned') === 'on',
+                  }),
+                });
+                state.textContent = result.ok ? 'Zapisano.' : 'Błąd zapisu.';
+              }, 700);
+            });
+            form.querySelector('[data-archive-note]')?.addEventListener('click', async () => {
+              if (!window.confirm('Przenieść tę notatkę do archiwum?')) return;
+              const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/notes/${note.id}`, {
+                method: 'DELETE',
+              });
+              if (result.ok) await loadNotes();
+            });
+          };
+          target.querySelector('[data-new-dm-note]')?.addEventListener('click', () => openEditor());
+          target
+            .querySelectorAll('[data-dm-note-id]')
+            .forEach((button) =>
+              button.addEventListener('click', () =>
+                openEditor(notes.find((note) => Number(note.id) === Number(button.dataset.dmNoteId))),
+              ),
+            );
+        };
+        const loadSessionDetails = async (sessionId) => {
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${sessionId}`);
+          if (!response.ok) throw new Error('dm_session_load_failed');
+          const session = await response.json();
+          const dateInput = (value) => (value ? new Date(value).toISOString().slice(0, 16) : '');
+          target.innerHTML = `<div class="dm-module-toolbar"><button type="button" class="secondary" data-back-sessions>← Sesje</button><div><p class="eyebrow">Sesja ${session.number}</p><h3>${escapeHtml(session.title)}</h3></div></div>
+            <form class="dm-workspace-form" data-session-editor>
+              <div class="dm-form-row"><label><span>Tytuł</span><input name="title" maxlength="200" value="${escapeHtml(session.title)}" required></label><label><span>Status</span><select name="status">${[
+                ['planned', 'Planowana'],
+                ['active', 'W trakcie'],
+                ['completed', 'Zakończona'],
+                ['cancelled', 'Anulowana'],
+              ]
+                .map(
+                  ([value, label]) =>
+                    `<option value="${value}"${session.status === value ? ' selected' : ''}>${label}</option>`,
+                )
+                .join('')}</select></label></div>
+              <div class="dm-form-row"><label><span>Planowana data</span><input name="plannedAt" type="datetime-local" value="${dateInput(session.planned_at)}"></label><label><span>Faktyczna data</span><input name="actualAt" type="datetime-local" value="${dateInput(session.actual_at)}"></label></div>
+              <div class="dm-session-columns"><label><span>Plan DM</span><textarea name="plan" maxlength="50000">${escapeHtml(session.plan)}</textarea></label><label><span>Notatki na żywo</span><textarea name="liveNotes" maxlength="50000">${escapeHtml(session.live_notes)}</textarea></label><label><span>Podsumowanie robocze</span><textarea name="summary" maxlength="10000">${escapeHtml(session.summary)}</textarea></label><label><span>Podsumowanie dla graczy</span><textarea name="publicSummary" maxlength="10000">${escapeHtml(session.public_summary)}</textarea></label><label><span>Prywatne podsumowanie DM</span><textarea name="privateSummary" maxlength="10000">${escapeHtml(session.private_summary)}</textarea></label><label><span>Możliwe nagrody</span><textarea name="rewards" maxlength="10000">${escapeHtml(session.rewards)}</textarea></label></div>
+              <div class="dm-form-actions"><small data-session-save-state>Zmiany zapisują się automatycznie.</small></div>
+            </form>
+            <section><div class="dm-module-toolbar"><h3>Sceny</h3><button type="button" class="small" data-add-scene>+ Scena</button></div><div class="dm-record-list">${session.scenes.length ? session.scenes.map((scene, index) => `<article class="dm-scene-row"><div><strong>${escapeHtml(scene.title)}</strong><small>${escapeHtml(scene.description || '')}</small></div><select data-scene-status="${scene.id}"><option value="planned"${scene.status === 'planned' ? ' selected' : ''}>Planowana</option><option value="completed"${scene.status === 'completed' ? ' selected' : ''}>Zrealizowana</option><option value="skipped"${scene.status === 'skipped' ? ' selected' : ''}>Pominięta</option><option value="moved"${scene.status === 'moved' ? ' selected' : ''}>Przeniesiona</option></select><div><button class="small secondary" data-scene-up="${scene.id}"${index === 0 ? ' disabled' : ''}>↑</button><button class="small secondary" data-scene-down="${scene.id}"${index === session.scenes.length - 1 ? ' disabled' : ''}>↓</button></div></article>`).join('') : '<div class="empty-state"><p>Brak scen w planie.</p></div>'}</div></section>
+            <section><div class="dm-module-toolbar"><h3>Wydarzenia</h3><button type="button" class="small" data-add-event>+ Wydarzenie</button></div><div class="dm-record-list">${session.events.length ? session.events.map((event) => `<article class="dm-record-card"><strong>${escapeHtml(event.title)}</strong><small>${escapeHtml(event.event_type)} • ${new Date(event.created_at).toLocaleString('pl-PL')}</small><p>${escapeHtml(event.content)}</p></article>`).join('') : '<div class="empty-state"><p>Brak zapisanych wydarzeń.</p></div>'}</div></section>`;
+          target.querySelector('[data-back-sessions]')?.addEventListener('click', () => loadSessions());
+          const editor = target.querySelector('[data-session-editor]');
+          let timer;
+          editor.addEventListener('input', () => {
+            const state = editor.querySelector('[data-session-save-state]');
+            state.textContent = 'Zapisywanie…';
+            window.clearTimeout(timer);
+            timer = window.setTimeout(async () => {
+              const data = new FormData(editor);
+              const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                  number: session.number,
+                  title: data.get('title'),
+                  status: data.get('status'),
+                  plannedAt: data.get('plannedAt') || null,
+                  actualAt: data.get('actualAt') || null,
+                  participants: session.participants,
+                  summary: data.get('summary'),
+                  publicSummary: data.get('publicSummary'),
+                  privateSummary: data.get('privateSummary'),
+                  plan: data.get('plan'),
+                  liveNotes: data.get('liveNotes'),
+                  rewards: data.get('rewards'),
+                  checklist: session.checklist,
+                }),
+              });
+              state.textContent = result.ok ? 'Zapisano.' : 'Błąd zapisu.';
+            }, 700);
+          });
+          target.querySelector('[data-add-scene]')?.addEventListener('click', async () => {
+            const title = window.prompt('Tytuł sceny:');
+            if (!title) return;
+            const description = window.prompt('Krótki opis sceny:') || '';
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}/scenes`, {
+              method: 'POST',
+              body: JSON.stringify({ title, description }),
+            });
+            if (result.ok) await loadSessionDetails(session.id);
+          });
+          const updateSceneRecord = async (scene, updates) =>
+            authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}/scenes/${scene.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                title: scene.title,
+                description: scene.description,
+                status: updates.status ?? scene.status,
+                sortOrder: updates.sortOrder ?? scene.sort_order,
+                relations: scene.relations,
+              }),
+            });
+          target.querySelectorAll('[data-scene-status]').forEach((select) =>
+            select.addEventListener('change', async () => {
+              const scene = session.scenes.find((item) => Number(item.id) === Number(select.dataset.sceneStatus));
+              await updateSceneRecord(scene, { status: select.value });
+            }),
+          );
+          const moveScene = async (id, direction) => {
+            const index = session.scenes.findIndex((item) => Number(item.id) === Number(id));
+            const other = session.scenes[index + direction];
+            if (!other) return;
+            await Promise.all([
+              updateSceneRecord(session.scenes[index], { sortOrder: other.sort_order }),
+              updateSceneRecord(other, { sortOrder: session.scenes[index].sort_order }),
+            ]);
+            await loadSessionDetails(session.id);
+          };
+          target
+            .querySelectorAll('[data-scene-up]')
+            .forEach((button) => button.addEventListener('click', () => moveScene(button.dataset.sceneUp, -1)));
+          target
+            .querySelectorAll('[data-scene-down]')
+            .forEach((button) => button.addEventListener('click', () => moveScene(button.dataset.sceneDown, 1)));
+          target.querySelector('[data-add-event]')?.addEventListener('click', async () => {
+            const title = window.prompt('Tytuł wydarzenia:');
+            if (!title) return;
+            const content = window.prompt('Opis wydarzenia:') || '';
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}/events`, {
+              method: 'POST',
+              body: JSON.stringify({ eventType: 'custom', title, content, visibility: 'dm' }),
+            });
+            if (result.ok) await loadSessionDetails(session.id);
+          });
+        };
+        const loadSessions = async () => {
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions`);
+          if (!response.ok) throw new Error('dm_sessions_load_failed');
+          const sessions = await response.json();
+          target.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Prawdziwa gra przy stole</p><h3>Sesje</h3></div><button type="button" data-create-session>+ Nowa sesja</button></div><div class="dm-record-list">${sessions.length ? sessions.map((session) => `<button type="button" class="dm-record-card" data-session-id="${session.id}"><strong>#${session.number} ${escapeHtml(session.title)}</strong><small>${escapeHtml(session.status)} • ${formatDate(session.planned_at || session.actual_at)}</small><p>${escapeHtml(session.summary || 'Brak podsumowania')}</p></button>`).join('') : '<div class="empty-state"><p>Nie zaplanowano jeszcze żadnej sesji.</p></div>'}</div>`;
+          target.querySelector('[data-create-session]')?.addEventListener('click', async () => {
+            const title = window.prompt('Tytuł sesji:');
+            if (!title) return;
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions`, {
+              method: 'POST',
+              body: JSON.stringify({ title, number: (sessions[0]?.number || 0) + 1 }),
+            });
+            if (result.ok) await loadSessionDetails((await result.json()).id);
+          });
+          target
+            .querySelectorAll('[data-session-id]')
+            .forEach((button) =>
+              button.addEventListener('click', () => loadSessionDetails(Number(button.dataset.sessionId))),
+            );
+        };
+        const campaignModules = {
+          quests: {
+            title: 'Zadania',
+            singular: 'zadanie',
+            statuses: [
+              ['prepared', 'Przygotowane'],
+              ['available', 'Dostępne'],
+              ['active', 'Aktywne'],
+              ['paused', 'Wstrzymane'],
+              ['completed', 'Ukończone'],
+              ['failed', 'Nieudane'],
+              ['hidden', 'Ukryte'],
+            ],
+            fields: [
+              ['mainGoal', 'Cel główny'],
+              ['commissioner', 'Zleceniodawca'],
+              ['relatedNpcs', 'Powiązani NPC'],
+              ['relatedLocations', 'Powiązane lokacje'],
+              ['rewards', 'Nagrody'],
+              ['resolution', 'Prywatne rozwiązanie'],
+            ],
+          },
+          npcs: {
+            title: 'NPC',
+            singular: 'NPC',
+            statuses: [
+              ['active', 'Aktywny'],
+              ['missing', 'Zaginiony'],
+              ['dead', 'Martwy'],
+              ['unknown', 'Nieznany'],
+            ],
+            fields: [
+              ['appearance', 'Wygląd'],
+              ['personality', 'Charakter i sposób mówienia'],
+              ['role', 'Rola'],
+              ['faction', 'Frakcja'],
+              ['location', 'Aktualna lokacja'],
+              ['attitudeToParty', 'Stosunek do drużyny'],
+              ['goals', 'Cele'],
+              ['secrets', 'Cele i sekrety'],
+              ['relations', 'Relacje i historia spotkań'],
+            ],
+          },
+          locations: {
+            title: 'Lokacje',
+            singular: 'lokację',
+            statuses: [],
+            fields: [
+              ['locationType', 'Typ lokacji'],
+              ['parentName', 'Lokacja nadrzędna'],
+              ['relatedNpcs', 'NPC'],
+              ['relatedQuests', 'Zadania i wątki'],
+              ['secrets', 'Sekrety'],
+              ['history', 'Historia wydarzeń'],
+              ['materials', 'Materiały'],
+            ],
+          },
+          factions: {
+            title: 'Frakcje',
+            singular: 'frakcję',
+            statuses: [],
+            fields: [
+              ['attitude', 'Stosunek do drużyny'],
+              ['goals', 'Cele'],
+              ['leader', 'Przywódca i członkowie'],
+              ['headquarters', 'Siedziba'],
+              ['allies', 'Sojusznicy'],
+              ['enemies', 'Przeciwnicy'],
+              ['plans', 'Prywatne plany'],
+            ],
+          },
+          threads: {
+            title: 'Wątki',
+            singular: 'wątek',
+            statuses: [
+              ['idea', 'Pomysł'],
+              ['prepared', 'Przygotowany'],
+              ['active', 'Aktywny'],
+              ['paused', 'Zawieszony'],
+              ['resolved', 'Rozwiązany'],
+              ['abandoned', 'Porzucony'],
+            ],
+            fields: [
+              ['priority', 'Priorytet'],
+              ['characters', 'Postacie'],
+              ['npcs', 'NPC'],
+              ['locations', 'Lokacje'],
+              ['factions', 'Frakcje'],
+              ['sessions', 'Sesje'],
+              ['plannedDevelopments', 'Planowane rozwinięcia'],
+              ['discoveredInformation', 'Informacje odkryte przez graczy'],
+            ],
+          },
+        };
+        const loadCampaignModule = async (module) => {
+          if (module === 'notes') return loadNotes();
+          if (module === 'history') return loadTimeline();
+          if (module === 'secrets') return loadSecrets();
+          const config = campaignModules[module];
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/content/${module}`);
+          if (!response.ok) throw new Error('dm_content_load_failed');
+          const records = await response.json();
+          target.innerHTML = `${campaignSubnav(module)}<div class="dm-module-toolbar"><h3>${config.title}</h3><button type="button" data-new-record>+ Dodaj</button></div><div class="dm-content-layout"><div class="dm-record-list">${records.length ? records.map((record) => `<button type="button" class="dm-record-card" data-record-id="${record.id}"><strong>${escapeHtml(record.name || record.title)}</strong><small>${escapeHtml(record.status || record.visibility || '')} • ${formatDate(record.updated_at)}</small></button>`).join('') : '<div class="empty-state"><p>Brak wpisów.</p></div>'}</div><div class="dm-record-editor"><div class="empty-state"><p>Wybierz wpis albo dodaj nowy.</p></div></div></div>`;
+          bindCampaignSubnav();
+          const editor = target.querySelector('.dm-record-editor');
+          const openRecord = async (record = null) => {
+            const extraFields = (config.fields || [])
+              .map(
+                ([key, label]) =>
+                  `<label><span>${label}</span><textarea data-extra-field="${key}" maxlength="5000">${escapeHtml(record?.data?.[key] || record?.[key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)] || '')}</textarea></label>`,
+              )
+              .join('');
+            editor.innerHTML = `<form class="dm-workspace-form" data-record-form><label><span>Nazwa</span><input name="name" maxlength="200" value="${escapeHtml(record?.name || record?.title || '')}" required></label>${config.statuses.length ? `<label><span>Status</span><select name="status">${config.statuses.map(([value, label]) => `<option value="${value}"${record?.status === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}<label><span>Opis dla graczy</span><textarea name="publicContent" maxlength="10000">${escapeHtml(record?.public_content || '')}</textarea></label><label><span>Prywatne informacje DM</span><textarea name="privateContent" maxlength="20000">${escapeHtml(record?.private_content || '')}</textarea></label>${extraFields}<label><span>Widoczność</span><select name="visibility"><option value="dm">Tylko DM</option><option value="party"${record?.visibility === 'party' ? ' selected' : ''}>Cała drużyna</option><option value="selected"${record?.visibility === 'selected' ? ' selected' : ''}>Wybrane postacie</option></select></label><div class="dm-form-actions"><button type="submit">${record ? 'Zapisz' : 'Utwórz'}</button>${record ? '<button type="button" class="danger" data-archive-record>Archiwizuj</button>' : ''}</div></form>`;
+            const form = editor.querySelector('[data-record-form]');
+            form.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              const data = new FormData(form);
+              const extraData = Object.fromEntries(
+                [...form.querySelectorAll('[data-extra-field]')].map((field) => [
+                  field.dataset.extraField,
+                  field.value,
+                ]),
+              );
+              const path = `/api/campaigns/${campaignId}/dm/content/${module}${record ? `/${record.id}` : ''}`;
+              const result = await authenticatedFetch(path, {
+                method: record ? 'PUT' : 'POST',
+                body: JSON.stringify({
+                  name: data.get('name'),
+                  title: data.get('name'),
+                  status: data.get('status'),
+                  publicContent: data.get('publicContent'),
+                  privateContent: data.get('privateContent'),
+                  visibility: data.get('visibility'),
+                  data: { ...(record?.data || {}), ...extraData },
+                  locationType: extraData.locationType,
+                  attitude: extraData.attitude,
+                  priority: extraData.priority,
+                }),
+              });
+              if (result.ok) await loadCampaignModule(module);
+              else window.alert('Nie udało się zapisać wpisu.');
+            });
+            form.querySelector('[data-archive-record]')?.addEventListener('click', async () => {
+              if (!window.confirm('Zarchiwizować ten wpis?')) return;
+              const result = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/content/${module}/${record.id}`,
+                { method: 'DELETE' },
+              );
+              if (result.ok) await loadCampaignModule(module);
+            });
+            if (module === 'quests' && record) {
+              const stepsResponse = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/quests/${record.id}/steps`,
+              );
+              const steps = stepsResponse.ok ? await stepsResponse.json() : [];
+              form.insertAdjacentHTML(
+                'afterend',
+                `<section class="dm-workspace-form"><div class="dm-module-toolbar"><h4>Etapy zadania</h4><button type="button" class="small" data-add-quest-step>+ Etap</button></div><div class="dm-record-list">${steps.map((step) => `<article class="dm-member-role"><label class="dm-check-row"><input type="checkbox" data-toggle-quest-step="${step.id}"${step.is_completed ? ' checked' : ''}><span>${escapeHtml(step.title)}</span></label><button type="button" class="danger small" data-delete-quest-step="${step.id}">Usuń</button></article>`).join('') || '<p class="section-note">Brak etapów.</p>'}</div></section>`,
+              );
+              editor.querySelector('[data-add-quest-step]')?.addEventListener('click', async () => {
+                const title = window.prompt('Nazwa etapu:');
+                if (!title) return;
+                const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/quests/${record.id}/steps`, {
+                  method: 'POST',
+                  body: JSON.stringify({ title }),
+                });
+                if (result.ok) await openRecord(record);
+              });
+              editor.querySelectorAll('[data-toggle-quest-step]').forEach((checkbox) =>
+                checkbox.addEventListener('change', async () => {
+                  const step = steps.find((item) => Number(item.id) === Number(checkbox.dataset.toggleQuestStep));
+                  await authenticatedFetch(`/api/campaigns/${campaignId}/dm/quests/${record.id}/steps/${step.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                      title: step.title,
+                      isCompleted: checkbox.checked,
+                      sortOrder: step.sort_order,
+                    }),
+                  });
+                }),
+              );
+              editor.querySelectorAll('[data-delete-quest-step]').forEach((button) =>
+                button.addEventListener('click', async () => {
+                  const result = await authenticatedFetch(
+                    `/api/campaigns/${campaignId}/dm/quests/${record.id}/steps/${button.dataset.deleteQuestStep}`,
+                    { method: 'DELETE' },
+                  );
+                  if (result.ok) await openRecord(record);
+                }),
+              );
+            }
+          };
+          target.querySelector('[data-new-record]')?.addEventListener('click', () => openRecord());
+          target
+            .querySelectorAll('[data-record-id]')
+            .forEach((button) =>
+              button.addEventListener('click', () =>
+                openRecord(records.find((record) => Number(record.id) === Number(button.dataset.recordId))),
+              ),
+            );
+        };
+        const campaignSubnav = (active) =>
+          `<div class="dm-subnav">${[
+            ['quests', 'Zadania'],
+            ['npcs', 'NPC'],
+            ['locations', 'Lokacje'],
+            ['factions', 'Frakcje'],
+            ['threads', 'Wątki'],
+            ['secrets', 'Sekrety'],
+            ['notes', 'Notatki'],
+            ['history', 'Historia'],
+          ]
+            .map(
+              ([key, label]) =>
+                `<button type="button" class="secondary${active === key ? ' active' : ''}" data-campaign-module="${key}">${label}</button>`,
+            )
+            .join('')}</div>`;
+        const bindCampaignSubnav = () =>
+          target
+            .querySelectorAll('[data-campaign-module]')
+            .forEach((button) =>
+              button.addEventListener('click', () => loadCampaignModule(button.dataset.campaignModule)),
+            );
+        const loadSecrets = async () => {
+          const [secretResponse, teamResponse] = await Promise.all([
+            authenticatedFetch(`/api/campaigns/${campaignId}/dm/secrets`),
+            authenticatedFetch(`/api/campaigns/${campaignId}/dm`),
+          ]);
+          if (!secretResponse.ok || !teamResponse.ok) throw new Error('dm_secrets_load_failed');
+          const secrets = await secretResponse.json();
+          const team = await teamResponse.json();
+          target.innerHTML = `${campaignSubnav('secrets')}<div class="dm-module-toolbar"><h3>Sekrety i wskazówki</h3><button data-new-secret>+ Dodaj</button></div><div class="dm-record-list">${secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)} • ${escapeHtml(secret.discovery_status)}</small><p>${escapeHtml(secret.content)}</p><div class="dm-form-actions"><button class="small" data-reveal-secret="${secret.id}">Ujawnij…</button><button class="small secondary" data-edit-secret="${secret.id}">Edytuj</button><button class="small danger" data-archive-secret="${secret.id}">Archiwizuj</button></div></article>`).join('') || '<div class="empty-state"><p>Brak sekretów.</p></div>'}</div>`;
+          bindCampaignSubnav();
+          target.querySelector('[data-new-secret]')?.addEventListener('click', async () => {
+            const title = window.prompt('Tytuł sekretu:');
+            if (!title) return;
+            const content = window.prompt('Treść sekretu:') || '';
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/secrets`, {
+              method: 'POST',
+              body: JSON.stringify({ title, content }),
+            });
+            if (result.ok) await loadSecrets();
+          });
+          target.querySelectorAll('[data-edit-secret]').forEach((button) =>
+            button.addEventListener('click', async () => {
+              const secret = secrets.find((item) => Number(item.id) === Number(button.dataset.editSecret));
+              const title = window.prompt('Tytuł sekretu:', secret.title);
+              if (!title) return;
+              const content = window.prompt('Treść sekretu:', secret.content) ?? secret.content;
+              const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/secrets/${secret.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                  title,
+                  content,
+                  secretType: secret.secret_type,
+                  discoveryStatus: secret.discovery_status,
+                }),
+              });
+              if (result.ok) await loadSecrets();
+            }),
+          );
+          target.querySelectorAll('[data-archive-secret]').forEach((button) =>
+            button.addEventListener('click', async () => {
+              if (!window.confirm('Zarchiwizować sekret?')) return;
+              const result = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/secrets/${button.dataset.archiveSecret}`,
+                { method: 'DELETE' },
+              );
+              if (result.ok) await loadSecrets();
+            }),
+          );
+          target.querySelectorAll('[data-reveal-secret]').forEach((button) =>
+            button.addEventListener('click', async () => {
+              const names = team.members.map((member, index) => `${index + 1}. ${member.name}`).join('\n');
+              const choice = window.prompt(`Podaj numery odbiorców oddzielone przecinkami:\n${names}`);
+              if (!choice) return;
+              const characterIds = choice
+                .split(',')
+                .map((entry) => team.members[Number(entry.trim()) - 1]?.id)
+                .filter(Boolean);
+              if (!characterIds.length || !window.confirm('Na pewno ujawnić sekret wybranym postaciom?')) return;
+              const result = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/secrets/${button.dataset.revealSecret}/reveal`,
+                { method: 'POST', body: JSON.stringify({ characterIds, confirmed: true }) },
+              );
+              if (result.ok) await loadSecrets();
+            }),
+          );
+        };
+        const loadTimeline = async () => {
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/timeline`);
+          if (!response.ok) throw new Error('dm_timeline_load_failed');
+          const events = await response.json();
+          target.innerHTML = `${campaignSubnav('history')}<div class="dm-module-toolbar"><h3>Historia kampanii</h3><button data-new-timeline>+ Wydarzenie</button></div><div class="dm-timeline">${events.map((event) => `<article><time>${formatDate(event.occurred_at)}</time><div><strong>${escapeHtml(event.title)}</strong><small>${escapeHtml(event.event_type)}${event.world_date ? ` • ${escapeHtml(event.world_date)}` : ''}</small><p>${escapeHtml(event.content)}</p></div></article>`).join('') || '<div class="empty-state"><p>Historia jest jeszcze pusta.</p></div>'}</div>`;
+          bindCampaignSubnav();
+          target.querySelector('[data-new-timeline]')?.addEventListener('click', async () => {
+            const title = window.prompt('Tytuł wydarzenia:');
+            if (!title) return;
+            const content = window.prompt('Opis:') || '';
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/timeline`, {
+              method: 'POST',
+              body: JSON.stringify({ title, content, visibility: 'dm' }),
+            });
+            if (result.ok) await loadTimeline();
+          });
+        };
+        const loadMaterials = async () => {
+          const [materialResponse, teamResponse] = await Promise.all([
+            authenticatedFetch(`/api/campaigns/${campaignId}/dm/materials`),
+            authenticatedFetch(`/api/campaigns/${campaignId}/dm`),
+          ]);
+          if (!materialResponse.ok || !teamResponse.ok) throw new Error('dm_materials_load_failed');
+          const materials = await materialResponse.json();
+          const team = await teamResponse.json();
+          target.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Handouty</p><h3>Materiały</h3></div><button data-new-material>+ Materiał</button></div><div class="dm-material-grid">${materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content.slice(0, 300))}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}<div class="dm-form-actions"><button class="small" data-share-material="${material.id}">Pokaż graczom…</button><button class="small secondary" data-edit-material="${material.id}">Edytuj</button><button class="small danger" data-archive-material="${material.id}">Archiwizuj</button></div></article>`).join('') || '<div class="empty-state"><p>Brak materiałów.</p></div>'}</div>`;
+          target.querySelector('[data-new-material]')?.addEventListener('click', async () => {
+            const title = window.prompt('Nazwa materiału:');
+            if (!title) return;
+            const content = window.prompt('Treść materiału:') || '';
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/materials`, {
+              method: 'POST',
+              body: JSON.stringify({ title, content, materialType: 'text', visibility: 'dm' }),
+            });
+            if (result.ok) await loadMaterials();
+          });
+          target.querySelectorAll('[data-edit-material]').forEach((button) =>
+            button.addEventListener('click', async () => {
+              const material = materials.find((item) => Number(item.id) === Number(button.dataset.editMaterial));
+              const title = window.prompt('Nazwa materiału:', material.title);
+              if (!title) return;
+              const content = window.prompt('Treść materiału:', material.content) ?? material.content;
+              const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/materials/${material.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                  title,
+                  content,
+                  materialType: material.material_type,
+                  externalUrl: material.external_url,
+                  visibility: material.visibility,
+                }),
+              });
+              if (result.ok) await loadMaterials();
+            }),
+          );
+          target.querySelectorAll('[data-archive-material]').forEach((button) =>
+            button.addEventListener('click', async () => {
+              if (!window.confirm('Zarchiwizować materiał?')) return;
+              const result = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/materials/${button.dataset.archiveMaterial}`,
+                { method: 'DELETE' },
+              );
+              if (result.ok) await loadMaterials();
+            }),
+          );
+          target.querySelectorAll('[data-share-material]').forEach((button) =>
+            button.addEventListener('click', async () => {
+              const names = team.members.map((member, index) => `${index + 1}. ${member.name}`).join('\n');
+              const choice = window.prompt(`Podaj numery odbiorców oddzielone przecinkami:\n${names}`);
+              if (!choice) return;
+              const characterIds = choice
+                .split(',')
+                .map((entry) => team.members[Number(entry.trim()) - 1]?.id)
+                .filter(Boolean);
+              if (!characterIds.length || !window.confirm('Udostępnić materiał i wysłać powiadomienie?')) return;
+              const result = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/materials/${button.dataset.shareMaterial}/share`,
+                { method: 'POST', body: JSON.stringify({ characterIds, confirmed: true }) },
+              );
+              if (result.ok) window.alert('Materiał udostępniony.');
+            }),
+          );
+        };
+        const loadSettings = async () => {
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/settings`);
+          if (!response.ok) throw new Error('dm_settings_load_failed');
+          const settings = await response.json();
+          const isOwner = settings.campaign.role === 'owner';
+          target.innerHTML = `
+            <div class="dm-module-toolbar"><div><p class="eyebrow">Panel DM</p><h3>Ustawienia kampanii</h3></div><button type="button" class="secondary" data-export-campaign>Eksportuj JSON</button></div>
+            <form class="dm-workspace-form" data-campaign-settings>
+              <label><span>Nazwa</span><input name="name" maxlength="100" value="${escapeHtml(settings.campaign.name)}" required${isOwner ? '' : ' disabled'}></label>
+              <label><span>Opis</span><textarea name="description" maxlength="2000"${isOwner ? '' : ' disabled'}>${escapeHtml(settings.campaign.description || '')}</textarea></label>
+              <label><span>Grafika kampanii</span><input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp"${isOwner ? '' : ' disabled'}></label>
+              <div data-campaign-image-preview>${settings.campaign.image ? `<img class="dm-settings-image" src="${escapeHtml(settings.campaign.image)}" alt="Aktualna grafika kampanii">` : '<small>Brak grafiki kampanii.</small>'}</div>
+              ${isOwner ? '<button type="submit">Zapisz ustawienia</button>' : '<p class="section-note">Ustawienia kampanii może zmienić wyłącznie właściciel.</p>'}
+            </form>
+            <section><h3>Role i członkowie</h3><div class="dm-record-list">${settings.members.map((member) => `<article class="dm-member-role"><span><strong>${escapeHtml(member.username)}</strong><small>${escapeHtml(member.character_name || 'Bez postaci')}</small></span>${Number(member.user_id) === Number(settings.campaign.owner_id) ? '<strong>Właściciel</strong>' : `<div class="dm-member-role-actions"><select data-member-role="${member.user_id}"${isOwner ? '' : ' disabled'}><option value="player">Gracz</option><option value="co_dm"${member.role === 'co_dm' ? ' selected' : ''}>Współprowadzący</option></select>${isOwner ? `<button type="button" class="danger small" data-remove-campaign-member="${member.user_id}">Usuń</button>` : ''}</div>`}</article>`).join('')}</div></section>
+            ${isOwner ? '<button type="button" class="danger" data-archive-campaign>Archiwizuj kampanię</button>' : ''}`;
+          const form = target.querySelector('[data-campaign-settings]');
+          let campaignImage = settings.campaign.image || '';
+          form.querySelector('input[name="imageFile"]')?.addEventListener('change', async (event) => {
+            try {
+              campaignImage = await prepareProfileImage(event.target.files?.[0]);
+              target.querySelector('[data-campaign-image-preview]').innerHTML =
+                `<img class="dm-settings-image" src="${campaignImage}" alt="Nowa grafika kampanii">`;
+            } catch {
+              event.target.value = '';
+              window.alert('Nie udało się przygotować grafiki. Wybierz JPEG, PNG lub WebP do 15 MB.');
+            }
+          });
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const data = new FormData(form);
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/settings`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                name: data.get('name'),
+                description: data.get('description'),
+                image: campaignImage,
+              }),
+            });
+            if (result.ok) window.alert('Ustawienia zapisane.');
+            else window.alert('Tylko właściciel może zmieniać ustawienia.');
+          });
+          target.querySelectorAll('[data-member-role]').forEach((select) =>
+            select.addEventListener('change', async () => {
+              const result = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/members/${select.dataset.memberRole}/role`,
+                { method: 'PUT', body: JSON.stringify({ role: select.value }) },
+              );
+              if (!result.ok) window.alert('Nie udało się zmienić roli.');
+            }),
+          );
+          target.querySelectorAll('[data-remove-campaign-member]').forEach((button) =>
+            button.addEventListener('click', async () => {
+              if (!window.confirm('Usunąć tego członka z kampanii?')) return;
+              const result = await authenticatedFetch(
+                `/api/campaigns/${campaignId}/dm/members/${button.dataset.removeCampaignMember}`,
+                { method: 'DELETE' },
+              );
+              if (result.ok) await loadSettings();
+            }),
+          );
+          target.querySelector('[data-archive-campaign]')?.addEventListener('click', async () => {
+            if (!window.confirm('Zarchiwizować kampanię? Zniknie z aktywnych drużyn, ale dane pozostaną w bazie.'))
+              return;
+            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/archive`, {
+              method: 'POST',
+              body: JSON.stringify({ confirmed: true }),
+            });
+            if (result.ok) showCharacter(character);
+          });
+          target.querySelector('[data-export-campaign]')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            authenticatedFetch(`/api/campaigns/${campaignId}/dm/export`)
+              .then((result) => result.json())
+              .then((payload) => {
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `campaign-${campaignId}.json`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+              });
+          });
+        };
         const setSection = async (section) => {
-          document.querySelectorAll('[data-dm-section]').forEach((button) => button.classList.toggle('active', button.dataset.dmSection === section));
+          document
+            .querySelectorAll('[data-dm-section]')
+            .forEach((button) => button.classList.toggle('active', button.dataset.dmSection === section));
           target.innerHTML = '<p class="loading-copy">Pobieranie danych…</p>';
           try {
             if (section === 'dashboard') await loadDashboard();
             else if (section === 'team') await loadTeam();
-            else if (section === 'sessions') target.innerHTML = unavailable('Sesje', 'Planowanie, prowadzenie i podsumowanie sesji zostanie dodane w Etapie 3.');
-            else if (section === 'campaign') target.innerHTML = unavailable('Kampania', 'Zadania, NPC, lokacje, frakcje, wątki, sekrety, notatki i historia będą wdrażane etapami.');
-            else if (section === 'materials') target.innerHTML = unavailable('Materiały', 'Bezpieczne handouty i udostępnianie plików zostaną dodane po sprawdzeniu magazynu plików.');
-            else target.innerHTML = unavailable('Ustawienia kampanii', 'Role, eksport i archiwizacja kampanii pojawią się w końcowym etapie przebudowy.');
-            target.querySelectorAll('[data-dm-section-link]').forEach((button) => button.addEventListener('click', () => setSection(button.dataset.dmSectionLink)));
+            else if (section === 'sessions') await loadSessions();
+            else if (section === 'campaign') await loadCampaignModule('quests');
+            else if (section === 'materials') await loadMaterials();
+            else await loadSettings();
+            target
+              .querySelectorAll('[data-dm-section-link]')
+              .forEach((button) => button.addEventListener('click', () => setSection(button.dataset.dmSectionLink)));
             target.focus({ preventScroll: true });
           } catch {
-            target.innerHTML = '<div class="empty-state"><h3>Nie udało się pobrać danych</h3><p>Sprawdź połączenie i spróbuj ponownie.</p><button type="button" class="secondary" data-dm-retry>Spróbuj ponownie</button></div>';
+            target.innerHTML =
+              '<div class="empty-state"><h3>Nie udało się pobrać danych</h3><p>Sprawdź połączenie i spróbuj ponownie.</p><button type="button" class="secondary" data-dm-retry>Spróbuj ponownie</button></div>';
             target.querySelector('[data-dm-retry]')?.addEventListener('click', () => setSection(section));
           }
         };
-        document.querySelectorAll('[data-dm-section]').forEach((button) => button.addEventListener('click', () => setSection(button.dataset.dmSection)));
+        document
+          .querySelectorAll('[data-dm-section]')
+          .forEach((button) => button.addEventListener('click', () => setSection(button.dataset.dmSection)));
         const quickButton = document.querySelector('.dm-floating-action');
         const quickMenu = document.querySelector('#dm-quick-menu');
         quickButton?.addEventListener('click', () => {
           quickMenu?.classList.toggle('hidden');
           quickButton.setAttribute('aria-expanded', String(!quickMenu?.classList.contains('hidden')));
         });
-        quickMenu?.querySelectorAll('[data-dm-quick]').forEach((button) => button.addEventListener('click', async () => {
-          quickMenu.classList.add('hidden');
-          quickButton?.setAttribute('aria-expanded', 'false');
-          if (button.dataset.dmQuick === 'note') {
-            await setSection('team');
-            target.querySelector('[data-dm-general-note]')?.focus();
-          } else if (button.dataset.dmQuick === 'sessions') await setSection('sessions');
-          else if (button.dataset.dmQuick === 'materials') await setSection('materials');
-          else await setSection('campaign');
-        }));
+        quickMenu?.querySelectorAll('[data-dm-quick]').forEach((button) =>
+          button.addEventListener('click', async () => {
+            quickMenu.classList.add('hidden');
+            quickButton?.setAttribute('aria-expanded', 'false');
+            if (button.dataset.dmQuick === 'note') {
+              await setSection('campaign');
+              await loadNotes();
+            } else if (button.dataset.dmQuick === 'sessions') await setSection('sessions');
+            else if (button.dataset.dmQuick === 'materials') await setSection('materials');
+            else await setSection('campaign');
+          }),
+        );
         await setSection(initialSection);
       }
 
@@ -2697,7 +3690,9 @@ function renderApp(statusMessage = null) {
           if (!response.ok) throw new Error('teams_load_failed');
           const campaigns = await response.json();
           teamContent.innerHTML = campaigns.length
-            ? `<div class="character-team-list">${campaigns.map((campaign) => `
+            ? `<div class="character-team-list">${campaigns
+                .map(
+                  (campaign) => `
                 <section class="character-team-campaign">
                   <div class="character-team-heading">
                     <h4>${escapeHtml(campaign.name)}${campaign.isDm ? ' <span class="dm-badge">DM</span>' : ''}</h4>
@@ -2706,7 +3701,9 @@ function renderApp(statusMessage = null) {
                     </div>
                   </div>
                   <div class="character-team-members">
-                    ${campaign.members.map((member) => `
+                    ${campaign.members
+                      .map(
+                        (member) => `
                       <button type="button" class="team-member${member.isCurrent ? ' current' : ''}" data-team-campaign="${campaign.id}" data-team-member="${member.id}">
                         ${avatarMarkup(member.avatar, member.name, 'friend-avatar')}
                         <span>
@@ -2714,11 +3711,16 @@ function renderApp(statusMessage = null) {
                           <small>${escapeHtml(member.race)} • ${escapeHtml(member.classes)} • poziom ${member.level}<br />Gracz: ${escapeHtml(member.user.username)}</small>
                         </span>
                       </button>
-                    `).join('')}
+                    `,
+                      )
+                      .join('')}
                   </div>
+                  <button type="button" class="secondary character-team-shared-action" data-open-campaign-shared="${campaign.id}" data-campaign-name="${escapeHtml(campaign.name)}">Materiały i informacje kampanii</button>
                   ${campaign.isDm ? `<button type="button" class="character-team-dm-action" data-open-dm-panel="${campaign.id}" data-campaign-name="${escapeHtml(campaign.name)}">Panel DM</button>` : ''}
                 </section>
-              `).join('')}</div>`
+              `,
+                )
+                .join('')}</div>`
             : '<p class="section-note">Ta postać nie należy do żadnej drużyny.</p>';
 
           teamContent.querySelectorAll('[data-team-member]').forEach((button) => {
@@ -2729,18 +3731,42 @@ function renderApp(statusMessage = null) {
             });
           });
           teamContent.querySelectorAll('[data-open-dm-panel]').forEach((button) => {
-            button.addEventListener('click', () => openDmPanel(
-              Number(button.dataset.openDmPanel),
-              button.dataset.campaignName,
-            ));
+            button.addEventListener('click', () =>
+              openDmPanel(Number(button.dataset.openDmPanel), button.dataset.campaignName),
+            );
+          });
+          teamContent.querySelectorAll('[data-open-campaign-shared]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              const campaignId = Number(button.dataset.openCampaignShared);
+              contentPanel.innerHTML = `<div class="team-character-screen"><div class="section-heading"><div><p class="eyebrow">Kampania</p><h2>${escapeHtml(button.dataset.campaignName)}</h2></div><button class="secondary small" data-shared-back>Wróć</button></div><div data-shared-content><p class="loading-copy">Pobieranie materiałów…</p></div></div>`;
+              contentPanel
+                .querySelector('[data-shared-back]')
+                ?.addEventListener('click', () => showCharacter(character));
+              const sharedTarget = contentPanel.querySelector('[data-shared-content]');
+              try {
+                const response = await authenticatedFetch(`/api/campaigns/${campaignId}/shared`);
+                if (!response.ok) throw new Error('shared_content_load_failed');
+                const shared = await response.json();
+                sharedTarget.innerHTML = `<section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section><section><h3>Historia kampanii</h3><div class="dm-timeline">${shared.timeline.map((event) => `<article><time>${new Date(event.occurred_at).toLocaleDateString('pl-PL')}</time><div><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.content)}</p></div></article>`).join('') || '<p class="section-note">Brak publicznych wydarzeń.</p>'}</div></section>`;
+              } catch {
+                sharedTarget.innerHTML =
+                  '<div class="empty-state"><p>Nie udało się pobrać materiałów kampanii.</p></div>';
+              }
+            });
           });
           teamContent.querySelectorAll('[data-leave-campaign]').forEach((button) => {
             button.addEventListener('click', async () => {
-              if (!window.confirm(`Czy postać „${character.name}” ma opuścić kampanię „${button.dataset.campaignName}”?`)) return;
+              if (
+                !window.confirm(`Czy postać „${character.name}” ma opuścić kampanię „${button.dataset.campaignName}”?`)
+              )
+                return;
               button.disabled = true;
-              const response = await authenticatedFetch(`/api/characters/${character.id}/campaigns/${button.dataset.leaveCampaign}`, {
-                method: 'DELETE',
-              });
+              const response = await authenticatedFetch(
+                `/api/characters/${character.id}/campaigns/${button.dataset.leaveCampaign}`,
+                {
+                  method: 'DELETE',
+                },
+              );
               if (response.ok) await loadCharacterTeams();
               else {
                 button.disabled = false;
@@ -2785,8 +3811,10 @@ function renderApp(statusMessage = null) {
       function renderInventoryItems() {
         if (!inventoryList) return;
         inventoryList.innerHTML = inventoryItems.length
-          ? inventoryItems.map((item, index) => editingInventoryIndex === index
-            ? `
+          ? inventoryItems
+              .map((item, index) =>
+                editingInventoryIndex === index
+                  ? `
               <form class="inventory-edit-form" data-edit-inventory-form="${index}">
                 <input name="name" maxlength="150" value="${escapeHtml(item.name)}" aria-label="Nazwa przedmiotu" required />
                 <input name="quantity" type="number" min="1" max="9999" value="${item.quantity}" inputmode="numeric" aria-label="Ilość" required />
@@ -2798,7 +3826,7 @@ function renderApp(statusMessage = null) {
                 </div>
               </form>
             `
-            : `
+                  : `
               <article class="inventory-item" data-edit-inventory-item="${index}" tabindex="0" title="Kliknij, aby edytować">
                 <button class="inventory-drag-handle" type="button" data-inventory-drag-handle="${index}" aria-label="Przesuń ${escapeHtml(item.name)}" title="Przeciągnij, aby zmienić kolejność">⠿</button>
                 <span class="inventory-icon">${inventoryIconMarkup(item)}</span>
@@ -2809,7 +3837,9 @@ function renderApp(statusMessage = null) {
                 <span class="inventory-quantity" aria-label="Ilość: ${item.quantity}">×&nbsp;${item.quantity}</span>
                 <button class="inventory-remove" type="button" data-remove-inventory-item="${index}" aria-label="Usuń ${escapeHtml(item.name)}" title="Usuń">×</button>
               </article>
-            `).join('')
+            `,
+              )
+              .join('')
           : '<div class="inventory-empty"><span aria-hidden="true">🎒</span><p>Ekwipunek jest pusty.</p></div>';
       }
 
@@ -2923,8 +3953,9 @@ function renderApp(statusMessage = null) {
           if (moveEvent.pointerId !== event.pointerId) return;
           moveEvent.preventDefault();
 
-          const siblings = [...inventoryList.querySelectorAll('[data-edit-inventory-item]')]
-            .filter((item) => item !== draggedItem);
+          const siblings = [...inventoryList.querySelectorAll('[data-edit-inventory-item]')].filter(
+            (item) => item !== draggedItem,
+          );
           const nextItem = siblings.find((item) => {
             const bounds = item.getBoundingClientRect();
             return moveEvent.clientY < bounds.top + bounds.height / 2;
@@ -2955,8 +3986,9 @@ function renderApp(statusMessage = null) {
           draggedItem.classList.remove('dragging');
           inventoryList.classList.remove('reordering');
 
-          const orderedIndices = [...inventoryList.querySelectorAll('[data-edit-inventory-item]')]
-            .map((item) => Number(item.dataset.editInventoryItem));
+          const orderedIndices = [...inventoryList.querySelectorAll('[data-edit-inventory-item]')].map((item) =>
+            Number(item.dataset.editInventoryItem),
+          );
           const nextItems = orderedIndices.map((index) => inventoryItems[index]);
           inventoryStatus.textContent = 'Zapisywanie kolejności…';
           try {
@@ -2990,18 +4022,24 @@ function renderApp(statusMessage = null) {
         event.preventDefault();
         const index = Number(form.dataset.editInventoryForm);
         const formData = new FormData(form);
-        const name = String(formData.get('name') || '').trim().replace(/\r?\n/g, ' ').slice(0, 150);
+        const name = String(formData.get('name') || '')
+          .trim()
+          .replace(/\r?\n/g, ' ')
+          .slice(0, 150);
         const quantity = Math.max(1, Math.min(9999, Number(formData.get('quantity')) || 1));
-        const duration = String(formData.get('duration') || '').trim().replace(/\r?\n/g, ' ').slice(0, 100);
+        const duration = String(formData.get('duration') || '')
+          .trim()
+          .replace(/\r?\n/g, ' ')
+          .slice(0, 100);
         const icon = INVENTORY_ICON_KEYS.has(formData.get('icon')) ? formData.get('icon') : 'backpack';
         if (!name) return;
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
         inventoryStatus.textContent = '';
         try {
-          const nextItems = inventoryItems.map((item, itemIndex) => (
-            itemIndex === index ? { name, quantity, duration, icon } : item
-          ));
+          const nextItems = inventoryItems.map((item, itemIndex) =>
+            itemIndex === index ? { name, quantity, duration, icon } : item,
+          );
           await saveInventory(nextItems);
           editingInventoryIndex = null;
           renderInventoryItems();
@@ -3017,9 +4055,15 @@ function renderApp(statusMessage = null) {
         const form = event.currentTarget;
         const button = form.querySelector('button[type="submit"]');
         const formData = new FormData(form);
-        const name = String(formData.get('name') || '').trim().replace(/\r?\n/g, ' ').slice(0, 150);
+        const name = String(formData.get('name') || '')
+          .trim()
+          .replace(/\r?\n/g, ' ')
+          .slice(0, 150);
         const quantity = Math.max(1, Math.min(9999, Number(formData.get('quantity')) || 1));
-        const duration = String(formData.get('duration') || '').trim().replace(/\r?\n/g, ' ').slice(0, 100);
+        const duration = String(formData.get('duration') || '')
+          .trim()
+          .replace(/\r?\n/g, ' ')
+          .slice(0, 100);
         const icon = INVENTORY_ICON_KEYS.has(formData.get('icon')) ? formData.get('icon') : 'backpack';
         if (!name) return;
         button.disabled = true;
@@ -3052,7 +4096,9 @@ function renderApp(statusMessage = null) {
         return;
       }
 
-      list.innerHTML = characters.map((character) => `
+      list.innerHTML = characters
+        .map(
+          (character) => `
         <article class="character-card selectable" data-view-character="${character.id}" tabindex="0">
           ${avatarMarkup(character.avatar, character.name, 'character-list-avatar')}
           <div class="character-info">
@@ -3081,7 +4127,9 @@ function renderApp(statusMessage = null) {
             </button>
           </div>
         </article>
-      `).join('');
+      `,
+        )
+        .join('');
 
       list.querySelectorAll('[data-view-character]').forEach((button) => {
         const openCharacter = (event) => {
@@ -3118,9 +4166,7 @@ function renderApp(statusMessage = null) {
       });
     } catch (error) {
       list.innerHTML = `<div class="empty-state"><p>${
-        error.message === 'session_expired'
-          ? 'Sesja wygasła. Zaloguj się ponownie.'
-          : 'Nie udało się pobrać postaci.'
+        error.message === 'session_expired' ? 'Sesja wygasła. Zaloguj się ponownie.' : 'Nie udało się pobrać postaci.'
       }</p></div>`;
     }
   }
@@ -3173,7 +4219,9 @@ function renderApp(statusMessage = null) {
       const releases = Array.isArray(data.releases) ? data.releases : [];
 
       list.innerHTML = releases.length
-        ? releases.map((release, index) => `
+        ? releases
+            .map(
+              (release, index) => `
           <article class="release-card${index === 0 ? ' latest' : ''}">
             <div class="release-heading">
               <div>
@@ -3187,7 +4235,9 @@ function renderApp(statusMessage = null) {
               ${(release.changes || []).map((change) => `<li>${escapeHtml(change)}</li>`).join('')}
             </ul>
           </article>
-        `).join('')
+        `,
+            )
+            .join('')
         : '<div class="empty-state"><p>Brak wpisów w historii zmian.</p></div>';
     } catch {
       list.innerHTML = `
@@ -3237,12 +4287,16 @@ function renderApp(statusMessage = null) {
           <p>${escapeHtml(policy.summary)}</p>
           <span>Wersja ${escapeHtml(policy.version)} • obowiązuje od ${escapeHtml(policy.effectiveDate)}</span>
         </div>
-        ${(policy.sections || []).map((section) => `
+        ${(policy.sections || [])
+          .map(
+            (section) => `
           <section class="privacy-section">
             <h3>${escapeHtml(section.title)}</h3>
             ${(section.content || []).map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}
           </section>
-        `).join('')}
+        `,
+          )
+          .join('')}
       `;
     } catch {
       content.innerHTML = `
@@ -3291,17 +4345,25 @@ function renderApp(statusMessage = null) {
           <h3>${escapeHtml(help.title)}</h3>
           <p>${escapeHtml(help.intro)}</p>
         </div>
-        ${(help.categories || []).map((category) => `
+        ${(help.categories || [])
+          .map(
+            (category) => `
           <section class="help-category">
             <h3>${escapeHtml(category.title)}</h3>
-            ${(category.items || []).map((item) => `
+            ${(category.items || [])
+              .map(
+                (item) => `
               <details class="help-item">
                 <summary>${escapeHtml(item.question)}</summary>
                 <p>${escapeHtml(item.answer)}</p>
               </details>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </section>
-        `).join('')}
+        `,
+          )
+          .join('')}
         <section class="help-diagnostics">
           <h3>Stan połączenia</h3>
           <p>Sprawdź, czy aplikacja może połączyć się z serwerem.</p>
@@ -3360,7 +4422,7 @@ function renderApp(statusMessage = null) {
       const deleteAccountForm = document.querySelector('#delete-account-form');
       document.querySelector('#open-delete-account')?.addEventListener('click', (event) => {
         const confirmed = window.confirm(
-          'Czy na pewno chcesz rozpocząć usuwanie konta? Wszystkie dane zostaną trwale usunięte.'
+          'Czy na pewno chcesz rozpocząć usuwanie konta? Wszystkie dane zostaną trwale usunięte.',
         );
         if (!confirmed) return;
         event.currentTarget.classList.add('hidden');
@@ -3380,7 +4442,7 @@ function renderApp(statusMessage = null) {
         const errorElement = document.querySelector('#delete-account-error');
         const password = new FormData(form).get('password');
         const finalConfirmation = window.confirm(
-          'To ostatnie potwierdzenie. Usunąć konto i wszystkie dane bez możliwości odzyskania?'
+          'To ostatnie potwierdzenie. Usunąć konto i wszystkie dane bez możliwości odzyskania?',
         );
         if (!finalConfirmation) return;
 
@@ -3398,9 +4460,10 @@ function renderApp(statusMessage = null) {
           clearSession();
           renderApp();
         } catch (error) {
-          errorElement.textContent = error.message === 'invalid_current_password'
-            ? 'Podane hasło jest nieprawidłowe.'
-            : 'Nie udało się usunąć konta. Spróbuj ponownie.';
+          errorElement.textContent =
+            error.message === 'invalid_current_password'
+              ? 'Podane hasło jest nieprawidłowe.'
+              : 'Nie udało się usunąć konta. Spróbuj ponownie.';
           submitButton.disabled = false;
         }
       });
@@ -3537,10 +4600,12 @@ function renderApp(statusMessage = null) {
           <button id="profile-message" type="button">Wyślij wiadomość</button>
         </section>
       `;
-      document.querySelector('#profile-message')?.addEventListener('click', () => renderConversation({
-        ...friend,
-        avatar: profile.avatar,
-      }));
+      document.querySelector('#profile-message')?.addEventListener('click', () =>
+        renderConversation({
+          ...friend,
+          avatar: profile.avatar,
+        }),
+      );
     } catch {
       content.innerHTML = '<div class="empty-state"><p>Nie udało się pobrać profilu znajomego.</p></div>';
     }
@@ -3586,7 +4651,10 @@ function renderApp(statusMessage = null) {
         <article class="message-bubble ${message.sentByMe ? 'mine' : 'theirs'}">
           <p>${escapeHtml(message.body)}</p>
           <time datetime="${escapeHtml(message.createdAt)}">${new Date(message.createdAt).toLocaleString('pl-PL', {
-            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
           })}</time>
         </article>`;
     }
@@ -3613,11 +4681,18 @@ function renderApp(statusMessage = null) {
           messagesList.scrollTop = messagesList.scrollHeight;
         }
         if (hasMore && nextCursor) {
-          messagesList.insertAdjacentHTML('afterbegin', '<button id="load-older-messages" class="secondary small" type="button">Wczytaj starsze wiadomości</button>');
-          document.querySelector('#load-older-messages')?.addEventListener('click', (event) => {
-            event.currentTarget.disabled = true;
-            void loadMessages({ before: nextCursor, prepend: true });
-          }, { once: true });
+          messagesList.insertAdjacentHTML(
+            'afterbegin',
+            '<button id="load-older-messages" class="secondary small" type="button">Wczytaj starsze wiadomości</button>',
+          );
+          document.querySelector('#load-older-messages')?.addEventListener(
+            'click',
+            (event) => {
+              event.currentTarget.disabled = true;
+              void loadMessages({ before: nextCursor, prepend: true });
+            },
+            { once: true },
+          );
         }
       } catch {
         if (!prepend) messagesList.innerHTML = '<div class="empty-state"><p>Nie udało się pobrać wiadomości.</p></div>';
@@ -3776,18 +4851,28 @@ function renderApp(statusMessage = null) {
           <label class="campaign-character-choice">
             <span>Twoja postać w tej kampanii</span>
             <select id="campaign-character-id" ${characters.length ? '' : 'disabled'} required>
-              ${characters.map((character) => `
+              ${characters
+                .map(
+                  (character) => `
                 <option value="${character.id}">${escapeHtml(character.name)} — ${escapeHtml(character.race)}, poziom ${character.level}</option>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </select>
           </label>
           ${characters.length ? '' : '<p class="form-error">Najpierw utwórz postać.</p>'}
           <div class="campaign-choice-list">
-            ${campaigns.map((campaign) => `
+            ${
+              campaigns
+                .map(
+                  (campaign) => `
               <button type="button" class="campaign-choice" data-campaign-invite="${campaign.id}" ${characters.length ? '' : 'disabled'}>
                 🎲 ${escapeHtml(campaign.name)}
               </button>
-            `).join('') || '<p class="loading-copy">Nie masz jeszcze własnej kampanii.</p>'}
+            `,
+                )
+                .join('') || '<p class="loading-copy">Nie masz jeszcze własnej kampanii.</p>'
+            }
           </div>
           <form id="create-campaign-form" class="social-action-form compact">
             <label><span>Nowa kampania</span>
@@ -3924,7 +5009,9 @@ function renderApp(statusMessage = null) {
             const form = submitEvent.currentTarget;
             const submitButton = form.querySelector('button[type="submit"]');
             const errorElement = document.querySelector('#friend-code-error');
-            const code = String(new FormData(form).get('code') || '').trim().toUpperCase();
+            const code = String(new FormData(form).get('code') || '')
+              .trim()
+              .toUpperCase();
             errorElement.textContent = '';
             submitButton.disabled = true;
 
@@ -3966,10 +5053,14 @@ function renderApp(statusMessage = null) {
       const invitations = await invitationsResponse.json();
 
       list.innerHTML = `
-        ${invitations.length ? `
+        ${
+          invitations.length
+            ? `
           <section class="campaign-invitations">
             <h3>Zaproszenia do kampanii</h3>
-            ${invitations.map((invitation) => `
+            ${invitations
+              .map(
+                (invitation) => `
               <article>
                 <div class="campaign-inviter">
                   ${avatarMarkup(invitation.inviter.avatar, invitation.inviter.username, 'friend-avatar')}
@@ -3980,10 +5071,16 @@ function renderApp(statusMessage = null) {
                   <button class="secondary small" data-campaign-response="${invitation.id}" data-campaign-name="${escapeHtml(invitation.campaign.name)}" data-action="decline">Odrzuć</button>
                 </div>
               </article>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </section>
-        ` : ''}
-        ${friends.map((friend) => `
+        `
+            : ''
+        }
+        ${friends
+          .map(
+            (friend) => `
           <article class="friend-card">
             <button class="friend-main" type="button" data-friend-menu="${friend.id}">
               ${avatarMarkup(friend.avatar, friend.username, 'friend-avatar')}
@@ -4003,7 +5100,9 @@ function renderApp(statusMessage = null) {
               <button class="danger small" type="button" data-friend-block="${friend.id}">Zablokuj</button>
             </div>
           </article>
-        `).join('')}
+        `,
+          )
+          .join('')}
         ${renderAddFriendRecord()}
       `;
       list.querySelectorAll('[data-friend-menu]').forEach((button) => {
@@ -4026,19 +5125,19 @@ function renderApp(statusMessage = null) {
         });
       });
       list.querySelectorAll('[data-friend-campaign]').forEach((button) => {
-        button.addEventListener('click', () => renderCampaignInvite(
-          friends.find((item) => item.id === Number(button.dataset.friendCampaign))
-        ));
+        button.addEventListener('click', () =>
+          renderCampaignInvite(friends.find((item) => item.id === Number(button.dataset.friendCampaign))),
+        );
       });
       list.querySelectorAll('[data-friend-nickname]').forEach((button) => {
-        button.addEventListener('click', () => renderFriendNickname(
-          friends.find((item) => item.id === Number(button.dataset.friendNickname))
-        ));
+        button.addEventListener('click', () =>
+          renderFriendNickname(friends.find((item) => item.id === Number(button.dataset.friendNickname))),
+        );
       });
       list.querySelectorAll('[data-friend-report]').forEach((button) => {
-        button.addEventListener('click', () => renderReportFriend(
-          friends.find((item) => item.id === Number(button.dataset.friendReport))
-        ));
+        button.addEventListener('click', () =>
+          renderReportFriend(friends.find((item) => item.id === Number(button.dataset.friendReport))),
+        );
       });
       list.querySelectorAll('[data-friend-remove]').forEach((button) => {
         button.addEventListener('click', async () => {
@@ -4070,7 +5169,7 @@ function renderApp(statusMessage = null) {
             const handled = await respondToCampaignInvitation(
               button.dataset.campaignResponse,
               button.dataset.action,
-              button.dataset.campaignName
+              button.dataset.campaignName,
             );
             if (handled) await renderFriends();
             else button.disabled = false;
@@ -4123,9 +5222,13 @@ function renderApp(statusMessage = null) {
             </div>
           </section>
           <div class="account-options">
-            ${Capacitor.isNativePlatform() ? '' : `
+            ${
+              Capacitor.isNativePlatform()
+                ? ''
+                : `
               <button id="install-pwa" class="account-option">📲 ${isStandalonePwa() ? 'Aplikacja PWA jest zainstalowana' : 'Zainstaluj aplikację PWA'}</button>
-            `}
+            `
+            }
             <div class="account-update">
               <button id="check-update-btn" class="account-option">🔄 Sprawdź aktualizacje</button>
               <p id="update-banner-text" class="account-update-status">Aktualna wersja: ${escapeHtml(currentAppVersion)}</p>
@@ -4176,7 +5279,8 @@ function renderApp(statusMessage = null) {
           `;
         }
         removeAccountAvatar?.classList.toggle('hidden', !user.avatar);
-        if (status) status.textContent = avatar ? 'Zdjęcie profilowe zostało zapisane.' : 'Zdjęcie profilowe zostało usunięte.';
+        if (status)
+          status.textContent = avatar ? 'Zdjęcie profilowe zostało zapisane.' : 'Zdjęcie profilowe zostało usunięte.';
       };
       accountAvatarInput?.addEventListener('change', async () => {
         const file = accountAvatarInput.files?.[0];
@@ -4230,40 +5334,50 @@ function renderApp(statusMessage = null) {
   renderContent('characters');
   if (storedSession) {
     notificationRouteHandler = async (route) => {
-    if (route.type === 'message' && route.friendId) {
-      await renderConversation({
-        id: Number(route.friendId),
-        username: route.username || 'Znajomy',
-        avatar: route.avatar || '',
-      });
-      return;
-    }
-
-    if (route.type === 'campaign' && route.invitationId) {
-      const action = ['accept', 'decline'].includes(route.action)
-        ? route.action
-        : window.confirm(
-          `${route.inviterUsername || 'Znajomy'} zaprasza Cię do kampanii „${route.campaignName || ''}”.\n\n`
-          + 'Wybierz OK, aby dołączyć, albo Anuluj, aby odrzucić zaproszenie.'
-        )
-          ? 'accept'
-          : 'decline';
-
-      try {
-        const handled = await respondToCampaignInvitation(
-          route.invitationId,
-          action,
-          route.campaignName
-        );
-        if (!handled) return;
-        window.alert(action === 'accept'
-          ? `Dołączono do kampanii „${route.campaignName || ''}”.`
-          : `Odrzucono zaproszenie do kampanii „${route.campaignName || ''}”.`);
-        await renderFriends();
-      } catch {
-        window.alert('Nie udało się odpowiedzieć na zaproszenie do kampanii.');
+      if (route.type === 'message' && route.friendId) {
+        await renderConversation({
+          id: Number(route.friendId),
+          username: route.username || 'Znajomy',
+          avatar: route.avatar || '',
+        });
+        return;
       }
-    }
+
+      if (route.type === 'campaign' && route.invitationId) {
+        const action = ['accept', 'decline'].includes(route.action)
+          ? route.action
+          : window.confirm(
+                `${route.inviterUsername || 'Znajomy'} zaprasza Cię do kampanii „${route.campaignName || ''}”.\n\n` +
+                  'Wybierz OK, aby dołączyć, albo Anuluj, aby odrzucić zaproszenie.',
+              )
+            ? 'accept'
+            : 'decline';
+
+        try {
+          const handled = await respondToCampaignInvitation(route.invitationId, action, route.campaignName);
+          if (!handled) return;
+          window.alert(
+            action === 'accept'
+              ? `Dołączono do kampanii „${route.campaignName || ''}”.`
+              : `Odrzucono zaproszenie do kampanii „${route.campaignName || ''}”.`,
+          );
+          await renderFriends();
+        } catch {
+          window.alert('Nie udało się odpowiedzieć na zaproszenie do kampanii.');
+        }
+      }
+
+      if (route.type === 'campaign_content' && route.campaignId) {
+        if (route.notificationId) {
+          await authenticatedFetch(`/api/notifications/campaign-content/${route.notificationId}/read`, {
+            method: 'POST',
+          }).catch(() => {});
+        }
+        window.alert(
+          `Nowa zawartość w kampanii „${route.campaignName || ''}”. Otwórz kartę postaci i sekcję materiałów kampanii.`,
+        );
+        await renderCharacters();
+      }
     };
     startNotificationPolling();
     if (pendingNotificationRoute) {
@@ -4274,7 +5388,6 @@ function renderApp(statusMessage = null) {
   }
   if (loginBtn) loginBtn.dataset.defaultText = 'Wejdź do aplikacji';
   if (registerBtn) registerBtn.dataset.defaultText = 'Utwórz konto';
-
 }
 
 async function checkForUpdates() {
@@ -4287,9 +5400,7 @@ async function checkForUpdates() {
     });
     const data = await response.json();
     const platform = Capacitor.getPlatform();
-    const release = platform === 'ios'
-      ? data.ios
-      : data.android || { version: data.version, url: null };
+    const release = platform === 'ios' ? data.ios : data.android || { version: data.version, url: null };
     const remoteVersion = release?.version;
     const reminder = localStorage.getItem(REMINDER_KEY);
 
@@ -4301,15 +5412,19 @@ async function checkForUpdates() {
       }
 
       if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then((registration) => {
-          registration?.update();
-        }).catch(console.error);
+        navigator.serviceWorker
+          .getRegistration()
+          .then((registration) => {
+            registration?.update();
+          })
+          .catch(console.error);
       }
     } else {
       availableUpdate = null;
-      setUpdateBanner(remoteVersion
-        ? `Masz najnowszą wersję aplikacji (${currentAppVersion})`
-        : 'Masz najnowszą wersję aplikacji', { visible: true, showButton: false });
+      setUpdateBanner(
+        remoteVersion ? `Masz najnowszą wersję aplikacji (${currentAppVersion})` : 'Masz najnowszą wersję aplikacji',
+        { visible: true, showButton: false },
+      );
     }
   } catch (error) {
     setUpdateBanner(`Nie można sprawdzić aktualizacji: ${formatError(error)}`, { visible: true, showButton: false });
@@ -4318,20 +5433,23 @@ async function checkForUpdates() {
 
 if (!Capacitor.isNativePlatform() && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${PWA_BASE}sw.js`, { scope: PWA_BASE }).then((registration) => {
-      registration.update();
+    navigator.serviceWorker
+      .register(`${PWA_BASE}sw.js`, { scope: PWA_BASE })
+      .then((registration) => {
+        registration.update();
 
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (!newWorker) return;
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
 
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            window.setTimeout(() => window.location.reload(), 1000);
-          }
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              window.setTimeout(() => window.location.reload(), 1000);
+            }
+          });
         });
-      });
-    }).catch(console.error);
+      })
+      .catch(console.error);
   });
 }
 

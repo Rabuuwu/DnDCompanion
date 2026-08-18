@@ -73,8 +73,20 @@
 - zakładki szczegółów postaci: podsumowanie, karta, ekwipunek, notatki, wątki i historia;
 - prywatne notatki DM dla kampanii i każdej postaci;
 - dodawanie przedmiotów bezpośrednio do ekwipunku gracza.
+- wiele prywatnych notatek z kategoriami, tagami, przypięciem, archiwum i autosave;
+- planowanie sesji, sceny z trwałą kolejnością, notatki na żywo i wydarzenia;
+- katalogi NPC, lokacji, frakcji, zadań oraz wątków fabularnych;
+- sekrety ujawniane wybranym postaciom dopiero po potwierdzeniu;
+- tekstowe materiały i linki udostępniane drużynie z powiadomieniem;
+- historia kampanii tworzona ręcznie oraz transakcyjnie przez istotne zdarzenia;
+- współprowadzący, role członków, usuwanie członków, grafika i opis kampanii;
+- eksport pełnych danych kampanii do JSON oraz bezpieczna archiwizacja.
 
-W pierwszym etapie przebudowy w pełni działają Pulpit, Drużyna oraz szczegóły postaci. Pozostałe moduły mają przygotowaną nawigację i czytelne puste stany; ich dane i operacje będą dodawane etapami, bez prowizorycznych tabel lub endpointów.
+## Materiały kampanii gracza
+
+- lista materiałów udostępnionych całej drużynie albo konkretnej postaci;
+- odkryte sekrety i wskazówki tylko dla właściwego odbiorcy;
+- publiczna oś historii kampanii bez prywatnych pól DM.
 
 ## Platformy
 
