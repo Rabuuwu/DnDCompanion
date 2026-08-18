@@ -3757,7 +3757,7 @@ function renderApp(statusMessage = null) {
           teamContent.querySelectorAll('[data-open-campaign-shared]').forEach((button) => {
             button.addEventListener('click', async () => {
               const campaignId = Number(button.dataset.openCampaignShared);
-              contentPanel.innerHTML = `<div class="team-character-screen"><div class="section-heading"><div><p class="eyebrow">Kampania</p><h2>${escapeHtml(button.dataset.campaignName)}</h2></div><button class="secondary small" data-shared-back>Wróć</button></div><div data-shared-content><p class="loading-copy">Pobieranie materiałów…</p></div></div>`;
+              contentPanel.innerHTML = `<div class="team-character-screen"><div class="section-heading"><div><p class="eyebrow">Kampania</p><h2>${escapeHtml(button.dataset.campaignName)}</h2></div><button class="secondary small" data-shared-back>Wróć</button></div><div class="campaign-shared-content" data-shared-content><p class="loading-copy">Pobieranie materiałów…</p></div></div>`;
               contentPanel
                 .querySelector('[data-shared-back]')
                 ?.addEventListener('click', () => showCharacter(character));

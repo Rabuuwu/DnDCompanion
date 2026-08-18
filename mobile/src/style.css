@@ -1671,6 +1671,29 @@ select {
   cursor: pointer;
 }
 
+.campaign-shared-content {
+  display: grid;
+  align-content: start;
+  gap: 1.6rem;
+  padding-bottom: 1rem;
+}
+
+.campaign-shared-content > section {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.campaign-shared-content > section > h3 {
+  margin: 0;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.campaign-shared-content .dm-record-list,
+.campaign-shared-content .dm-material-grid {
+  gap: 0.85rem;
+}
+
 .campaign-shared-quest:focus-visible {
   outline: 2px solid var(--accent-2);
   outline-offset: 2px;
