@@ -963,6 +963,8 @@ async function listSharedCampaignContent(req, res) {
               quest.data->>'mainGoal' AS main_goal,
               quest.data->>'commissioner' AS commissioner,
               quest.data->>'rewards' AS rewards,
+              COALESCE(note.content,'') AS party_notes,
+              note.updated_at AS party_notes_updated_at,
               COALESCE(
                 json_agg(
                   json_build_object(
@@ -976,13 +978,38 @@ async function listSharedCampaignContent(req, res) {
               ) AS steps
        FROM campaign_quests quest
        LEFT JOIN quest_steps step ON step.quest_id=quest.id
+       LEFT JOIN quest_party_notes note ON note.quest_id=quest.id
        WHERE quest.campaign_id=$1 AND quest.archived_at IS NULL AND quest.visibility='party'
-       GROUP BY quest.id
+       GROUP BY quest.id,note.content,note.updated_at
        ORDER BY quest.updated_at DESC,quest.id DESC`,
       [campaignId],
     ),
   ]);
   return res.json({ materials: materials.rows, secrets: secrets.rows, quests: quests.rows });
+}
+
+async function updateSharedQuestNotes(req, res) {
+  const campaignId = requireCampaignId(req, res);
+  const questId = parseId(req.params.questId);
+  if (!campaignId || !questId) return res.status(400).json({ error: 'invalid_quest' });
+  const content = optionalText(req.body?.content, 20_000);
+  const access = await pool.query(
+    `SELECT quest.id
+     FROM campaign_quests quest
+     JOIN campaign_members member ON member.campaign_id=quest.campaign_id AND member.user_id=$3
+     WHERE quest.id=$1 AND quest.campaign_id=$2 AND quest.archived_at IS NULL AND quest.visibility='party'`,
+    [questId, campaignId, req.user.id],
+  );
+  if (!access.rows[0]) return res.status(404).json({ error: 'quest_not_found' });
+  const result = await pool.query(
+    `INSERT INTO quest_party_notes (quest_id,campaign_id,content,updated_by)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (quest_id) DO UPDATE
+       SET content=EXCLUDED.content,updated_by=EXCLUDED.updated_by,updated_at=NOW()
+     RETURNING content,updated_at`,
+    [questId, campaignId, content, req.user.id],
+  );
+  return res.json(result.rows[0]);
 }
 
 async function listTimeline(req, res) {
@@ -1180,6 +1207,7 @@ async function exportCampaign(req, res) {
     'campaign_factions',
     'campaign_quests',
     'quest_steps',
+    'quest_party_notes',
     'campaign_story_threads',
     'campaign_secrets',
     'secret_recipients',
@@ -1237,6 +1265,7 @@ module.exports = {
   updateQuestStep,
   updateScene,
   updateSecret,
+  updateSharedQuestNotes,
   updateSession,
   deleteQuestStep,
 };

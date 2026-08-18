@@ -45,6 +45,7 @@ async function run() {
       'campaign_materials',
       'campaign_timeline_events',
       'campaign_content_notifications',
+      'quest_party_notes',
     ];
     const result = await client.query(
       `SELECT table_name FROM information_schema.tables

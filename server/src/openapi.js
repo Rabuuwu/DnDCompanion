@@ -88,6 +88,7 @@ const operations = [
   ['post', '/api/campaigns/{campaignId}/dm/archive', 'Archiwizacja kampanii'],
   ['get', '/api/campaigns/{campaignId}/dm/export', 'Eksport kampanii'],
   ['get', '/api/campaigns/{campaignId}/shared', 'Materiały i wiedza postaci'],
+  ['put', '/api/campaigns/{campaignId}/shared/quests/{questId}/notes', 'Wspólne notatki drużyny do zadania'],
   ['get', '/api/characters/{characterId}/teams', 'Drużyny postaci'],
   ['get', '/api/campaigns/{campaignId}/characters/{characterId}', 'Karta członka kampanii'],
   ['delete', '/api/characters/{characterId}/campaigns/{campaignId}', 'Opuszczenie kampanii'],

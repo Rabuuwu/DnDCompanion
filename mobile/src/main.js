@@ -3767,7 +3767,44 @@ function renderApp(statusMessage = null) {
                   failed: 'Nieudane',
                   hidden: 'Ukryte',
                 };
-                sharedTarget.innerHTML = `<section><h3>Zadania drużyny</h3><div class="dm-record-list">${(shared.quests || []).map((quest) => `<article class="dm-record-card campaign-shared-quest"><div class="dm-module-toolbar"><strong>${escapeHtml(quest.name)}</strong><small>${escapeHtml(questStatus[quest.status] || quest.status)}</small></div>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : ''}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}${quest.commissioner ? `<small>Zleceniodawca: ${escapeHtml(quest.commissioner)}</small>` : ''}${quest.steps?.length ? `<ul>${quest.steps.map((step) => `<li${step.is_completed ? ' class="completed"' : ''}>${step.is_completed ? '✓' : '○'} ${escapeHtml(step.title)}</li>`).join('')}</ul>` : ''}${quest.rewards ? `<p><strong>Nagrody:</strong> ${escapeHtml(quest.rewards)}</p>` : ''}</article>`).join('') || '<p class="section-note">DM nie udostępnił jeszcze żadnych zadań.</p>'}</div></section><section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section>`;
+                sharedTarget.innerHTML = `<section><h3>Zadania drużyny</h3><div class="dm-record-list">${(shared.quests || []).map((quest) => `<article class="dm-record-card campaign-shared-quest" data-open-shared-quest="${quest.id}" role="button" tabindex="0"><div class="dm-module-toolbar"><strong>${escapeHtml(quest.name)}</strong><small>${escapeHtml(questStatus[quest.status] || quest.status)}</small></div>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : ''}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}<small>Kliknij, aby zobaczyć szczegóły i wspólne notatki.</small></article>`).join('') || '<p class="section-note">DM nie udostępnił jeszcze żadnych zadań.</p>'}</div></section><section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section><dialog class="shared-quest-dialog" data-shared-quest-dialog></dialog>`;
+                const questDialog = sharedTarget.querySelector('[data-shared-quest-dialog]');
+                const openSharedQuest = (quest) => {
+                  questDialog.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Zadanie drużyny</p><h3>${escapeHtml(quest.name)}</h3></div><button type="button" class="secondary small" data-close-shared-quest>Zamknij</button></div><div class="shared-quest-details"><p><strong>Status:</strong> ${escapeHtml(questStatus[quest.status] || quest.status)}</p>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : '<p class="section-note">Brak dodatkowego opisu.</p>'}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}${quest.commissioner ? `<p><strong>Zleceniodawca:</strong> ${escapeHtml(quest.commissioner)}</p>` : ''}${quest.steps?.length ? `<div><strong>Etapy:</strong><ul>${quest.steps.map((step) => `<li${step.is_completed ? ' class="completed"' : ''}>${step.is_completed ? '✓' : '○'} ${escapeHtml(step.title)}</li>`).join('')}</ul></div>` : ''}${quest.rewards ? `<p><strong>Nagrody:</strong> ${escapeHtml(quest.rewards)}</p>` : ''}</div><label class="dm-note-field general"><span>Wspólne notatki drużyny</span><textarea data-shared-quest-notes maxlength="20000" placeholder="Ustalenia, tropy i pomysły drużyny…">${escapeHtml(quest.party_notes || '')}</textarea><small data-shared-quest-note-status>Zmiany zapisują się automatycznie i są widoczne dla całej drużyny.</small></label>`;
+                  questDialog
+                    .querySelector('[data-close-shared-quest]')
+                    ?.addEventListener('click', () => questDialog.close());
+                  let noteTimer;
+                  questDialog.querySelector('[data-shared-quest-notes]')?.addEventListener('input', (event) => {
+                    const status = questDialog.querySelector('[data-shared-quest-note-status]');
+                    status.textContent = 'Zapisywanie…';
+                    window.clearTimeout(noteTimer);
+                    noteTimer = window.setTimeout(async () => {
+                      const result = await authenticatedFetch(
+                        `/api/campaigns/${campaignId}/shared/quests/${quest.id}/notes`,
+                        { method: 'PUT', body: JSON.stringify({ content: event.target.value }) },
+                      );
+                      if (result.ok) {
+                        quest.party_notes = event.target.value;
+                        status.textContent = 'Zapisano dla całej drużyny.';
+                      } else status.textContent = 'Nie udało się zapisać notatki.';
+                    }, 600);
+                  });
+                  questDialog.showModal();
+                };
+                sharedTarget.querySelectorAll('[data-open-shared-quest]').forEach((item) => {
+                  const open = () =>
+                    openSharedQuest(
+                      shared.quests.find((quest) => Number(quest.id) === Number(item.dataset.openSharedQuest)),
+                    );
+                  item.addEventListener('click', open);
+                  item.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      open();
+                    }
+                  });
+                });
               } catch {
                 sharedTarget.innerHTML =
                   '<div class="empty-state"><p>Nie udało się pobrać materiałów kampanii.</p></div>';

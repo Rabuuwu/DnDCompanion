@@ -83,6 +83,7 @@
 ## Materiały kampanii gracza
 
 - lista zadań udostępnionych całej drużynie wraz ze statusem, celem, etapami, zleceniodawcą i nagrodami;
+- szczegóły zadania tylko do odczytu oraz wspólne notatki edytowane przez członków drużyny;
 - lista materiałów udostępnionych całej drużynie albo konkretnej postaci;
 - odkryte sekrety i wskazówki tylko dla właściwego odbiorcy;
 

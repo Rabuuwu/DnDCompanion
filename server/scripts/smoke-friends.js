@@ -377,6 +377,20 @@ async function run() {
     assert.equal(shared.quests[0].steps[0].title, 'Odnajdź świadka');
     assert.equal(shared.quests[0].private_content, undefined);
     assert.equal(shared.quests[0].resolution, undefined);
+    const questNotesResponse = await request(
+      `/api/campaigns/${campaign.id}/shared/quests/${createdEntities.quests.id}/notes`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${second.token}` },
+        body: JSON.stringify({ content: 'Wspólny trop drużyny' }),
+      },
+    );
+    assert.equal(questNotesResponse.status, 200);
+    const ownerSharedResponse = await request(`/api/campaigns/${campaign.id}/shared`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(ownerSharedResponse.status, 200);
+    assert.equal((await ownerSharedResponse.json()).quests[0].party_notes, 'Wspólny trop drużyny');
 
     const roleResponse = await request(`/api/campaigns/${campaign.id}/dm/members/${second.user.id}/role`, {
       method: 'PUT',

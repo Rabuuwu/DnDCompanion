@@ -111,6 +111,7 @@ const {
   updateQuestStep,
   updateScene,
   updateSecret,
+  updateSharedQuestNotes,
   updateSession,
   deleteQuestStep,
 } = require('./dm-workspace');
@@ -320,6 +321,12 @@ app.delete('/api/campaigns/:campaignId/dm/members/:userId', mutationLimiter, req
 app.post('/api/campaigns/:campaignId/dm/archive', mutationLimiter, requireAuth, archiveCampaign);
 app.get('/api/campaigns/:campaignId/dm/export', readLimiter, requireAuth, exportCampaign);
 app.get('/api/campaigns/:campaignId/shared', readLimiter, requireAuth, listSharedCampaignContent);
+app.put(
+  '/api/campaigns/:campaignId/shared/quests/:questId/notes',
+  mutationLimiter,
+  requireAuth,
+  updateSharedQuestNotes,
+);
 app.get('/api/characters/:characterId/teams', requireAuth, listCharacterTeams);
 app.get('/api/campaigns/:campaignId/characters/:characterId', requireAuth, getCampaignCharacter);
 app.delete('/api/characters/:characterId/campaigns/:campaignId', requireAuth, leaveCampaign);
