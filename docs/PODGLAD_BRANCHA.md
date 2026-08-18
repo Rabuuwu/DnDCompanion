@@ -18,6 +18,8 @@ Skrypt:
 4. wyświetla adres komputera i adresy dostępne w LAN;
 5. przekazuje `/api`, `/health` i `/ready` przez proxy Vite do lokalnego API.
 
+Skrypt automatycznie dodaje adres lokalny i wykryte adresy LAN podglądu do `CORS_ORIGINS` tej instancji API.
+
 Na tym samym komputerze należy wejść na:
 
 ```text

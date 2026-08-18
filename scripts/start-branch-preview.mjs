@@ -4,6 +4,18 @@ import { networkInterfaces } from 'node:os';
 const root = new URL('..', import.meta.url).pathname;
 const children = new Set();
 const apiPort = process.env.BRANCH_PREVIEW_API_PORT || '3010';
+const addresses = Object.values(networkInterfaces())
+  .flat()
+  .filter((entry) => entry?.family === 'IPv4' && !entry.internal)
+  .map((entry) => entry.address);
+const previewOrigins = [
+  process.env.CORS_ORIGINS,
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+  ...addresses.map((address) => `http://${address}:5173`),
+]
+  .filter(Boolean)
+  .join(',');
 
 function run(command, args, options = {}) {
   const child = spawn(command, args, {
@@ -44,18 +56,13 @@ try {
   await wait(run('npm', ['run', 'db:migrate']));
 
   const api = run('npm', ['run', 'start', '--workspace', 'server'], {
-    env: { PORT: apiPort, HOST: '127.0.0.1' },
+    env: { PORT: apiPort, HOST: '127.0.0.1', CORS_ORIGINS: previewOrigins },
   });
   const frontend = run(
     'npm',
     ['run', 'dev', '--workspace', 'mobile', '--', '--host', '0.0.0.0', '--port', '5173', '--strictPort'],
     { env: { VITE_API_PROXY_TARGET: `http://127.0.0.1:${apiPort}` } },
   );
-
-  const addresses = Object.values(networkInterfaces())
-    .flat()
-    .filter((entry) => entry?.family === 'IPv4' && !entry.internal)
-    .map((entry) => entry.address);
 
   console.log('\n[preview] Podgląd brancha z hot reloadem:');
   console.log('  komputer: http://127.0.0.1:5173');
