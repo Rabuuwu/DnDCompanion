@@ -235,7 +235,11 @@ async function run() {
     assert.equal(dmDashboard.campaign.name, 'Testowa kampania');
     assert.equal(dmDashboard.memberCount, 2);
     assert.equal(dmDashboard.members.length, 2);
-    assert.equal(dmDashboard.members.find((member) => member.id === secondCharacter.id).hasDmNote, true);
+    const dashboardMember = dmDashboard.members.find((member) => member.id === secondCharacter.id);
+    assert.equal(dashboardMember.hasDmNote, true);
+    assert.equal(dashboardMember.race, 'Człowiek');
+    assert.equal(dashboardMember.classes, 'Wędrowiec');
+    assert.equal(dashboardMember.level, 1);
     assert.equal(dmDashboard.members[0].inventory, undefined);
 
     const createNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/notes`, {

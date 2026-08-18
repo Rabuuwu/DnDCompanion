@@ -26,9 +26,7 @@ async function getDmDashboard(req, res) {
 
   const [members, campaignState] = await Promise.all([
     pool.query(
-      `SELECT ch.id, ch.name, ch.data->>'avatar' AS avatar,
-              ch.data->>'race' AS race, ch.data->>'classes' AS classes,
-              ch.data->>'level' AS level, u.id AS user_id, u.username,
+      `SELECT ch.id, ch.name, ch.data, u.id AS user_id, u.username,
               EXISTS (
                 SELECT 1
                 FROM campaign_character_dm_notes note
@@ -76,16 +74,19 @@ async function getDmDashboard(req, res) {
     lastSession: campaignState.rows[0]?.last_session || null,
     nextSession: campaignState.rows[0]?.next_session || null,
     lastNoteUpdate: campaignState.rows[0]?.last_note_update || null,
-    members: members.rows.map((row) => ({
-      id: Number(row.id),
-      name: row.name,
-      avatar: row.avatar || '',
-      race: row.race || '',
-      classes: row.classes || '',
-      level: Math.max(0, Number(row.level) || 0),
-      user: { id: Number(row.user_id), username: row.username },
-      hasDmNote: row.has_dm_note,
-    })),
+    members: members.rows.map((row) => {
+      const character = serializeCharacter({ id: row.id, name: row.name, data: row.data });
+      return {
+        id: character.id,
+        name: character.name,
+        avatar: character.avatar,
+        race: character.race,
+        classes: character.classes,
+        level: character.level,
+        user: { id: Number(row.user_id), username: row.username },
+        hasDmNote: row.has_dm_note,
+      };
+    }),
     counts: {
       activeQuests: Number(campaignState.rows[0]?.active_quests) || 0,
       activeThreads: Number(campaignState.rows[0]?.active_threads) || 0,
