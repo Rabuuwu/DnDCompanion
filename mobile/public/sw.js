@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-mobile-cache-v26';
+const CACHE_NAME = 'dnd-mobile-cache-v27';
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const scopedPath = (file = '') => `${SCOPE_PATH}${file}`;
 const APP_SHELL = [
@@ -50,6 +50,8 @@ self.addEventListener('notificationclick', (event) => {
     if (route.friendId) params.set('friendId', route.friendId);
     if (route.username) params.set('username', route.username);
     if (route.invitationId) params.set('invitationId', route.invitationId);
+    if (route.notificationId) params.set('notificationId', route.notificationId);
+    if (route.campaignId) params.set('campaignId', route.campaignId);
     if (route.campaignName) params.set('campaignName', route.campaignName);
     if (route.inviterUsername) params.set('inviterUsername', route.inviterUsername);
     if (route.action) params.set('action', route.action);

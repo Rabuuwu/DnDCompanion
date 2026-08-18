@@ -1,18 +1,20 @@
 import { defineConfig } from 'vite';
 import { readFileSync } from 'node:fs';
 
-const https = process.env.PWA_HTTPS_KEY && process.env.PWA_HTTPS_CERT
-  ? {
-      key: readFileSync(process.env.PWA_HTTPS_KEY),
-      cert: readFileSync(process.env.PWA_HTTPS_CERT),
-    }
-  : undefined;
+const https =
+  process.env.PWA_HTTPS_KEY && process.env.PWA_HTTPS_CERT
+    ? {
+        key: readFileSync(process.env.PWA_HTTPS_KEY),
+        cert: readFileSync(process.env.PWA_HTTPS_CERT),
+      }
+    : undefined;
 const release = JSON.parse(readFileSync(new URL('../release.json', import.meta.url), 'utf8'));
 
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:3000';
 const proxy = {
-  '/api': 'http://127.0.0.1:3000',
-  '/health': 'http://127.0.0.1:3000',
-  '/ready': 'http://127.0.0.1:3000',
+  '/api': apiProxyTarget,
+  '/health': apiProxyTarget,
+  '/ready': apiProxyTarget,
 };
 
 export default defineConfig({

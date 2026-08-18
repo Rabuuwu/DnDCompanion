@@ -182,6 +182,11 @@ async function run() {
     });
     assert.equal(forbiddenDmPanel.status, 403);
 
+    const forbiddenDmDashboard = await request(`/api/campaigns/${campaign.id}/dm/dashboard`, {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal(forbiddenDmDashboard.status, 403, await forbiddenDmDashboard.clone().text());
+
     const dmNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/note`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${first.token}` },
@@ -221,6 +226,191 @@ async function run() {
       dmPanel.members.find((member) => member.id === secondCharacter.id).dmNote,
       'Postać zna ukryte przejście',
     );
+
+    const dmDashboardResponse = await request(`/api/campaigns/${campaign.id}/dm/dashboard`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(dmDashboardResponse.status, 200);
+    const dmDashboard = await dmDashboardResponse.json();
+    assert.equal(dmDashboard.campaign.name, 'Testowa kampania');
+    assert.equal(dmDashboard.memberCount, 2);
+    assert.equal(dmDashboard.members.length, 2);
+    const dashboardMember = dmDashboard.members.find((member) => member.id === secondCharacter.id);
+    assert.equal(dashboardMember.hasDmNote, true);
+    assert.equal(dashboardMember.race, 'Człowiek');
+    assert.equal(dashboardMember.classes, 'Wędrowiec');
+    assert.equal(dashboardMember.level, 1);
+    assert.equal(dmDashboard.members[0].inventory, undefined);
+
+    const createNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/notes`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ title: 'Plan testowy', content: 'Treść planu', category: 'Pomysły', tags: ['test'] }),
+    });
+    assert.equal(createNoteResponse.status, 201);
+    const createdNote = await createNoteResponse.json();
+    const updateNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/notes/${createdNote.id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ title: 'Plan testowy 2', content: 'Zmieniona treść', category: 'Fabuła', isPinned: true }),
+    });
+    assert.equal(updateNoteResponse.status, 200);
+    const notesResponse = await request(`/api/campaigns/${campaign.id}/dm/notes`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(notesResponse.status, 200);
+    assert.ok((await notesResponse.json()).some((note) => note.title === 'Plan testowy 2'));
+
+    const createSessionResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ number: 1, title: 'Pierwsza sesja', plan: 'Plan sesji' }),
+    });
+    assert.equal(createSessionResponse.status, 201);
+    const createdSession = await createSessionResponse.json();
+    const sceneResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions/${createdSession.id}/scenes`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ title: 'Spotkanie w karczmie', description: 'Scena otwierająca' }),
+    });
+    assert.equal(sceneResponse.status, 201);
+    const eventResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions/${createdSession.id}/events`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({
+        eventType: 'party_decision',
+        title: 'Wybór drogi',
+        content: 'Drużyna ruszyła na północ',
+        visibility: 'party',
+      }),
+    });
+    assert.equal(eventResponse.status, 201);
+    const sessionDetailsResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions/${createdSession.id}`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(sessionDetailsResponse.status, 200);
+    const sessionDetails = await sessionDetailsResponse.json();
+    assert.equal(sessionDetails.scenes.length, 1);
+    assert.equal(sessionDetails.events.length, 1);
+
+    const createdEntities = {};
+    for (const [module, name] of [
+      ['npcs', 'Karczmarz'],
+      ['locations', 'Karczma'],
+      ['factions', 'Straż'],
+      ['quests', 'Zaginiony list'],
+      ['threads', 'Tajemnica ruin'],
+    ]) {
+      const entityResponse = await request(`/api/campaigns/${campaign.id}/dm/content/${module}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${first.token}` },
+        body: JSON.stringify({
+          name,
+          title: name,
+          publicContent: 'Opis publiczny',
+          privateContent: 'Sekret DM',
+          visibility: module === 'quests' ? 'party' : 'dm',
+          data:
+            module === 'quests'
+              ? { mainGoal: 'Odnaleźć list', commissioner: 'Karczmarz', rewards: '50 sztuk złota', resolution: 'Tajne' }
+              : {},
+        }),
+      });
+      assert.equal(entityResponse.status, 201);
+      createdEntities[module] = await entityResponse.json();
+      const entityListResponse = await request(`/api/campaigns/${campaign.id}/dm/content/${module}`, {
+        headers: { Authorization: `Bearer ${first.token}` },
+      });
+      assert.equal(entityListResponse.status, 200);
+      assert.equal((await entityListResponse.json()).length, 1);
+    }
+
+    const questStepResponse = await request(
+      `/api/campaigns/${campaign.id}/dm/quests/${createdEntities.quests.id}/steps`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${first.token}` },
+        body: JSON.stringify({ title: 'Odnajdź świadka' }),
+      },
+    );
+    assert.equal(questStepResponse.status, 201);
+
+    const secretResponse = await request(`/api/campaigns/${campaign.id}/dm/secrets`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ title: 'Ukryta prawda', content: 'Król jest sobowtórem', secretType: 'world_secret' }),
+    });
+    assert.equal(secretResponse.status, 201);
+    const secret = await secretResponse.json();
+    const revealResponse = await request(`/api/campaigns/${campaign.id}/dm/secrets/${secret.id}/reveal`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ characterIds: [secondCharacter.id], confirmed: true }),
+    });
+    assert.equal(revealResponse.status, 204);
+
+    const materialResponse = await request(`/api/campaigns/${campaign.id}/dm/materials`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ title: 'List gończy', content: 'Poszukiwany czarodziej', materialType: 'letter' }),
+    });
+    assert.equal(materialResponse.status, 201);
+    const material = await materialResponse.json();
+    const shareResponse = await request(`/api/campaigns/${campaign.id}/dm/materials/${material.id}/share`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ characterIds: [secondCharacter.id], confirmed: true }),
+    });
+    assert.equal(shareResponse.status, 204);
+    const contentNotificationsResponse = await request('/api/notifications', {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal(contentNotificationsResponse.status, 200);
+    const contentNotifications = await contentNotificationsResponse.json();
+    assert.ok(contentNotifications.campaignContent.some((item) => item.type === 'campaign_material'));
+    assert.ok(contentNotifications.campaignContent.some((item) => item.type === 'campaign_secret'));
+    const sharedResponse = await request(`/api/campaigns/${campaign.id}/shared`, {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal(sharedResponse.status, 200);
+    const shared = await sharedResponse.json();
+    assert.equal(shared.materials[0].title, 'List gończy');
+    assert.equal(shared.secrets[0].title, 'Ukryta prawda');
+    assert.equal(shared.quests[0].name, 'Zaginiony list');
+    assert.equal(shared.quests[0].main_goal, 'Odnaleźć list');
+    assert.equal(shared.quests[0].steps[0].title, 'Odnajdź świadka');
+    assert.equal(shared.quests[0].private_content, undefined);
+    assert.equal(shared.quests[0].resolution, undefined);
+    const questNotesResponse = await request(
+      `/api/campaigns/${campaign.id}/shared/quests/${createdEntities.quests.id}/notes`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${second.token}` },
+        body: JSON.stringify({ content: 'Wspólny trop drużyny' }),
+      },
+    );
+    assert.equal(questNotesResponse.status, 200);
+    const ownerSharedResponse = await request(`/api/campaigns/${campaign.id}/shared`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(ownerSharedResponse.status, 200);
+    assert.equal((await ownerSharedResponse.json()).quests[0].party_notes, 'Wspólny trop drużyny');
+
+    const roleResponse = await request(`/api/campaigns/${campaign.id}/dm/members/${second.user.id}/role`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ role: 'co_dm' }),
+    });
+    assert.equal(roleResponse.status, 200);
+    const coDmDashboardResponse = await request(`/api/campaigns/${campaign.id}/dm/dashboard`, {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal(coDmDashboardResponse.status, 200);
+    const exportResponse = await request(`/api/campaigns/${campaign.id}/dm/export`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(exportResponse.status, 200);
+    assert.equal((await exportResponse.json()).campaign.name, 'Testowa kampania');
 
     const dmCharacterResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}`, {
       headers: { Authorization: `Bearer ${first.token}` },

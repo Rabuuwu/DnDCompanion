@@ -24,7 +24,8 @@ Serwer Express składa się z modułów:
 - `auth.js` — rejestracja, logowanie, rotacja sesji, awatar, hasło i usuwanie konta;
 - `characters.js` — walidacja i serializacja całego modelu postaci, szybkie aktualizacje ekwipunku i notatnika;
 - `friends.js` / `social.js` — relacje, wiadomości, pseudonimy, blokady i zgłoszenia;
-- `campaigns.js` — drużyny, zaproszenia, dostęp do postaci i Panel DM;
+- `campaigns.js` — drużyny, zaproszenia, dostęp do postaci, lekkie podsumowanie Pulpitu i podstawowy Panel DM;
+- `dm-workspace.js` — notatki, sesje, treści kampanii, widoczność, materiały, historia, role i eksport;
 - `notifications.js` — kanał SSE, lista bieżących powiadomień i dystrybucja zdarzeń przez PostgreSQL `LISTEN/NOTIFY`;
 - `preferences.js` — trwałe ustawienia interfejsu użytkownika;
 - `audit.js` — dziennik zdarzeń i żądań w bazie;

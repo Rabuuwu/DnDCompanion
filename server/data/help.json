@@ -41,7 +41,19 @@
         },
         {
           "question": "Kto ma dostęp do Panelu DM?",
-          "answer": "Panel DM jest dostępny właścicielowi kampanii pod rekordem drużyny. DM widzi pełne karty członków, może prowadzić prywatne notatki i dodawać przedmioty do ich ekwipunku."
+          "answer": "Panel DM jest dostępny właścicielowi oraz wskazanym współprowadzącym pod rekordem drużyny. Pełna karta postaci ładuje się dopiero po wybraniu członka."
+        },
+        {
+          "question": "Co można prowadzić w Panelu DM?",
+          "answer": "Pulpit kampanii, wiele prywatnych notatek, NPC, lokacje, frakcje, zadania, wątki, sekrety oraz materiały. Zadania oznaczone jako widoczne dla całej drużyny pojawiają się graczom w informacjach kampanii."
+        },
+        {
+          "question": "Jak udostępnić sekret lub materiał?",
+          "answer": "Wybierz odbiorców w Panelu DM i potwierdź ujawnienie. Tylko wybrane postacie otrzymają powiadomienie i zobaczą treść w materiałach swojej kampanii."
+        },
+        {
+          "question": "Czy można wykonać kopię kampanii?",
+          "answer": "Tak. W Ustawieniach Panelu DM wybierz Eksportuj JSON. Archiwizacja ukrywa kampanię z aktywnych list, ale nie usuwa jej danych."
         }
       ]
     },
