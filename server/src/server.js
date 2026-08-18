@@ -47,7 +47,12 @@ const {
   setFriendNickname,
 } = require('./friends');
 const { blockUser, reportUser } = require('./social');
-const { listNotifications, stopNotificationListener, streamNotifications } = require('./notifications');
+const {
+  listNotifications,
+  readCampaignContentNotification,
+  stopNotificationListener,
+  streamNotifications,
+} = require('./notifications');
 const { getUiPreferences, updateUiPreferences } = require('./preferences');
 const { startDatabaseMaintenance } = require('./maintenance');
 const {
@@ -66,6 +71,49 @@ const {
   updateDmCharacterNote,
   updateDmNote,
 } = require('./campaigns');
+const {
+  addScene,
+  addSessionEvent,
+  archiveCampaign,
+  archiveDmNote,
+  archiveEntity,
+  archiveMaterial,
+  archiveSecret,
+  createDmNote,
+  createEntity,
+  createMaterial,
+  createQuestStep,
+  createRelation,
+  createSecret,
+  createSession,
+  createTimelineEvent,
+  exportCampaign,
+  getCampaignSettings,
+  getSession,
+  listDmNotes,
+  listEntities,
+  listMaterials,
+  listQuestSteps,
+  listRelations,
+  listSecrets,
+  listSharedCampaignContent,
+  listSessions,
+  listTimeline,
+  revealSecret,
+  removeCampaignMember,
+  deleteRelation,
+  shareMaterial,
+  updateCampaignRole,
+  updateCampaignSettings,
+  updateDmNoteRecord,
+  updateEntity,
+  updateMaterial,
+  updateQuestStep,
+  updateScene,
+  updateSecret,
+  updateSession,
+  deleteQuestStep,
+} = require('./dm-workspace');
 
 const app = express();
 
@@ -102,6 +150,14 @@ const authLimiter = rateLimit({
 const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'too_many_requests' },
+});
+
+const mutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 120,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'too_many_requests' },
@@ -205,6 +261,7 @@ app.post('/api/users/:id/block', authLimiter, requireAuth, blockUser);
 app.post('/api/users/:id/report', authLimiter, requireAuth, reportUser);
 app.get('/api/notifications', requireAuth, listNotifications);
 app.get('/api/notifications/stream', requireAuth, streamNotifications);
+app.post('/api/notifications/campaign-content/:id/read', mutationLimiter, requireAuth, readCampaignContentNotification);
 
 app.get('/api/campaigns', requireAuth, listOwnedCampaigns);
 app.post('/api/campaigns', requireAuth, createCampaign);
@@ -217,6 +274,52 @@ app.put('/api/campaigns/:id/dm/note', requireAuth, updateDmNote);
 app.get('/api/campaigns/:campaignId/dm/characters/:characterId', requireAuth, getDmCharacter);
 app.put('/api/campaigns/:campaignId/dm/characters/:characterId/note', requireAuth, updateDmCharacterNote);
 app.post('/api/campaigns/:campaignId/dm/characters/:characterId/inventory', requireAuth, addDmCharacterInventoryItem);
+app.get('/api/campaigns/:campaignId/dm/notes', readLimiter, requireAuth, listDmNotes);
+app.post('/api/campaigns/:campaignId/dm/notes', mutationLimiter, requireAuth, createDmNote);
+app.put('/api/campaigns/:campaignId/dm/notes/:noteId', mutationLimiter, requireAuth, updateDmNoteRecord);
+app.delete('/api/campaigns/:campaignId/dm/notes/:noteId', mutationLimiter, requireAuth, archiveDmNote);
+app.get('/api/campaigns/:campaignId/dm/sessions', readLimiter, requireAuth, listSessions);
+app.post('/api/campaigns/:campaignId/dm/sessions', mutationLimiter, requireAuth, createSession);
+app.get('/api/campaigns/:campaignId/dm/sessions/:sessionId', readLimiter, requireAuth, getSession);
+app.put('/api/campaigns/:campaignId/dm/sessions/:sessionId', mutationLimiter, requireAuth, updateSession);
+app.post('/api/campaigns/:campaignId/dm/sessions/:sessionId/scenes', mutationLimiter, requireAuth, addScene);
+app.put('/api/campaigns/:campaignId/dm/sessions/:sessionId/scenes/:sceneId', mutationLimiter, requireAuth, updateScene);
+app.post('/api/campaigns/:campaignId/dm/sessions/:sessionId/events', mutationLimiter, requireAuth, addSessionEvent);
+app.get('/api/campaigns/:campaignId/dm/content/:module', readLimiter, requireAuth, listEntities);
+app.post('/api/campaigns/:campaignId/dm/content/:module', mutationLimiter, requireAuth, createEntity);
+app.put('/api/campaigns/:campaignId/dm/content/:module/:entityId', mutationLimiter, requireAuth, updateEntity);
+app.delete('/api/campaigns/:campaignId/dm/content/:module/:entityId', mutationLimiter, requireAuth, archiveEntity);
+app.get('/api/campaigns/:campaignId/dm/quests/:questId/steps', readLimiter, requireAuth, listQuestSteps);
+app.post('/api/campaigns/:campaignId/dm/quests/:questId/steps', mutationLimiter, requireAuth, createQuestStep);
+app.put('/api/campaigns/:campaignId/dm/quests/:questId/steps/:stepId', mutationLimiter, requireAuth, updateQuestStep);
+app.delete(
+  '/api/campaigns/:campaignId/dm/quests/:questId/steps/:stepId',
+  mutationLimiter,
+  requireAuth,
+  deleteQuestStep,
+);
+app.get('/api/campaigns/:campaignId/dm/secrets', readLimiter, requireAuth, listSecrets);
+app.post('/api/campaigns/:campaignId/dm/secrets', mutationLimiter, requireAuth, createSecret);
+app.put('/api/campaigns/:campaignId/dm/secrets/:secretId', mutationLimiter, requireAuth, updateSecret);
+app.delete('/api/campaigns/:campaignId/dm/secrets/:secretId', mutationLimiter, requireAuth, archiveSecret);
+app.post('/api/campaigns/:campaignId/dm/secrets/:secretId/reveal', mutationLimiter, requireAuth, revealSecret);
+app.get('/api/campaigns/:campaignId/dm/materials', readLimiter, requireAuth, listMaterials);
+app.post('/api/campaigns/:campaignId/dm/materials', mutationLimiter, requireAuth, createMaterial);
+app.put('/api/campaigns/:campaignId/dm/materials/:materialId', mutationLimiter, requireAuth, updateMaterial);
+app.delete('/api/campaigns/:campaignId/dm/materials/:materialId', mutationLimiter, requireAuth, archiveMaterial);
+app.post('/api/campaigns/:campaignId/dm/materials/:materialId/share', mutationLimiter, requireAuth, shareMaterial);
+app.get('/api/campaigns/:campaignId/dm/timeline', readLimiter, requireAuth, listTimeline);
+app.post('/api/campaigns/:campaignId/dm/timeline', mutationLimiter, requireAuth, createTimelineEvent);
+app.get('/api/campaigns/:campaignId/dm/relations', readLimiter, requireAuth, listRelations);
+app.post('/api/campaigns/:campaignId/dm/relations', mutationLimiter, requireAuth, createRelation);
+app.delete('/api/campaigns/:campaignId/dm/relations/:relationId', mutationLimiter, requireAuth, deleteRelation);
+app.get('/api/campaigns/:campaignId/dm/settings', readLimiter, requireAuth, getCampaignSettings);
+app.put('/api/campaigns/:campaignId/dm/settings', mutationLimiter, requireAuth, updateCampaignSettings);
+app.put('/api/campaigns/:campaignId/dm/members/:userId/role', mutationLimiter, requireAuth, updateCampaignRole);
+app.delete('/api/campaigns/:campaignId/dm/members/:userId', mutationLimiter, requireAuth, removeCampaignMember);
+app.post('/api/campaigns/:campaignId/dm/archive', mutationLimiter, requireAuth, archiveCampaign);
+app.get('/api/campaigns/:campaignId/dm/export', readLimiter, requireAuth, exportCampaign);
+app.get('/api/campaigns/:campaignId/shared', readLimiter, requireAuth, listSharedCampaignContent);
 app.get('/api/characters/:characterId/teams', requireAuth, listCharacterTeams);
 app.get('/api/campaigns/:campaignId/characters/:characterId', requireAuth, getCampaignCharacter);
 app.delete('/api/characters/:characterId/campaigns/:campaignId', requireAuth, leaveCampaign);

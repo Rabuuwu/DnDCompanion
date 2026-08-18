@@ -111,6 +111,26 @@ Wszystkie endpointy wymagają, aby zalogowany użytkownik był właścicielem ka
 
 Panel pobiera pełną kartę wyłącznie po wybraniu konkretnej postaci. Endpoint Pulpitu nie zwraca ekwipunku, umiejętności, notatnika ani prywatnej treści notatki. Sekcje sesji, kampanii, materiałów i ustawień mają zostać rozszerzone w kolejnych etapach opisanych w `POMYSLY_ROZWOJU_TABLETOP.md`.
 
+### Moduły przestrzeni DM
+
+Wszystkie poniższe endpointy wymagają roli właściciela albo współprowadzącego. Zmiana właściciela, ról, członkostwa, głównych ustawień i archiwizacja wymagają właściciela.
+
+| Obszar | Endpointy |
+|---|---|
+| Notatki | `GET/POST /api/campaigns/:campaignId/dm/notes`, `PUT/DELETE .../notes/:noteId` |
+| Sesje | `GET/POST .../sessions`, `GET/PUT .../sessions/:sessionId` |
+| Sceny i wydarzenia | `POST .../sessions/:sessionId/scenes`, `PUT .../scenes/:sceneId`, `POST .../events` |
+| NPC, lokacje, frakcje, zadania i wątki | `GET/POST .../content/:module`, `PUT/DELETE .../content/:module/:entityId` |
+| Etapy zadania | `GET/POST .../quests/:questId/steps`, `PUT/DELETE .../steps/:stepId` |
+| Sekrety | `GET/POST .../secrets`, `PUT/DELETE .../secrets/:secretId`, `POST .../reveal` |
+| Materiały | `GET/POST .../materials`, `PUT/DELETE .../materials/:materialId`, `POST .../share` |
+| Historia | `GET/POST .../timeline` |
+| Ustawienia | `GET/PUT .../settings`, `PUT/DELETE .../members/:userId[/role]`, `POST .../archive` |
+| Eksport | `GET .../export` |
+| Widok gracza | `GET /api/campaigns/:campaignId/shared` |
+
+Listy mają limit maksymalnie 100 rekordów na stronę. Prywatne pola DM są dostępne wyłącznie przez endpointy DM. Ujawnienie sekretu lub materiału wymaga listy `characterIds` i jawnego `confirmed: true`. Powiadomienie trafia tylko do odbiorców, a ponowne udostępnienie istniejącego materiału nie wysyła duplikatu.
+
 ## Kody statusów
 
 - `200/201/204` — sukces;

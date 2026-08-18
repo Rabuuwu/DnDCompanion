@@ -29,6 +29,19 @@ Skrypt stosuje pliki `server/migrations/*.sql` alfabetycznie i zapisuje pełną 
 | `campaign_invitations` | oczekujące/zaakceptowane/odrzucone zaproszenia |
 | `campaign_dm_notes` | prywatna notatka DM dla kampanii, maks. 50 000 znaków |
 | `campaign_character_dm_notes` | prywatna notatka DM o konkretnej postaci |
+| `dm_notes` | wiele kategoryzowanych notatek DM; bezpieczna kopia starej notatki ogólnej |
+| `campaign_sessions` | plan, status, daty, uczestnicy, podsumowania, checklisty i notatki sesji |
+| `session_scenes` | uporządkowane sceny należące do sesji |
+| `session_events` | szybkie wydarzenia sesji z widocznością i powiązaniami |
+| `campaign_npcs` | NPC, opis publiczny/prywatny, status, widoczność i dane dodatkowe |
+| `campaign_locations` | hierarchiczne lokacje i ich treści |
+| `campaign_factions` | frakcje, nastawienie, symbol i prywatne plany |
+| `campaign_quests`, `quest_steps` | zadania kampanii oraz uporządkowane cele cząstkowe |
+| `campaign_story_threads` | niezależne wątki fabularne i ich statusy |
+| `campaign_secrets`, `secret_recipients` | sekrety oraz wiedza konkretnych postaci |
+| `campaign_materials`, `material_recipients` | handouty tekstowe/linki i odbiorcy udostępnienia |
+| `campaign_timeline_events` | ręczna i automatyczna chronologia kampanii |
+| `entity_relations` | uniwersalne powiązania elementów w granicach jednej kampanii |
 | `user_ui_preferences` | JSONB ustawień interfejsu, np. zwinięte sekcje |
 | `audit_logs` | aktor, akcja, encja, HTTP, wynik, czas, IP, user-agent i metadata JSONB |
 
@@ -51,6 +64,8 @@ API normalizuje limity, typy i wartości wyliczane przed zapisem. Zmiana modelu 
 ## Indeksy i ograniczenia
 
 Migracje definiują indeksy dla właścicieli postaci, rozmów, nieprzeczytanych wiadomości, zaproszeń, członkostwa, preferencji i głównych wymiarów audytu. Nazwa użytkownika jest unikalna bez rozróżniania wielkości liter. Oczekujące zaproszenie kampanii jest unikalne dla pary kampania–zaproszony.
+
+Encje przestrzeni DM zawsze zawierają `campaign_id`. Najczęściej używane listy mają indeksy po kampanii, statusie, czasie aktualizacji i relacjach. Prywatność nie wynika z CSS: endpointy DM sprawdzają rolę, a widok gracza korzysta z osobnego zapytania zwracającego wyłącznie treści publiczne lub jawnie przypisane jego postaci.
 
 ## Operacje i utrzymanie
 

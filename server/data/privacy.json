@@ -16,7 +16,7 @@
       "content": [
         "Przechowujemy utworzone postacie wraz z kartą, awatarem, ekwipunkiem i notatnikiem.",
         "Postać jest przypisana do właściciela. Po dołączeniu nią do kampanii jej dane mogą zobaczyć członkowie drużyny, a właściciel kampanii (DM) otrzymuje pełny podgląd karty.",
-        "Prywatne notatki DM są widoczne wyłącznie dla właściciela danej kampanii."
+        "Prywatne dane DM są widoczne wyłącznie dla właściciela oraz wskazanych współprowadzących danej kampanii. Materiały i sekrety są zwracane graczowi tylko po udostępnieniu drużynie albo jego postaci."
       ]
     },
     {

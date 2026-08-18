@@ -3,6 +3,7 @@ const { pool } = require('./db');
 const DAY_MS = 86_400_000;
 const AUDIT_RETENTION_DAYS = Math.max(7, Number(process.env.AUDIT_RETENTION_DAYS || 90));
 const INVITE_RETENTION_DAYS = Math.max(1, Number(process.env.INVITE_RETENTION_DAYS || 30));
+const NOTIFICATION_RETENTION_DAYS = Math.max(7, Number(process.env.NOTIFICATION_RETENTION_DAYS || 30));
 
 async function runDatabaseMaintenance() {
   const client = await pool.connect();
@@ -28,6 +29,11 @@ async function runDatabaseMaintenance() {
       `DELETE FROM campaign_invitations WHERE status <> 'pending' AND responded_at < NOW() - ($1 * INTERVAL '1 day')`,
       [INVITE_RETENTION_DAYS],
     );
+    const campaignContentNotifications = await client.query(
+      `DELETE FROM campaign_content_notifications
+       WHERE created_at < NOW() - ($1 * INTERVAL '1 day')`,
+      [NOTIFICATION_RETENTION_DAYS],
+    );
     await client.query('COMMIT');
     return {
       skipped: false,
@@ -36,6 +42,7 @@ async function runDatabaseMaintenance() {
         refreshTokens: refreshTokens.rowCount,
         friendInvites: friendInvites.rowCount,
         campaignInvitations: campaignInvitations.rowCount,
+        campaignContentNotifications: campaignContentNotifications.rowCount,
       },
     };
   } catch (error) {

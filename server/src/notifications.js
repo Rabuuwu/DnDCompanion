@@ -103,7 +103,7 @@ function streamNotifications(req, res) {
 }
 
 async function listNotifications(req, res) {
-  const [messagesResult, invitationsResult] = await Promise.all([
+  const [messagesResult, contentResult, invitationsResult] = await Promise.all([
     pool.query(
       `SELECT dm.id, dm.body, dm.created_at,
               sender.id AS sender_id, sender.username, sender.avatar,
@@ -117,6 +117,15 @@ async function listNotifications(req, res) {
          AND dm.read_at IS NULL
        ORDER BY dm.created_at ASC, dm.id ASC
        LIMIT 50`,
+      [req.user.id],
+    ),
+    pool.query(
+      `SELECT notification.id,notification.campaign_id,notification.notification_type,
+              notification.entity_id,notification.title,notification.created_at,campaign.name AS campaign_name
+       FROM campaign_content_notifications notification
+       JOIN campaigns campaign ON campaign.id=notification.campaign_id
+       WHERE notification.user_id=$1 AND notification.read_at IS NULL
+       ORDER BY notification.created_at ASC,notification.id ASC LIMIT 50`,
       [req.user.id],
     ),
     pool.query(
@@ -160,7 +169,35 @@ async function listNotifications(req, res) {
       },
       createdAt: invitation.created_at,
     })),
+    campaignContent: contentResult.rows.map((notification) => ({
+      id: Number(notification.id),
+      type: notification.notification_type,
+      entityId: Number(notification.entity_id),
+      campaign: { id: Number(notification.campaign_id), name: notification.campaign_name },
+      title: notification.title,
+      createdAt: notification.created_at,
+    })),
   });
 }
 
-module.exports = { listNotifications, publishUserNotification, stopNotificationListener, streamNotifications };
+async function readCampaignContentNotification(req, res) {
+  const notificationId = Number(req.params.id);
+  if (!Number.isSafeInteger(notificationId) || notificationId < 1) {
+    return res.status(400).json({ error: 'invalid_notification_id' });
+  }
+  const result = await pool.query(
+    `UPDATE campaign_content_notifications SET read_at=COALESCE(read_at,NOW())
+     WHERE id=$1 AND user_id=$2 RETURNING id`,
+    [notificationId, req.user.id],
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: 'notification_not_found' });
+  return res.status(204).end();
+}
+
+module.exports = {
+  listNotifications,
+  publishUserNotification,
+  readCampaignContentNotification,
+  stopNotificationListener,
+  streamNotifications,
+};

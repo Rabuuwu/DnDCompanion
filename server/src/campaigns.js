@@ -8,10 +8,13 @@ function parseId(value) {
 }
 
 async function requireCampaignDm(campaignId, userId) {
-  const result = await pool.query('SELECT id, name, created_at FROM campaigns WHERE id = $1 AND owner_id = $2', [
-    campaignId,
-    userId,
-  ]);
+  const result = await pool.query(
+    `SELECT c.id, c.name, c.image, c.created_at
+     FROM campaigns c
+     LEFT JOIN campaign_members cm ON cm.campaign_id = c.id AND cm.user_id = $2
+     WHERE c.id = $1 AND c.archived_at IS NULL AND (c.owner_id = $2 OR cm.role = 'co_dm')`,
+    [campaignId, userId],
+  );
   return result.rows[0] || null;
 }
 
@@ -21,7 +24,7 @@ async function getDmDashboard(req, res) {
   const campaign = await requireCampaignDm(campaignId, req.user.id);
   if (!campaign) return res.status(403).json({ error: 'dm_access_required' });
 
-  const [members, noteState] = await Promise.all([
+  const [members, campaignState] = await Promise.all([
     pool.query(
       `SELECT ch.id, ch.name, ch.data->>'avatar' AS avatar,
               ch.data->>'race' AS race, ch.data->>'classes' AS classes,
@@ -42,17 +45,23 @@ async function getDmDashboard(req, res) {
       [campaignId, req.user.id],
     ),
     pool.query(
-      `SELECT MAX(updated_at) AS last_note_update
-       FROM (
-         SELECT updated_at
-         FROM campaign_dm_notes
-         WHERE campaign_id = $1 AND dm_user_id = $2
-         UNION ALL
-         SELECT updated_at
-         FROM campaign_character_dm_notes
-         WHERE campaign_id = $1 AND dm_user_id = $2
-       ) notes`,
-      [campaignId, req.user.id],
+      `SELECT
+         (SELECT MAX(updated_at) FROM dm_notes WHERE campaign_id=$1 AND archived_at IS NULL) AS last_note_update,
+         (SELECT row_to_json(last_session) FROM (
+           SELECT id,title,actual_at FROM campaign_sessions
+           WHERE campaign_id=$1 AND status='completed' AND archived_at IS NULL
+           ORDER BY COALESCE(actual_at,updated_at) DESC LIMIT 1
+         ) last_session) AS last_session,
+         (SELECT row_to_json(next_session) FROM (
+           SELECT id,title,planned_at FROM campaign_sessions
+           WHERE campaign_id=$1 AND status='planned' AND archived_at IS NULL
+           ORDER BY planned_at NULLS LAST,number LIMIT 1
+         ) next_session) AS next_session,
+         (SELECT COUNT(*) FROM campaign_quests WHERE campaign_id=$1 AND status='active' AND archived_at IS NULL) AS active_quests,
+         (SELECT COUNT(*) FROM campaign_story_threads WHERE campaign_id=$1 AND status='active' AND archived_at IS NULL) AS active_threads,
+         (SELECT COUNT(*) FROM campaign_npcs WHERE campaign_id=$1 AND archived_at IS NULL) AS npc_count,
+         (SELECT COUNT(*) FROM campaign_materials WHERE campaign_id=$1 AND archived_at IS NULL) AS material_count`,
+      [campaignId],
     ),
   ]);
 
@@ -60,13 +69,13 @@ async function getDmDashboard(req, res) {
     campaign: {
       id: Number(campaign.id),
       name: campaign.name,
-      image: '',
+      image: campaign.image || '',
       createdAt: campaign.created_at,
     },
     memberCount: members.rows.length,
-    lastSession: null,
-    nextSession: null,
-    lastNoteUpdate: noteState.rows[0]?.last_note_update || null,
+    lastSession: campaignState.rows[0]?.last_session || null,
+    nextSession: campaignState.rows[0]?.next_session || null,
+    lastNoteUpdate: campaignState.rows[0]?.last_note_update || null,
     members: members.rows.map((row) => ({
       id: Number(row.id),
       name: row.name,
@@ -77,12 +86,11 @@ async function getDmDashboard(req, res) {
       user: { id: Number(row.user_id), username: row.username },
       hasDmNote: row.has_dm_note,
     })),
-    availableModules: {
-      sessions: false,
-      quests: false,
-      storyThreads: false,
-      npcs: false,
-      materials: false,
+    counts: {
+      activeQuests: Number(campaignState.rows[0]?.active_quests) || 0,
+      activeThreads: Number(campaignState.rows[0]?.active_threads) || 0,
+      npcs: Number(campaignState.rows[0]?.npc_count) || 0,
+      materials: Number(campaignState.rows[0]?.material_count) || 0,
     },
   });
 }
@@ -99,7 +107,7 @@ async function listOwnedCampaigns(req, res) {
   const result = await pool.query(
     `SELECT id, name, created_at
      FROM campaigns
-     WHERE owner_id = $1
+     WHERE owner_id = $1 AND archived_at IS NULL
      ORDER BY LOWER(name), id
      LIMIT $2 OFFSET $3`,
     [req.user.id, limit + 1, offset],
@@ -316,7 +324,7 @@ async function listCharacterTeams(req, res) {
   if (!ownedCharacter.rows[0]) return res.status(404).json({ error: 'character_not_found' });
 
   const result = await pool.query(
-    `SELECT c.id AS campaign_id, c.name AS campaign_name, c.owner_id, cm.joined_at,
+    `SELECT c.id AS campaign_id, c.name AS campaign_name, c.owner_id, own_membership.role AS own_role, cm.joined_at,
             member_character.id AS character_id, member_character.name AS character_name,
             member_character.data, member_character.created_at, member_character.updated_at,
             u.id AS user_id, u.username
@@ -327,6 +335,7 @@ async function listCharacterTeams(req, res) {
      JOIN users u ON u.id = cm.user_id
      WHERE own_membership.character_id = $1
        AND own_membership.user_id = $2
+       AND c.archived_at IS NULL
      ORDER BY LOWER(c.name), c.id, cm.joined_at, member_character.id`,
     [characterId, req.user.id],
   );
@@ -337,7 +346,7 @@ async function listCharacterTeams(req, res) {
       campaigns.set(row.campaign_id, {
         id: Number(row.campaign_id),
         name: row.campaign_name,
-        isDm: Number(row.owner_id) === req.user.id,
+        isDm: Number(row.owner_id) === req.user.id || row.own_role === 'co_dm',
         members: [],
       });
     }
