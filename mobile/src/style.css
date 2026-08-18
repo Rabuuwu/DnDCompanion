@@ -1678,14 +1678,21 @@ select {
 
 .shared-quest-dialog {
   width: min(42rem, calc(100vw - 1.2rem));
-  max-height: min(48rem, calc(100dvh - 1.2rem));
-  overflow-y: auto;
+  height: min(48rem, calc(100dvh - 1.2rem));
+  max-height: calc(100dvh - 1.2rem);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 1rem;
   background: #111a2c;
   color: inherit;
   box-shadow: 0 1.2rem 4rem rgba(0, 0, 0, 0.65);
+}
+
+.shared-quest-dialog[open] {
+  display: grid;
 }
 
 .shared-quest-dialog::backdrop {
@@ -1695,8 +1702,9 @@ select {
 
 .shared-quest-details {
   display: grid;
+  min-height: 0;
   gap: 0.55rem;
-  margin: 0.9rem 0;
+  margin: 0;
 }
 
 .shared-quest-details p {
@@ -1714,6 +1722,17 @@ select {
 .shared-quest-details li.completed {
   color: var(--text-soft);
   text-decoration: line-through;
+}
+
+.shared-quest-dialog .dm-note-field {
+  min-height: 0;
+  height: 100%;
+}
+
+.shared-quest-dialog .dm-note-field textarea {
+  min-height: 0;
+  height: 100%;
+  resize: none;
 }
 
 button.dm-record-card {
