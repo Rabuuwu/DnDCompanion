@@ -99,6 +99,14 @@ const authLimiter = rateLimit({
   message: { error: 'too_many_attempts' },
 });
 
+const readLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'too_many_requests' },
+});
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 app.get('/openapi.json', (req, res) => res.json(openapiDocument));
@@ -204,7 +212,7 @@ app.post('/api/campaigns/:id/invitations', requireAuth, inviteToCampaign);
 app.get('/api/campaign-invitations', requireAuth, listCampaignInvitations);
 app.post('/api/campaign-invitations/:id/respond', requireAuth, respondToCampaignInvitation);
 app.get('/api/campaigns/:id/dm', requireAuth, getDmPanel);
-app.get('/api/campaigns/:id/dm/dashboard', requireAuth, getDmDashboard);
+app.get('/api/campaigns/:id/dm/dashboard', readLimiter, requireAuth, getDmDashboard);
 app.put('/api/campaigns/:id/dm/note', requireAuth, updateDmNote);
 app.get('/api/campaigns/:campaignId/dm/characters/:characterId', requireAuth, getDmCharacter);
 app.put('/api/campaigns/:campaignId/dm/characters/:characterId/note', requireAuth, updateDmCharacterNote);
