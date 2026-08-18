@@ -2977,8 +2977,10 @@ function renderApp(statusMessage = null) {
           if (!response.ok) throw new Error('dm_notes_load_failed');
           const notes = await response.json();
           target.innerHTML = `
+            ${campaignSubnav('notes')}
             <div class="dm-module-toolbar"><div><p class="eyebrow">Kampania</p><h3>Notatki DM</h3></div><button type="button" data-new-dm-note>+ Nowa notatka</button></div>
             <div class="dm-notes-layout"><div class="dm-record-list">${notes.length ? notes.map((note) => `<button type="button" class="dm-record-card${note.is_pinned ? ' pinned' : ''}" data-dm-note-id="${note.id}"><strong>${escapeHtml(note.title)}</strong><small>${escapeHtml(note.category)} • ${formatDate(note.updated_at)}</small></button>`).join('') : '<div class="empty-state"><p>Nie masz jeszcze uporządkowanych notatek.</p></div>'}</div><div class="dm-note-editor"><div class="empty-state"><p>Wybierz notatkę albo utwórz nową.</p></div></div></div>`;
+          bindCampaignSubnav();
           const editor = target.querySelector('.dm-note-editor');
           const openEditor = (note = null) => {
             editor.innerHTML = `<form class="dm-workspace-form" data-dm-note-form>
