@@ -2053,6 +2053,10 @@ button:disabled {
   display: grid;
 }
 
+.character-tab-panel.active:not([data-character-panel='notebook']) {
+  align-content: start;
+}
+
 .notebook-screen,
 .notebook-text-panel,
 .notebook-draw-panel {
@@ -2712,6 +2716,7 @@ button:disabled {
 }
 
 .character-section {
+  align-self: start;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   overflow: hidden;
