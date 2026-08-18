@@ -1993,13 +1993,21 @@ function renderApp(statusMessage = null) {
       });
       characterTabs?.querySelectorAll('[data-character-tab]').forEach((button) => {
         button.addEventListener('click', () => {
+          const tab = button.dataset.characterTab;
+          if (!contentPanel.querySelector(`[data-character-panel="${tab}"]`)) {
+            showCharacter(character);
+            window.requestAnimationFrame(() => {
+              document.querySelector(`.character-footer-tabs [data-character-tab="${tab}"]`)?.click();
+            });
+            return;
+          }
           characterTabs
             .querySelectorAll('[data-character-tab]')
             .forEach((item) => item.classList.toggle('active', item === button));
           contentPanel.querySelectorAll('[data-character-panel]').forEach((panel) => {
-            panel.classList.toggle('active', panel.dataset.characterPanel === button.dataset.characterTab);
+            panel.classList.toggle('active', panel.dataset.characterPanel === tab);
           });
-          if (button.dataset.characterTab === 'notebook') {
+          if (tab === 'notebook') {
             contentPanel.querySelector('.character-dashboard')?.classList.add('notebook-active');
             window.requestAnimationFrame(renderNotebookCanvas);
           } else {
@@ -3767,7 +3775,7 @@ function renderApp(statusMessage = null) {
                   failed: 'Nieudane',
                   hidden: 'Ukryte',
                 };
-                sharedTarget.innerHTML = `<section><h3>Zadania drużyny</h3><div class="dm-record-list">${(shared.quests || []).map((quest) => `<article class="dm-record-card campaign-shared-quest" data-open-shared-quest="${quest.id}" role="button" tabindex="0"><div class="dm-module-toolbar"><strong>${escapeHtml(quest.name)}</strong><small>${escapeHtml(questStatus[quest.status] || quest.status)}</small></div>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : ''}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}<small>Kliknij, aby zobaczyć szczegóły i wspólne notatki.</small></article>`).join('') || '<p class="section-note">DM nie udostępnił jeszcze żadnych zadań.</p>'}</div></section><section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section><dialog class="shared-quest-dialog" data-shared-quest-dialog></dialog>`;
+                sharedTarget.innerHTML = `<section><h3>Zadania drużyny</h3><div class="dm-record-list">${(shared.quests || []).map((quest) => `<article class="dm-record-card campaign-shared-quest" data-open-shared-quest="${quest.id}" role="button" tabindex="0"><div class="dm-module-toolbar"><strong>${escapeHtml(quest.name)}</strong><small>${escapeHtml(questStatus[quest.status] || quest.status)}</small></div>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : ''}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}<small>Kliknij, aby zobaczyć szczegóły i wspólne notatki.</small></article>`).join('') || '<p class="section-note">DM nie udostępnił jeszcze żadnych zadań.</p>'}</div></section><section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card campaign-shared-material" data-open-shared-material="${material.id}" role="button" tabindex="0"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content.slice(0, 160))}${material.content.length > 160 ? '…' : ''}</p><small>Kliknij, aby otworzyć pełną treść.</small></article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section><dialog class="shared-quest-dialog" data-shared-quest-dialog></dialog><dialog class="shared-material-dialog" data-shared-material-dialog></dialog>`;
                 const questDialog = sharedTarget.querySelector('[data-shared-quest-dialog]');
                 const openSharedQuest = (quest) => {
                   questDialog.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Zadanie drużyny</p><h3>${escapeHtml(quest.name)}</h3></div><button type="button" class="secondary small" data-close-shared-quest>Zamknij</button></div><div class="shared-quest-details"><p><strong>Status:</strong> ${escapeHtml(questStatus[quest.status] || quest.status)}</p>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : '<p class="section-note">Brak dodatkowego opisu.</p>'}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}${quest.commissioner ? `<p><strong>Zleceniodawca:</strong> ${escapeHtml(quest.commissioner)}</p>` : ''}${quest.steps?.length ? `<div><strong>Etapy:</strong><ul>${quest.steps.map((step) => `<li${step.is_completed ? ' class="completed"' : ''}>${step.is_completed ? '✓' : '○'} ${escapeHtml(step.title)}</li>`).join('')}</ul></div>` : ''}${quest.rewards ? `<p><strong>Nagrody:</strong> ${escapeHtml(quest.rewards)}</p>` : ''}</div><label class="dm-note-field general"><span>Wspólne notatki drużyny</span><textarea data-shared-quest-notes maxlength="20000" placeholder="Ustalenia, tropy i pomysły drużyny…">${escapeHtml(quest.party_notes || '')}</textarea><small data-shared-quest-note-status>Zmiany zapisują się automatycznie i są widoczne dla całej drużyny.</small></label>`;
@@ -3796,6 +3804,29 @@ function renderApp(statusMessage = null) {
                   const open = () =>
                     openSharedQuest(
                       shared.quests.find((quest) => Number(quest.id) === Number(item.dataset.openSharedQuest)),
+                    );
+                  item.addEventListener('click', open);
+                  item.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      open();
+                    }
+                  });
+                });
+                const materialDialog = sharedTarget.querySelector('[data-shared-material-dialog]');
+                const openSharedMaterial = (material) => {
+                  materialDialog.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">${escapeHtml(material.material_type)}</p><h3>${escapeHtml(material.title)}</h3></div><button type="button" class="secondary small" data-close-shared-material>Zamknij</button></div><div class="shared-material-content"><p>${escapeHtml(material.content).replace(/\r?\n/g, '<br>')}</p>${material.external_url ? `<a class="shared-material-link" href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz załączony link ↗</a>` : ''}</div>`;
+                  materialDialog
+                    .querySelector('[data-close-shared-material]')
+                    ?.addEventListener('click', () => materialDialog.close());
+                  materialDialog.showModal();
+                };
+                sharedTarget.querySelectorAll('[data-open-shared-material]').forEach((item) => {
+                  const open = () =>
+                    openSharedMaterial(
+                      shared.materials.find(
+                        (material) => Number(material.id) === Number(item.dataset.openSharedMaterial),
+                      ),
                     );
                   item.addEventListener('click', open);
                   item.addEventListener('keydown', (event) => {
