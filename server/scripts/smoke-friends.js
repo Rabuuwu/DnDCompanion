@@ -182,6 +182,11 @@ async function run() {
     });
     assert.equal(forbiddenDmPanel.status, 403);
 
+    const forbiddenDmDashboard = await request(`/api/campaigns/${campaign.id}/dm/dashboard`, {
+      headers: { Authorization: `Bearer ${second.token}` },
+    });
+    assert.equal(forbiddenDmDashboard.status, 403);
+
     const dmNoteResponse = await request(`/api/campaigns/${campaign.id}/dm/note`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${first.token}` },
@@ -221,6 +226,17 @@ async function run() {
       dmPanel.members.find((member) => member.id === secondCharacter.id).dmNote,
       'Postać zna ukryte przejście',
     );
+
+    const dmDashboardResponse = await request(`/api/campaigns/${campaign.id}/dm/dashboard`, {
+      headers: { Authorization: `Bearer ${first.token}` },
+    });
+    assert.equal(dmDashboardResponse.status, 200);
+    const dmDashboard = await dmDashboardResponse.json();
+    assert.equal(dmDashboard.campaign.name, 'Testowa kampania');
+    assert.equal(dmDashboard.memberCount, 2);
+    assert.equal(dmDashboard.members.length, 2);
+    assert.equal(dmDashboard.members.find((member) => member.id === secondCharacter.id).hasDmNote, true);
+    assert.equal(dmDashboard.members[0].inventory, undefined);
 
     const dmCharacterResponse = await request(`/api/campaigns/${campaign.id}/dm/characters/${secondCharacter.id}`, {
       headers: { Authorization: `Bearer ${first.token}` },

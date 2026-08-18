@@ -8,11 +8,83 @@ function parseId(value) {
 }
 
 async function requireCampaignDm(campaignId, userId) {
-  const result = await pool.query('SELECT id, name FROM campaigns WHERE id = $1 AND owner_id = $2', [
+  const result = await pool.query('SELECT id, name, created_at FROM campaigns WHERE id = $1 AND owner_id = $2', [
     campaignId,
     userId,
   ]);
   return result.rows[0] || null;
+}
+
+async function getDmDashboard(req, res) {
+  const campaignId = parseId(req.params.id);
+  if (!campaignId) return res.status(400).json({ error: 'invalid_campaign_id' });
+  const campaign = await requireCampaignDm(campaignId, req.user.id);
+  if (!campaign) return res.status(403).json({ error: 'dm_access_required' });
+
+  const [members, noteState] = await Promise.all([
+    pool.query(
+      `SELECT ch.id, ch.name, ch.data->>'avatar' AS avatar,
+              ch.data->>'race' AS race, ch.data->>'classes' AS classes,
+              ch.data->>'level' AS level, u.id AS user_id, u.username,
+              EXISTS (
+                SELECT 1
+                FROM campaign_character_dm_notes note
+                WHERE note.campaign_id = cm.campaign_id
+                  AND note.dm_user_id = $2
+                  AND note.character_id = ch.id
+                  AND BTRIM(note.content) <> ''
+              ) AS has_dm_note
+       FROM campaign_members cm
+       JOIN characters ch ON ch.id = cm.character_id
+       JOIN users u ON u.id = cm.user_id
+       WHERE cm.campaign_id = $1
+       ORDER BY cm.joined_at, ch.id`,
+      [campaignId, req.user.id],
+    ),
+    pool.query(
+      `SELECT MAX(updated_at) AS last_note_update
+       FROM (
+         SELECT updated_at
+         FROM campaign_dm_notes
+         WHERE campaign_id = $1 AND dm_user_id = $2
+         UNION ALL
+         SELECT updated_at
+         FROM campaign_character_dm_notes
+         WHERE campaign_id = $1 AND dm_user_id = $2
+       ) notes`,
+      [campaignId, req.user.id],
+    ),
+  ]);
+
+  return res.json({
+    campaign: {
+      id: Number(campaign.id),
+      name: campaign.name,
+      image: '',
+      createdAt: campaign.created_at,
+    },
+    memberCount: members.rows.length,
+    lastSession: null,
+    nextSession: null,
+    lastNoteUpdate: noteState.rows[0]?.last_note_update || null,
+    members: members.rows.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      avatar: row.avatar || '',
+      race: row.race || '',
+      classes: row.classes || '',
+      level: Math.max(0, Number(row.level) || 0),
+      user: { id: Number(row.user_id), username: row.username },
+      hasDmNote: row.has_dm_note,
+    })),
+    availableModules: {
+      sessions: false,
+      quests: false,
+      storyThreads: false,
+      npcs: false,
+      materials: false,
+    },
+  });
 }
 
 function dmNote(value) {
@@ -510,6 +582,7 @@ module.exports = {
   addDmCharacterInventoryItem,
   createCampaign,
   getDmCharacter,
+  getDmDashboard,
   getDmPanel,
   inviteToCampaign,
   getCampaignCharacter,

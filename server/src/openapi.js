@@ -41,6 +41,7 @@ const operations = [
   ['get', '/api/campaign-invitations', 'Zaproszenia do kampanii'],
   ['post', '/api/campaign-invitations/{id}/respond', 'Odpowiedź na zaproszenie'],
   ['get', '/api/campaigns/{id}/dm', 'Panel DM'],
+  ['get', '/api/campaigns/{id}/dm/dashboard', 'Lekkie podsumowanie Pulpitu DM'],
   ['put', '/api/campaigns/{id}/dm/note', 'Notatka DM'],
   ['get', '/api/campaigns/{campaignId}/dm/characters/{characterId}', 'Pełna karta dla DM'],
   ['put', '/api/campaigns/{campaignId}/dm/characters/{characterId}/note', 'Notatka DM o postaci'],

@@ -2418,83 +2418,66 @@ function renderApp(statusMessage = null) {
         });
       }
 
-      function dmCarouselCharacterMarkup(teammate) {
-        const attributes = CHARACTER_ATTRIBUTES.map(([key, label]) => {
-          const stat = teammate.attributes?.[key] || { adventure: 0, combat: 0 };
-          return `<div class="sheet-row"><span>${label}</span><strong>${stat.adventure} / ${stat.combat}</strong></div>`;
-        }).join('');
-        const formulas = (definitions, values) => definitions.map(([key, label]) => {
-          const stat = values?.[key] || {};
-          const formula = stat.formulaTerms?.length ? formulaTermsText(stat.formulaTerms) : stat.formula;
-          return `<div class="sheet-stat"><span>${label}</span><strong>${escapeHtml(stat.value || '—')}</strong>${key !== 'initiative' && formula ? `<small>${escapeHtml(formula)}</small>` : ''}</div>`;
-        }).join('');
-        const skills = CHARACTER_SKILL_GROUPS.map(([group, entries, groupKey]) => `
-          <div class="sheet-skill-group"><h4>${group}</h4>
-            ${entries.map(([key, label]) => { const skill = teammate.skills?.[key] || {}; return `<div class="sheet-row"><span>${label}${skill.note ? ` <small>(${escapeHtml(skill.note)})</small>` : ''}</span><strong>${skill.percent ?? 0}% = ${skill.result ?? 0}</strong></div>`; }).join('')}
-            ${(teammate.customSkills || []).filter((item) => item.group === groupKey).map((item) => `<div class="sheet-row custom"><span>${escapeHtml(item.name)}</span><strong>${item.percent ?? 0}% = ${item.result ?? 0}</strong></div>`).join('')}
-          </div>`).join('');
-        const special = CHARACTER_SPECIAL.map(([key, label]) => { const value = teammate.special?.[key] || {}; return `<div class="sheet-row"><span>${label}</span><strong>${value.current ?? 0} / ${value.max ?? 0}</strong></div>`; }).join('');
-        const guilds = (teammate.guilds || []).length
-          ? teammate.guilds.map((guild) => `<div class="sheet-row"><span>${escapeHtml(guild.name)}</span><strong>${escapeHtml([guild.rank, guild.profession].filter(Boolean).join(' • ') || 'Bez rangi')}</strong></div>`).join('')
-          : '<p class="section-note">Brak gildii.</p>';
-        const inventory = parseInventory(teammate.inventory);
-        const inventoryRows = inventory.length
-          ? inventory.map((item) => `<div class="sheet-row dm-inventory-row"><span class="inventory-icon">${inventoryIconMarkup(item)}</span><span>${escapeHtml(item.name)}${item.duration ? ` • ${escapeHtml(item.duration)}` : ''}</span><strong class="inventory-quantity">×&nbsp;${item.quantity}</strong></div>`).join('')
-          : '<p class="section-note">Ekwipunek jest pusty.</p>';
-        return `
-          <details class="dm-full-character-card" open>
-            <summary>
-              ${avatarMarkup(teammate.avatar, teammate.name, 'friend-avatar')}
-              <span><strong>${escapeHtml(teammate.name)}</strong><small>${escapeHtml(teammate.user.username)} • ${escapeHtml(teammate.race)} • poziom ${teammate.level}</small></span>
-            </summary>
-            <div class="dm-full-character-content">
-          <div class="character-profile-banner"><div>${avatarMarkup(teammate.avatar, teammate.name, 'character-avatar large')}<strong>${escapeHtml(teammate.name)}</strong></div>${teammate.motto ? `<em>${escapeHtml(teammate.motto)}</em>` : ''}</div>
-          <div class="sheet-profile">
-            <span>Gracz: <strong>${escapeHtml(teammate.user.username)}</strong></span><span>Rasa: <strong>${escapeHtml(teammate.race)}</strong></span>
-            <span>Klasa: <strong>${escapeHtml(teammate.classes)}</strong></span><span>Poziom: <strong>${teammate.level}</strong></span>
-            <span>Wiek: <strong>${teammate.age || '—'}</strong></span><span>Wzrost: <strong>${escapeHtml(teammate.height || '—')}</strong></span>
-            <span>Waga: <strong>${escapeHtml(teammate.weight || '—')}</strong></span><span>Punkty: <strong>${teammate.points} (minimum ${teammate.minimumPoints})</strong></span>
-            <span>Utworzono: <strong>${teammate.createdAt ? new Date(teammate.createdAt).toLocaleString('pl-PL') : '—'}</strong></span><span>Ostatnia zmiana: <strong>${teammate.updatedAt ? new Date(teammate.updatedAt).toLocaleString('pl-PL') : '—'}</strong></span>
-          </div>
-          ${section('Gildie', guilds, true)}
-          ${section('Statystyki główne', attributes, true)}
-          ${section('Walka', `<div class="sheet-stat-grid">${formulas(CHARACTER_COMBAT, teammate.combat)}</div>`, true)}
-          ${section('Statystyki pomocnicze', `<div class="sheet-stat-grid">${formulas(CHARACTER_AUXILIARY, teammate.auxiliary)}</div>`, true)}
-          ${section('Podstatystyki', skills, true)}
-          ${section('Rozwój specjalny', special, true)}
-          ${dmFeatureSections(teammate)}
-          ${section('Ekwipunek', `
-            <div class="dm-inventory-list">${inventoryRows}</div>
-            <section class="inventory-add-card">
-              <button class="inventory-add-trigger" type="button" data-dm-open-inventory>
-                <span class="inventory-icon add">+</span>
-                <span><strong>Dodaj przedmiot</strong><small>Dodaj przedmiot jako DM</small></span>
-              </button>
-              <form class="inventory-item-form dm-inventory-add-form hidden" data-dm-add-inventory>
-                <label><span>Nazwa przedmiotu</span><input name="name" maxlength="150" placeholder="np. Mikstura leczenia" required></label>
-                <label><span>Ilość</span><input name="quantity" type="number" min="1" max="9999" value="1" inputmode="numeric" required></label>
-                ${inventoryDurationControl()}
-                ${inventoryIconPicker()}
-                <button type="submit" class="small">Dodaj do ekwipunku</button>
-              </form>
-            </section>`, true)}
-          ${section('Notatnik postaci', `<div class="dm-character-notebook"><small>Ostatni tryb: ${teammate.notebook?.mode === 'draw' ? 'Kartka' : 'Klawiatura'}</small>${teammate.notebook?.text ? `<p>${escapeHtml(teammate.notebook.text).replace(/\r?\n/g, '<br>')}</p>` : '<p class="section-note">Brak notatek tekstowych.</p>'}<canvas class="dm-notebook-preview" data-dm-notebook-preview aria-label="Podgląd rysunku z notatnika"></canvas><small>Kreski na kartce: ${teammate.notebook?.strokes?.length || 0}</small></div>`, true)}
-            </div>
-          </details>
-          <label class="dm-note-field dm-slide-note"><span>Prywatne notatki DM o tej postaci</span><textarea data-dm-member-note="${teammate.id}" maxlength="50000" placeholder="Prywatna notatka DM…">${escapeHtml(teammate.dmNote)}</textarea></label>
-        `;
+      function bindDmCharacterCard(container, teammate, campaignId, memberId) {
+        renderDmNotebookPreview(container.querySelector('[data-dm-notebook-preview]'), teammate.notebook);
+        let noteTimer;
+        container.querySelectorAll('[data-dm-member-note], [data-dm-character-note]').forEach((textarea) => {
+          textarea.addEventListener('input', () => {
+            teammate.dmNote = textarea.value;
+            container.querySelectorAll('[data-dm-member-note], [data-dm-character-note]').forEach((other) => {
+              if (other !== textarea) other.value = textarea.value;
+            });
+            window.clearTimeout(noteTimer);
+            noteTimer = window.setTimeout(() => authenticatedFetch(
+              `/api/campaigns/${campaignId}/dm/characters/${memberId}/note`,
+              { method: 'PUT', body: JSON.stringify({ content: textarea.value }) },
+            ).catch(() => {}), 500);
+          });
+        });
+        const inventoryForm = container.querySelector('[data-dm-add-inventory]');
+        container.querySelector('[data-dm-open-inventory]')?.addEventListener('click', (event) => {
+          inventoryForm?.classList.toggle('hidden');
+          event.currentTarget.classList.toggle('open');
+        });
+        inventoryForm?.querySelector('input[name="name"]')?.addEventListener('input', () => selectAutomaticInventoryIcon(inventoryForm));
+        inventoryForm?.querySelectorAll('input[name="icon"]').forEach((input) => input.addEventListener('change', () => {
+          inventoryForm.dataset.iconManuallySelected = 'true';
+        }));
+        inventoryForm?.querySelector('input[name="hasDuration"]')?.addEventListener('change', (event) => toggleInventoryDuration(event.target));
+        inventoryForm?.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const submit = inventoryForm.querySelector('button[type="submit"]');
+          const data = new FormData(inventoryForm);
+          submit.disabled = true;
+          try {
+            const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${memberId}/inventory`, {
+              method: 'POST',
+              body: JSON.stringify({
+                name: data.get('name'),
+                quantity: Number(data.get('quantity')) || 1,
+                duration: data.get('duration') || '',
+                icon: data.get('icon') || '',
+              }),
+            });
+            if (!response.ok) throw new Error('dm_inventory_add_failed');
+            teammate.inventory = (await response.json()).inventory;
+            await showDmCharacter(campaignId, teammate.campaignName || '', { id: memberId, name: teammate.name }, 'inventory');
+          } catch {
+            submit.disabled = false;
+          }
+        });
       }
 
-      async function showDmCharacter(campaignId, campaignName, member) {
+      async function showDmCharacter(campaignId, campaignName, member, initialTab = 'summary') {
         contentPanel.innerHTML = `
-          <div class="dm-panel-screen">
+          <div class="dm-panel-screen dm-character-screen">
             <div class="section-heading">
               <div><p class="eyebrow">Panel DM • ${escapeHtml(campaignName)}</p><h2>${escapeHtml(member.name)}</h2></div>
               <button id="dm-character-back" class="secondary small">Wróć</button>
             </div>
             <div id="dm-character-content"><p class="loading-copy">Pobieranie pełnej karty postaci…</p></div>
           </div>`;
-        document.querySelector('#dm-character-back')?.addEventListener('click', () => openDmPanel(campaignId, campaignName));
+        document.querySelector('#dm-character-back')?.addEventListener('click', () => openDmPanel(campaignId, campaignName, 'team'));
         const target = document.querySelector('#dm-character-content');
         try {
           const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${member.id}`);
@@ -2522,38 +2505,59 @@ function renderApp(statusMessage = null) {
           const inventoryRows = inventory.length
             ? inventory.map((item) => `<div class="sheet-row"><span>${escapeHtml(item.name)}${item.duration ? ` • ${escapeHtml(item.duration)}` : ''}</span><strong>× ${item.quantity}</strong></div>`).join('')
             : '<p class="section-note">Ekwipunek jest pusty.</p>';
+          teammate.campaignName = campaignName;
           target.innerHTML = `
-            <div class="character-profile-banner"><div>${avatarMarkup(teammate.avatar, teammate.name, 'character-avatar large')}<strong>${escapeHtml(teammate.name)}</strong></div>${teammate.motto ? `<em>${escapeHtml(teammate.motto)}</em>` : ''}</div>
-            <div class="sheet-profile">
-              <span>Gracz: <strong>${escapeHtml(teammate.user.username)}</strong></span><span>Rasa: <strong>${escapeHtml(teammate.race)}</strong></span>
-              <span>Klasa: <strong>${escapeHtml(teammate.classes)}</strong></span><span>Poziom: <strong>${teammate.level}</strong></span>
-              <span>Wiek: <strong>${teammate.age || '—'}</strong></span><span>Wzrost: <strong>${escapeHtml(teammate.height || '—')}</strong></span>
-              <span>Waga: <strong>${escapeHtml(teammate.weight || '—')}</strong></span><span>Punkty: <strong>${teammate.points} (minimum ${teammate.minimumPoints})</strong></span>
+            <div class="dm-character-tabs" role="tablist" aria-label="Szczegóły postaci">
+              <button class="secondary" data-dm-character-tab="summary">Podsumowanie</button>
+              <button class="secondary" data-dm-character-tab="sheet">Karta postaci</button>
+              <button class="secondary" data-dm-character-tab="inventory">Ekwipunek</button>
+              <button class="secondary" data-dm-character-tab="notes">Notatki DM</button>
+              <button class="secondary" data-dm-character-tab="threads">Wątki i sekrety</button>
+              <button class="secondary" data-dm-character-tab="history">Historia</button>
             </div>
-            <label class="dm-note-field"><span>Prywatne notatki DM o tej postaci</span><textarea data-dm-character-note maxlength="50000" placeholder="Twoje prywatne notatki…">${escapeHtml(teammate.dmNote)}</textarea></label>
-            ${section('Gildie', guilds, true)}
-            ${section('Statystyki główne', attributes, true)}
-            ${section('Walka', `<div class="sheet-stat-grid">${formulaRows(CHARACTER_COMBAT, teammate.combat)}</div>`, true)}
-            ${section('Statystyki pomocnicze', `<div class="sheet-stat-grid">${formulaRows(CHARACTER_AUXILIARY, teammate.auxiliary)}</div>`, true)}
-            ${section('Podstatystyki', skills, true)}
-            ${section('Rozwój specjalny', special, true)}
-            ${dmFeatureSections(teammate)}
-            ${section('Ekwipunek', inventoryRows, true)}
-            ${section('Notatnik postaci', `<div class="dm-character-notebook">${teammate.notebook?.text ? `<p>${escapeHtml(teammate.notebook.text).replace(/\r?\n/g, '<br>')}</p>` : '<p class="section-note">Brak notatek tekstowych.</p>'}<small>Kreski na kartce: ${teammate.notebook?.strokes?.length || 0}</small></div>`, true)}
+            <div class="dm-character-panel" data-dm-character-panel="summary">
+              <div class="character-profile-banner"><div>${avatarMarkup(teammate.avatar, teammate.name, 'character-avatar large')}<strong>${escapeHtml(teammate.name)}</strong></div>${teammate.motto ? `<em>${escapeHtml(teammate.motto)}</em>` : ''}</div>
+              <div class="sheet-profile">
+                <span>Gracz: <strong>${escapeHtml(teammate.user.username)}</strong></span><span>Rasa: <strong>${escapeHtml(teammate.race || '—')}</strong></span>
+                <span>Klasa: <strong>${escapeHtml(teammate.classes || '—')}</strong></span><span>Poziom: <strong>${teammate.level}</strong></span>
+                <span>Wiek: <strong>${teammate.age || '—'}</strong></span><span>Wzrost: <strong>${escapeHtml(teammate.height || '—')}</strong></span>
+                <span>Waga: <strong>${escapeHtml(teammate.weight || '—')}</strong></span><span>Punkty: <strong>${teammate.points} (minimum ${teammate.minimumPoints})</strong></span>
+              </div>
+            </div>
+            <div class="dm-character-panel" data-dm-character-panel="sheet">
+              ${section('Gildie', guilds, true)}
+              ${section('Statystyki główne', attributes, true)}
+              ${section('Walka', `<div class="sheet-stat-grid">${formulaRows(CHARACTER_COMBAT, teammate.combat)}</div>`, true)}
+              ${section('Statystyki pomocnicze', `<div class="sheet-stat-grid">${formulaRows(CHARACTER_AUXILIARY, teammate.auxiliary)}</div>`, true)}
+              ${section('Podstatystyki', skills, true)}
+              ${section('Rozwój specjalny', special, true)}
+              ${dmFeatureSections(teammate)}
+              ${section('Notatnik postaci', `<div class="dm-character-notebook">${teammate.notebook?.text ? `<p>${escapeHtml(teammate.notebook.text).replace(/\r?\n/g, '<br>')}</p>` : '<p class="section-note">Brak notatek tekstowych.</p>'}<canvas class="dm-notebook-preview" data-dm-notebook-preview aria-label="Podgląd rysunku z notatnika"></canvas><small>Kreski na kartce: ${teammate.notebook?.strokes?.length || 0}</small></div>`, true)}
+            </div>
+            <div class="dm-character-panel" data-dm-character-panel="inventory">
+              ${section('Ekwipunek', `${inventoryRows}<section class="inventory-add-card"><button class="inventory-add-trigger" type="button" data-dm-open-inventory><span class="inventory-icon add">+</span><span><strong>Dodaj przedmiot</strong><small>Dodaj przedmiot jako DM</small></span></button><form class="inventory-item-form dm-inventory-add-form hidden" data-dm-add-inventory><label><span>Nazwa przedmiotu</span><input name="name" maxlength="150" required></label><label><span>Ilość</span><input name="quantity" type="number" min="1" max="9999" value="1" required></label>${inventoryDurationControl()}${inventoryIconPicker()}<button type="submit" class="small">Dodaj do ekwipunku</button></form></section>`, true)}
+            </div>
+            <div class="dm-character-panel" data-dm-character-panel="notes">
+              <label class="dm-note-field general"><span>Prywatne notatki DM o tej postaci</span><textarea data-dm-character-note maxlength="50000" placeholder="Twoje prywatne notatki…">${escapeHtml(teammate.dmNote)}</textarea></label>
+            </div>
+            <div class="dm-character-panel" data-dm-character-panel="threads"><div class="empty-state"><h3>Wątki i sekrety</h3><p>Ten moduł zostanie dodany w kolejnym etapie rozwoju Panelu DM.</p></div></div>
+            <div class="dm-character-panel" data-dm-character-panel="history"><div class="empty-state"><h3>Historia postaci w kampanii</h3><p>Historia działań zostanie uruchomiona razem z osią kampanii.</p></div></div>
           `;
-          let timer;
-          target.querySelector('[data-dm-character-note]')?.addEventListener('input', (event) => {
-            window.clearTimeout(timer);
-            timer = window.setTimeout(() => authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${member.id}/note`, {
-              method: 'PUT', body: JSON.stringify({ content: event.target.value }),
-            }).catch(() => {}), 500);
+          const setCharacterTab = (tab) => {
+            target.querySelectorAll('[data-dm-character-tab]').forEach((button) => button.classList.toggle('active', button.dataset.dmCharacterTab === tab));
+            target.querySelectorAll('[data-dm-character-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.dmCharacterPanel === tab));
+          };
+          target.querySelectorAll('[data-dm-character-tab]').forEach((button) => {
+            button.addEventListener('click', () => setCharacterTab(button.dataset.dmCharacterTab));
           });
+          setCharacterTab(initialTab);
+          bindDmCharacterCard(target, teammate, campaignId, member.id);
         } catch {
           target.innerHTML = '<div class="empty-state"><p>Nie udało się pobrać pełnej karty postaci.</p></div>';
         }
       }
 
-      async function openDmPanel(campaignId, campaignName) {
+      async function openDmPanel(campaignId, campaignName, initialSection = 'dashboard') {
         characterTabs?.classList.add('hidden');
         if (headerIdentity) {
           headerIdentity.innerHTML = `
@@ -2564,107 +2568,125 @@ function renderApp(statusMessage = null) {
         }
         if (headerAction) headerAction.innerHTML = '<button id="dm-panel-back" class="secondary small">Wróć</button>';
         contentPanel.innerHTML = `
-          <div class="dm-panel-screen dm-panel-main">
-            <div class="dm-panel-tabs" role="tablist">
-              <button class="secondary active" data-dm-tab="members">Członkowie</button>
-              <button class="secondary" data-dm-tab="notes">Notatki DM</button>
+          <div class="dm-panel-screen dm-panel-main dm-workspace">
+            <nav class="dm-panel-tabs" aria-label="Sekcje Panelu DM">
+              <button class="secondary" data-dm-section="dashboard"><span aria-hidden="true">⌂</span><span>Pulpit</span></button>
+              <button class="secondary" data-dm-section="sessions"><span aria-hidden="true">◫</span><span>Sesje</span></button>
+              <button class="secondary" data-dm-section="team"><span aria-hidden="true">♟</span><span>Drużyna</span></button>
+              <button class="secondary" data-dm-section="campaign"><span aria-hidden="true">◇</span><span>Kampania</span></button>
+              <button class="secondary" data-dm-section="materials"><span aria-hidden="true">▧</span><span>Materiały</span></button>
+              <button class="secondary" data-dm-section="settings"><span aria-hidden="true">⚙</span><span>Ustawienia</span></button>
+            </nav>
+            <div id="dm-panel-content" tabindex="-1"><p class="loading-copy">Pobieranie Panelu DM…</p></div>
+            <div class="dm-quick-actions">
+              <button type="button" class="dm-floating-action" aria-expanded="false" aria-controls="dm-quick-menu" title="Szybkie działania">+</button>
+              <div id="dm-quick-menu" class="dm-quick-menu hidden">
+                <button type="button" data-dm-quick="note">Szybka notatka</button>
+                <button type="button" data-dm-quick="npcs">Nowy NPC</button>
+                <button type="button" data-dm-quick="quests">Nowe zadanie</button>
+                <button type="button" data-dm-quick="history">Nowe wydarzenie</button>
+                <button type="button" data-dm-quick="materials">Nowy materiał</button>
+                <button type="button" data-dm-quick="sessions">Nowa sesja</button>
+              </div>
             </div>
-            <div id="dm-panel-content"><p class="loading-copy">Pobieranie panelu DM…</p></div>
           </div>`;
         headerAction?.querySelector('#dm-panel-back')?.addEventListener('click', () => showCharacter(character));
-        try {
-          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm`);
-          if (!response.ok) throw new Error('dm_panel_load_failed');
-          const panel = await response.json();
-          const target = document.querySelector('#dm-panel-content');
+        const target = document.querySelector('#dm-panel-content');
+        const formatDate = (value) => value ? new Date(value).toLocaleDateString('pl-PL') : 'Brak';
+        const unavailable = (title, description) => `<div class="empty-state dm-module-empty"><h3>${title}</h3><p>${description}</p><small>Moduł jest przewidziany w następnym etapie przebudowy.</small></div>`;
+        let generalNoteTimer;
+        const loadDashboard = async () => {
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/dashboard`);
+          if (!response.ok) throw new Error('dm_dashboard_load_failed');
+          const dashboard = await response.json();
           target.innerHTML = `
-            <div class="dm-tab-panel active" data-dm-panel="members">
-              <div class="dm-carousel-hint">Przesuń w bok, aby zmienić postać</div>
-              <div class="dm-character-carousel">${panel.members.map((member, index) => `
-                <article class="dm-character-slide" data-dm-slide="${member.id}" aria-label="${escapeHtml(member.name)}, ${index + 1} z ${panel.members.length}">
-                  <p class="loading-copy">Pobieranie karty ${escapeHtml(member.name)}…</p>
-                </article>`).join('')}</div>
-            </div>
-            <div class="dm-tab-panel" data-dm-panel="notes">
-              <label class="dm-note-field general"><span>Twoje prywatne notatki do drużyny</span><textarea data-dm-general-note maxlength="50000" placeholder="Miejsca, wydarzenia, plany sesji…">${escapeHtml(panel.generalNote)}</textarea></label>
-            </div>`;
-          document.querySelectorAll('[data-dm-tab]').forEach((button) => button.addEventListener('click', () => {
-            document.querySelectorAll('[data-dm-tab]').forEach((item) => item.classList.toggle('active', item === button));
-            document.querySelectorAll('[data-dm-panel]').forEach((item) => item.classList.toggle('active', item.dataset.dmPanel === button.dataset.dmTab));
-          }));
-          const timers = new Map();
-          const saveLater = (key, path, content) => {
-            window.clearTimeout(timers.get(key));
-            timers.set(key, window.setTimeout(() => authenticatedFetch(path, {
-              method: 'PUT', body: JSON.stringify({ content }),
-            }).catch(() => {}), 500));
-          };
-          target.querySelector('[data-dm-general-note]')?.addEventListener('input', (event) => saveLater('general', `/api/campaigns/${campaignId}/dm/note`, event.target.value));
-          const hydrateDmSlide = (slide, teammate, member) => {
-            slide.innerHTML = dmCarouselCharacterMarkup(teammate);
-            const characterCard = slide.querySelector('.dm-full-character-card');
-            slide.classList.toggle('character-open', Boolean(characterCard?.open));
-            characterCard?.addEventListener('toggle', () => {
-              slide.classList.toggle('character-open', characterCard.open);
-            });
-            renderDmNotebookPreview(slide.querySelector('[data-dm-notebook-preview]'), teammate.notebook);
-            const textarea = slide.querySelector('[data-dm-member-note]');
-            textarea?.addEventListener('input', () => {
-              teammate.dmNote = textarea.value;
-              saveLater(
-                `character-${member.id}`,
-                `/api/campaigns/${campaignId}/dm/characters/${member.id}/note`,
-                textarea.value,
-              );
-            });
-            const inventoryForm = slide.querySelector('[data-dm-add-inventory]');
-            slide.querySelector('[data-dm-open-inventory]')?.addEventListener('click', (event) => {
-              inventoryForm?.classList.toggle('hidden');
-              event.currentTarget.classList.toggle('open');
-            });
-            inventoryForm?.querySelector('input[name="name"]')?.addEventListener('input', () => selectAutomaticInventoryIcon(inventoryForm));
-            inventoryForm?.querySelectorAll('input[name="icon"]').forEach((input) => input.addEventListener('change', () => {
-              inventoryForm.dataset.iconManuallySelected = 'true';
-            }));
-            inventoryForm?.querySelector('input[name="hasDuration"]')?.addEventListener('change', (event) => toggleInventoryDuration(event.target));
-            inventoryForm?.addEventListener('submit', async (event) => {
-              event.preventDefault();
-              const submit = inventoryForm.querySelector('button[type="submit"]');
-              const data = new FormData(inventoryForm);
-              submit.disabled = true;
-              try {
-                const inventoryResponse = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${member.id}/inventory`, {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    name: data.get('name'),
-                    quantity: Number(data.get('quantity')) || 1,
-                    duration: data.get('duration') || '',
-                    icon: data.get('icon') || '',
-                  }),
-                });
-                if (!inventoryResponse.ok) throw new Error('dm_inventory_add_failed');
-                const updated = await inventoryResponse.json();
-                teammate.inventory = updated.inventory;
-                hydrateDmSlide(slide, teammate, member);
-              } catch {
-                submit.disabled = false;
-              }
-            });
-          };
-          panel.members.forEach(async (member) => {
-            const slide = target.querySelector(`[data-dm-slide="${member.id}"]`);
-            try {
-              const characterResponse = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/characters/${member.id}`);
-              if (!characterResponse.ok) throw new Error('dm_character_load_failed');
-              const teammate = await characterResponse.json();
-              hydrateDmSlide(slide, teammate, member);
-            } catch {
-              slide.innerHTML = '<div class="empty-state"><p>Nie udało się pobrać tej postaci.</p></div>';
-            }
+            <section class="dm-dashboard-header">
+              <div class="dm-campaign-image" aria-hidden="true">D&amp;D</div>
+              <div><p class="eyebrow">Pulpit kampanii</p><h3>${escapeHtml(dashboard.campaign.name)}</h3><p>${dashboard.memberCount} ${dashboard.memberCount === 1 ? 'członek' : 'członków'} drużyny</p></div>
+              <button type="button" class="primary" data-dm-section-link="sessions">Przygotuj sesję</button>
+            </section>
+            <div class="dm-campaign-meta"><span>Ostatnia sesja <strong>${formatDate(dashboard.lastSession?.actualDate)}</strong></span><span>Następna sesja <strong>${formatDate(dashboard.nextSession?.plannedDate)}</strong></span></div>
+            <section><div class="section-heading"><div><p class="eyebrow">Drużyna</p><h3>Szybki podgląd</h3></div><button class="secondary small" data-dm-section-link="team">Zobacz całą</button></div>
+              <div class="dm-dashboard-team">${dashboard.members.length ? dashboard.members.map((item) => `<button type="button" class="dm-dashboard-member" data-dm-member="${item.id}">${avatarMarkup(item.avatar, item.name, 'friend-avatar')}<span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.user.username)} • ${escapeHtml(item.race || 'brak rasy')} • ${escapeHtml(item.classes || 'brak klasy')} • poz. ${item.level}</small></span>${item.hasDmNote ? '<span class="dm-note-indicator" title="Ma prywatną notatkę DM">●</span>' : ''}</button>`).join('') : '<div class="empty-state"><p>W kampanii nie ma jeszcze przypisanych postaci.</p></div>'}</div>
+            </section>
+            <section><div class="section-heading"><div><p class="eyebrow">Stan kampanii</p><h3>Najważniejsze obszary</h3></div></div>
+              <div class="dm-status-grid">
+                <button data-dm-section-link="campaign"><strong>Aktywne zadania</strong><span>Moduł w przygotowaniu</span></button>
+                <button data-dm-section-link="campaign"><strong>Otwarte wątki</strong><span>Moduł w przygotowaniu</span></button>
+                <button data-dm-section-link="team"><strong>Notatki DM</strong><span>${dashboard.lastNoteUpdate ? `Ostatnia zmiana ${formatDate(dashboard.lastNoteUpdate)}` : 'Brak zapisanych notatek'}</span></button>
+                <button data-dm-section-link="campaign"><strong>Ostatnio poznani NPC</strong><span>Moduł w przygotowaniu</span></button>
+                <button data-dm-section-link="sessions"><strong>Następna sesja</strong><span>Nie zaplanowano</span></button>
+                <button data-dm-section-link="sessions"><strong>Ostatnia sesja</strong><span>Brak zakończonych sesji</span></button>
+              </div>
+            </section>`;
+          target.querySelectorAll('[data-dm-member]').forEach((button) => {
+            const selected = dashboard.members.find((item) => item.id === Number(button.dataset.dmMember));
+            button.addEventListener('click', () => showDmCharacter(campaignId, campaignName, selected));
           });
-        } catch {
-          document.querySelector('#dm-panel-content').innerHTML = '<div class="empty-state"><p>Nie udało się otworzyć Panelu DM.</p></div>';
-        }
+        };
+        const loadTeam = async () => {
+          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm`);
+          if (!response.ok) throw new Error('dm_team_load_failed');
+          const panel = await response.json();
+          target.innerHTML = `
+            <section class="dm-team-section"><div class="section-heading"><div><p class="eyebrow">Drużyna</p><h3>${panel.members.length} ${panel.members.length === 1 ? 'postać' : 'postaci'}</h3></div></div>
+              <div class="dm-member-list">${panel.members.length ? panel.members.map((item) => `<button type="button" class="dm-member-card" data-dm-member="${item.id}">${avatarMarkup(item.avatar, item.name, 'friend-avatar')}<span><strong>${escapeHtml(item.name)}</strong><small>Gracz: ${escapeHtml(item.user.username)}<br>${escapeHtml(item.race || 'Brak rasy')} • ${escapeHtml(item.classes || 'Brak klasy')} • poziom ${item.level}</small>${item.dmNote ? `<em>${escapeHtml(item.dmNote.slice(0, 100))}${item.dmNote.length > 100 ? '…' : ''}</em>` : ''}</span><span aria-hidden="true">›</span></button>`).join('') : '<div class="empty-state"><p>Brak członków drużyny.</p></div>'}</div>
+            </section>
+            <label class="dm-note-field general"><span>Ogólna prywatna notatka DM</span><textarea data-dm-general-note maxlength="50000" placeholder="Miejsca, wydarzenia, plany sesji…">${escapeHtml(panel.generalNote)}</textarea><small data-dm-note-status>Zmiany zapisują się automatycznie.</small></label>`;
+          target.querySelectorAll('[data-dm-member]').forEach((button) => {
+            const selected = panel.members.find((item) => item.id === Number(button.dataset.dmMember));
+            button.addEventListener('click', () => showDmCharacter(campaignId, campaignName, selected));
+          });
+          target.querySelector('[data-dm-general-note]')?.addEventListener('input', (event) => {
+            const status = target.querySelector('[data-dm-note-status]');
+            if (status) status.textContent = 'Zapisywanie…';
+            window.clearTimeout(generalNoteTimer);
+            generalNoteTimer = window.setTimeout(async () => {
+              try {
+                const saveResponse = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/note`, { method: 'PUT', body: JSON.stringify({ content: event.target.value }) });
+                if (!saveResponse.ok) throw new Error('dm_note_save_failed');
+                if (status) status.textContent = 'Zapisano.';
+              } catch {
+                if (status) status.textContent = 'Nie udało się zapisać. Spróbuj ponownie.';
+              }
+            }, 500);
+          });
+        };
+        const setSection = async (section) => {
+          document.querySelectorAll('[data-dm-section]').forEach((button) => button.classList.toggle('active', button.dataset.dmSection === section));
+          target.innerHTML = '<p class="loading-copy">Pobieranie danych…</p>';
+          try {
+            if (section === 'dashboard') await loadDashboard();
+            else if (section === 'team') await loadTeam();
+            else if (section === 'sessions') target.innerHTML = unavailable('Sesje', 'Planowanie, prowadzenie i podsumowanie sesji zostanie dodane w Etapie 3.');
+            else if (section === 'campaign') target.innerHTML = unavailable('Kampania', 'Zadania, NPC, lokacje, frakcje, wątki, sekrety, notatki i historia będą wdrażane etapami.');
+            else if (section === 'materials') target.innerHTML = unavailable('Materiały', 'Bezpieczne handouty i udostępnianie plików zostaną dodane po sprawdzeniu magazynu plików.');
+            else target.innerHTML = unavailable('Ustawienia kampanii', 'Role, eksport i archiwizacja kampanii pojawią się w końcowym etapie przebudowy.');
+            target.querySelectorAll('[data-dm-section-link]').forEach((button) => button.addEventListener('click', () => setSection(button.dataset.dmSectionLink)));
+            target.focus({ preventScroll: true });
+          } catch {
+            target.innerHTML = '<div class="empty-state"><h3>Nie udało się pobrać danych</h3><p>Sprawdź połączenie i spróbuj ponownie.</p><button type="button" class="secondary" data-dm-retry>Spróbuj ponownie</button></div>';
+            target.querySelector('[data-dm-retry]')?.addEventListener('click', () => setSection(section));
+          }
+        };
+        document.querySelectorAll('[data-dm-section]').forEach((button) => button.addEventListener('click', () => setSection(button.dataset.dmSection)));
+        const quickButton = document.querySelector('.dm-floating-action');
+        const quickMenu = document.querySelector('#dm-quick-menu');
+        quickButton?.addEventListener('click', () => {
+          quickMenu?.classList.toggle('hidden');
+          quickButton.setAttribute('aria-expanded', String(!quickMenu?.classList.contains('hidden')));
+        });
+        quickMenu?.querySelectorAll('[data-dm-quick]').forEach((button) => button.addEventListener('click', async () => {
+          quickMenu.classList.add('hidden');
+          quickButton?.setAttribute('aria-expanded', 'false');
+          if (button.dataset.dmQuick === 'note') {
+            await setSection('team');
+            target.querySelector('[data-dm-general-note]')?.focus();
+          } else if (button.dataset.dmQuick === 'sessions') await setSection('sessions');
+          else if (button.dataset.dmQuick === 'materials') await setSection('materials');
+          else await setSection('campaign');
+        }));
+        await setSection(initialSection);
       }
 
       async function loadCharacterTeams() {

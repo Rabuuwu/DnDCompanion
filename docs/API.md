@@ -102,11 +102,14 @@ Wszystkie endpointy wymagają, aby zalogowany użytkownik był właścicielem ka
 
 | Metoda | Ścieżka | Body / opis |
 |---|---|---|
-| GET | `/api/campaigns/:id/dm` | kampania, członkowie i prywatna notatka DM |
+| GET | `/api/campaigns/:id/dm/dashboard` | lekkie podsumowanie Pulpitu: kampania, liczba i skrócona lista członków oraz stan notatek; nie zwraca pełnych kart |
+| GET | `/api/campaigns/:id/dm` | skrócona lista członków i zachowana ogólna prywatna notatka DM |
 | PUT | `/api/campaigns/:id/dm/note` | `{ content }`, maks. 50 000 znaków |
 | GET | `/api/campaigns/:campaignId/dm/characters/:characterId` | pełna karta i notatka o postaci |
 | PUT | `/api/campaigns/:campaignId/dm/characters/:characterId/note` | `{ content }` |
 | POST | `/api/campaigns/:campaignId/dm/characters/:characterId/inventory` | `{ item }`; dodaje przedmiot i zwraca nowy ekwipunek |
+
+Panel pobiera pełną kartę wyłącznie po wybraniu konkretnej postaci. Endpoint Pulpitu nie zwraca ekwipunku, umiejętności, notatnika ani prywatnej treści notatki. Sekcje sesji, kampanii, materiałów i ustawień mają zostać rozszerzone w kolejnych etapach opisanych w `POMYSLY_ROZWOJU_TABLETOP.md`.
 
 ## Kody statusów
 

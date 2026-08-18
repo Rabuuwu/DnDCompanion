@@ -54,6 +54,7 @@ const {
   addDmCharacterInventoryItem,
   createCampaign,
   getDmCharacter,
+  getDmDashboard,
   getDmPanel,
   getCampaignCharacter,
   inviteToCampaign,
@@ -203,6 +204,7 @@ app.post('/api/campaigns/:id/invitations', requireAuth, inviteToCampaign);
 app.get('/api/campaign-invitations', requireAuth, listCampaignInvitations);
 app.post('/api/campaign-invitations/:id/respond', requireAuth, respondToCampaignInvitation);
 app.get('/api/campaigns/:id/dm', requireAuth, getDmPanel);
+app.get('/api/campaigns/:id/dm/dashboard', requireAuth, getDmDashboard);
 app.put('/api/campaigns/:id/dm/note', requireAuth, updateDmNote);
 app.get('/api/campaigns/:campaignId/dm/characters/:characterId', requireAuth, getDmCharacter);
 app.put('/api/campaigns/:campaignId/dm/characters/:characterId/note', requireAuth, updateDmCharacterNote);
