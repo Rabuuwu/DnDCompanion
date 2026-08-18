@@ -15,7 +15,7 @@ Aktualizacja: 2026-08-18
 
 ## Zrealizowany Etap 1
 
-- dodano responsywną nawigację: Pulpit, Sesje, Drużyna, Kampania, Materiały i Ustawienia;
+- dodano responsywną nawigację: Pulpit, Drużyna, Kampania, Materiały i Ustawienia;
 - Panel DM otwiera się domyślnie na Pulpicie;
 - dodano lekki endpoint `GET /api/campaigns/:id/dm/dashboard`;
 - Pulpit wyświetla nagłówek kampanii, skróconą drużynę, stan notatek i kafelki obszarów kampanii;
@@ -32,7 +32,7 @@ Aktualizacja: 2026-08-18
 ## Dalsze etapy
 
 - system wielu notatek DM i migracja starej notatki — Etap 2: **wykonano**;
-- sesje, sceny i wydarzenia — Etap 3: **wykonano**;
+- sesje, sceny i wydarzenia zostały wycofane z interfejsu jako zbędne dla obecnego sposobu prowadzenia kampanii;
 - NPC, zadania i wątki — Etap 4: **wykonano**;
 - lokacje, frakcje i sekrety — Etap 5: **wykonano**;
 - handouty tekstowe i linki — Etap 6: **wykonano**;

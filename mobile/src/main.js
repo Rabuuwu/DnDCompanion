@@ -2880,7 +2880,6 @@ function renderApp(statusMessage = null) {
           <div class="dm-panel-screen dm-panel-main dm-workspace">
             <nav class="dm-panel-tabs" aria-label="Sekcje Panelu DM">
               <button class="secondary" data-dm-section="dashboard"><span aria-hidden="true">⌂</span><span>Pulpit</span></button>
-              <button class="secondary" data-dm-section="sessions"><span aria-hidden="true">◫</span><span>Sesje</span></button>
               <button class="secondary" data-dm-section="team"><span aria-hidden="true">♟</span><span>Drużyna</span></button>
               <button class="secondary" data-dm-section="campaign"><span aria-hidden="true">◇</span><span>Kampania</span></button>
               <button class="secondary" data-dm-section="materials"><span aria-hidden="true">▧</span><span>Materiały</span></button>
@@ -2895,7 +2894,6 @@ function renderApp(statusMessage = null) {
                 <button type="button" data-dm-quick="quests">Nowe zadanie</button>
                 <button type="button" data-dm-quick="history">Nowe wydarzenie</button>
                 <button type="button" data-dm-quick="materials">Nowy materiał</button>
-                <button type="button" data-dm-quick="sessions">Nowa sesja</button>
               </div>
             </div>
           </div>`;
@@ -2911,9 +2909,7 @@ function renderApp(statusMessage = null) {
             <section class="dm-dashboard-header">
               ${dashboard.campaign.image ? `<img class="dm-campaign-image" src="${escapeHtml(dashboard.campaign.image)}" alt="Grafika kampanii ${escapeHtml(dashboard.campaign.name)}">` : '<div class="dm-campaign-image" aria-hidden="true">D&amp;D</div>'}
               <div><p class="eyebrow">Pulpit kampanii</p><h3>${escapeHtml(dashboard.campaign.name)}</h3><p>${dashboard.memberCount} ${dashboard.memberCount === 1 ? 'członek' : 'członków'} drużyny</p></div>
-              <button type="button" class="primary" data-dm-section-link="sessions">Przygotuj sesję</button>
             </section>
-            <div class="dm-campaign-meta"><span>Ostatnia sesja <strong>${formatDate(dashboard.lastSession?.actual_at)}</strong></span><span>Następna sesja <strong>${formatDate(dashboard.nextSession?.planned_at)}</strong></span></div>
             <section><div class="section-heading"><div><p class="eyebrow">Drużyna</p><h3>Szybki podgląd</h3></div><button class="secondary small" data-dm-section-link="team">Zobacz całą</button></div>
               <div class="dm-dashboard-team">${dashboard.members.length ? dashboard.members.map((item) => `<button type="button" class="dm-dashboard-member" data-dm-member="${item.id}">${avatarMarkup(item.avatar, item.name, 'friend-avatar')}<span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.user.username)} • ${escapeHtml(item.race || 'brak rasy')} • ${escapeHtml(item.classes || 'brak klasy')} • poz. ${item.level}</small></span>${item.hasDmNote ? '<span class="dm-note-indicator" title="Ma prywatną notatkę DM">●</span>' : ''}</button>`).join('') : '<div class="empty-state"><p>W kampanii nie ma jeszcze przypisanych postaci.</p></div>'}</div>
             </section>
@@ -2923,8 +2919,6 @@ function renderApp(statusMessage = null) {
                 <button data-dm-section-link="campaign"><strong>Otwarte wątki</strong><span>${dashboard.counts?.activeThreads || 0}</span></button>
                 <button data-dm-section-link="team"><strong>Notatki DM</strong><span>${dashboard.lastNoteUpdate ? `Ostatnia zmiana ${formatDate(dashboard.lastNoteUpdate)}` : 'Brak zapisanych notatek'}</span></button>
                 <button data-dm-section-link="campaign"><strong>NPC kampanii</strong><span>${dashboard.counts?.npcs || 0}</span></button>
-                <button data-dm-section-link="sessions"><strong>Następna sesja</strong><span>${dashboard.nextSession ? escapeHtml(dashboard.nextSession.title) : 'Nie zaplanowano'}</span></button>
-                <button data-dm-section-link="sessions"><strong>Ostatnia sesja</strong><span>${dashboard.lastSession ? escapeHtml(dashboard.lastSession.title) : 'Brak zakończonych sesji'}</span></button>
               </div>
             </section>`;
           target.querySelectorAll('[data-dm-member]').forEach((button) => {
@@ -2940,7 +2934,7 @@ function renderApp(statusMessage = null) {
             <section class="dm-team-section"><div class="section-heading"><div><p class="eyebrow">Drużyna</p><h3>${panel.members.length} ${panel.members.length === 1 ? 'postać' : 'postaci'}</h3></div></div>
               <div class="dm-member-list">${panel.members.length ? panel.members.map((item) => `<button type="button" class="dm-member-card" data-dm-member="${item.id}">${avatarMarkup(item.avatar, item.name, 'friend-avatar')}<span><strong>${escapeHtml(item.name)}</strong><small>Gracz: ${escapeHtml(item.user.username)}<br>${escapeHtml(item.race || 'Brak rasy')} • ${escapeHtml(item.classes || 'Brak klasy')} • poziom ${item.level}</small>${item.dmNote ? `<em>${escapeHtml(item.dmNote.slice(0, 100))}${item.dmNote.length > 100 ? '…' : ''}</em>` : ''}</span><span aria-hidden="true">›</span></button>`).join('') : '<div class="empty-state"><p>Brak członków drużyny.</p></div>'}</div>
             </section>
-            <label class="dm-note-field general"><span>Ogólna prywatna notatka DM</span><textarea data-dm-general-note maxlength="50000" placeholder="Miejsca, wydarzenia, plany sesji…">${escapeHtml(panel.generalNote)}</textarea><small data-dm-note-status>Zmiany zapisują się automatycznie.</small></label>`;
+            <label class="dm-note-field general"><span>Ogólna prywatna notatka DM</span><textarea data-dm-general-note maxlength="50000" placeholder="Miejsca, wydarzenia i plany kampanii…">${escapeHtml(panel.generalNote)}</textarea><small data-dm-note-status>Zmiany zapisują się automatycznie.</small></label>`;
           target.querySelectorAll('[data-dm-member]').forEach((button) => {
             const selected = panel.members.find((item) => item.id === Number(button.dataset.dmMember));
             button.addEventListener('click', () => showDmCharacter(campaignId, campaignName, selected));
@@ -2965,7 +2959,7 @@ function renderApp(statusMessage = null) {
         };
         const noteCategories = [
           'Pomysły',
-          'Przygotowanie sesji',
+          'Przygotowanie kampanii',
           'Fabuła',
           'Gracze',
           'Zasady własne',
@@ -3273,7 +3267,6 @@ function renderApp(statusMessage = null) {
               ['npcs', 'NPC'],
               ['locations', 'Lokacje'],
               ['factions', 'Frakcje'],
-              ['sessions', 'Sesje'],
               ['plannedDevelopments', 'Planowane rozwinięcia'],
               ['discoveredInformation', 'Informacje odkryte przez graczy'],
             ],
@@ -3649,7 +3642,6 @@ function renderApp(statusMessage = null) {
           try {
             if (section === 'dashboard') await loadDashboard();
             else if (section === 'team') await loadTeam();
-            else if (section === 'sessions') await loadSessions();
             else if (section === 'campaign') await loadCampaignModule('quests');
             else if (section === 'materials') await loadMaterials();
             else await loadSettings();
@@ -3679,8 +3671,7 @@ function renderApp(statusMessage = null) {
             if (button.dataset.dmQuick === 'note') {
               await setSection('campaign');
               await loadNotes();
-            } else if (button.dataset.dmQuick === 'sessions') await setSection('sessions');
-            else if (button.dataset.dmQuick === 'materials') await setSection('materials');
+            } else if (button.dataset.dmQuick === 'materials') await setSection('materials');
             else await setSection('campaign');
           }),
         );
