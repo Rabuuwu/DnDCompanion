@@ -65,20 +65,18 @@
 ## Panel DM
 
 - automatyczne uprawnienia Mistrza Gry dla twórcy kampanii;
-- responsywna nawigacja: Pulpit, Sesje, Drużyna, Kampania, Materiały i Ustawienia;
+- responsywna nawigacja: Pulpit, Drużyna, Kampania, Materiały i Ustawienia;
 - Pulpit z nagłówkiem kampanii, skrótem drużyny, stanem notatek i kafelkami kolejnych obszarów;
 - szybkie działania dostępne z pływającego przycisku „+”;
 - lekka lista/siatka drużyny bez renderowania wszystkich pełnych kart;
 - pełny podgląd danych członka ładowany dopiero po wybraniu postaci;
-- zakładki szczegółów postaci: podsumowanie, karta, ekwipunek, notatki, wątki i historia;
+- zakładki szczegółów postaci: podsumowanie, karta, ekwipunek, notatki i wątki;
 - prywatne notatki DM dla kampanii i każdej postaci;
 - dodawanie przedmiotów bezpośrednio do ekwipunku gracza.
 - wiele prywatnych notatek z kategoriami, tagami, przypięciem, archiwum i autosave;
-- planowanie sesji, sceny z trwałą kolejnością, notatki na żywo i wydarzenia;
 - katalogi NPC, lokacji, frakcji, zadań oraz wątków fabularnych;
 - sekrety ujawniane wybranym postaciom dopiero po potwierdzeniu;
 - tekstowe materiały i linki udostępniane drużynie z powiadomieniem;
-- historia kampanii tworzona ręcznie oraz transakcyjnie przez istotne zdarzenia;
 - współprowadzący, role członków, usuwanie członków, grafika i opis kampanii;
 - eksport pełnych danych kampanii do JSON oraz bezpieczna archiwizacja.
 
@@ -86,7 +84,6 @@
 
 - lista materiałów udostępnionych całej drużynie albo konkretnej postaci;
 - odkryte sekrety i wskazówki tylko dla właściwego odbiorcy;
-- publiczna oś historii kampanii bez prywatnych pól DM.
 
 ## Platformy
 

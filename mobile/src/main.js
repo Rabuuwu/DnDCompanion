@@ -2818,7 +2818,6 @@ function renderApp(statusMessage = null) {
               <button class="secondary" data-dm-character-tab="inventory">Ekwipunek</button>
               <button class="secondary" data-dm-character-tab="notes">Notatki DM</button>
               <button class="secondary" data-dm-character-tab="threads">Wątki i sekrety</button>
-              <button class="secondary" data-dm-character-tab="history">Historia</button>
             </div>
             <div class="dm-character-panel" data-dm-character-panel="summary">
               <div class="character-profile-banner"><div>${avatarMarkup(teammate.avatar, teammate.name, 'character-avatar large')}<strong>${escapeHtml(teammate.name)}</strong></div>${teammate.motto ? `<em>${escapeHtml(teammate.motto)}</em>` : ''}</div>
@@ -2846,7 +2845,6 @@ function renderApp(statusMessage = null) {
               <label class="dm-note-field general"><span>Prywatne notatki DM o tej postaci</span><textarea data-dm-character-note maxlength="50000" placeholder="Twoje prywatne notatki…">${escapeHtml(teammate.dmNote)}</textarea></label>
             </div>
             <div class="dm-character-panel" data-dm-character-panel="threads"><div class="empty-state"><h3>Wątki i sekrety</h3><p>Ten moduł zostanie dodany w kolejnym etapie rozwoju Panelu DM.</p></div></div>
-            <div class="dm-character-panel" data-dm-character-panel="history"><div class="empty-state"><h3>Historia postaci w kampanii</h3><p>Historia działań zostanie uruchomiona razem z osią kampanii.</p></div></div>
           `;
           const setCharacterTab = (tab) => {
             target
@@ -2892,7 +2890,6 @@ function renderApp(statusMessage = null) {
                 <button type="button" data-dm-quick="note">Szybka notatka</button>
                 <button type="button" data-dm-quick="npcs">Nowy NPC</button>
                 <button type="button" data-dm-quick="quests">Nowe zadanie</button>
-                <button type="button" data-dm-quick="history">Nowe wydarzenie</button>
                 <button type="button" data-dm-quick="materials">Nowy materiał</button>
               </div>
             </div>
@@ -3274,7 +3271,6 @@ function renderApp(statusMessage = null) {
         };
         const loadCampaignModule = async (module) => {
           if (module === 'notes') return loadNotes();
-          if (module === 'history') return loadTimeline();
           if (module === 'secrets') return loadSecrets();
           const config = campaignModules[module];
           const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/content/${module}`);
@@ -3388,7 +3384,6 @@ function renderApp(statusMessage = null) {
             ['threads', 'Wątki'],
             ['secrets', 'Sekrety'],
             ['notes', 'Notatki'],
-            ['history', 'Historia'],
           ]
             .map(
               ([key, label]) =>
@@ -3743,7 +3738,7 @@ function renderApp(statusMessage = null) {
                 const response = await authenticatedFetch(`/api/campaigns/${campaignId}/shared`);
                 if (!response.ok) throw new Error('shared_content_load_failed');
                 const shared = await response.json();
-                sharedTarget.innerHTML = `<section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section><section><h3>Historia kampanii</h3><div class="dm-timeline">${shared.timeline.map((event) => `<article><time>${new Date(event.occurred_at).toLocaleDateString('pl-PL')}</time><div><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.content)}</p></div></article>`).join('') || '<p class="section-note">Brak publicznych wydarzeń.</p>'}</div></section>`;
+                sharedTarget.innerHTML = `<section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content)}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}</article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section>`;
               } catch {
                 sharedTarget.innerHTML =
                   '<div class="empty-state"><p>Nie udało się pobrać materiałów kampanii.</p></div>';

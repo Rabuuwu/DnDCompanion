@@ -36,7 +36,7 @@ Aktualizacja: 2026-08-18
 - NPC, zadania i wątki — Etap 4: **wykonano**;
 - lokacje, frakcje i sekrety — Etap 5: **wykonano**;
 - handouty tekstowe i linki — Etap 6: **wykonano**;
-- historia kampanii, współprowadzący, eksport i archiwizacja — Etap 7: **wykonano**.
+- współprowadzący, eksport i archiwizacja — Etap 7: **wykonano**; historia kampanii została później wycofana z interfejsu.
 
 Upload plików binarnych nie został włączony, ponieważ obecna infrastruktura nie ma prywatnego magazynu obiektowego. Etap 6 zgodnie ze specyfikacją zaczyna się od treści tekstowych i bezpiecznych linków. Obrazy kampanii są kompresowane po stronie klienta i przechowywane w istniejącym modelu Data URL.
 
