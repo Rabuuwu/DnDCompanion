@@ -1388,6 +1388,19 @@ select {
   scroll-snap-align: start;
 }
 
+.dm-nav-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  fill: currentColor;
+}
+
+.dm-nav-icon.stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
 .dm-workspace #dm-panel-content,
 .dm-character-screen #dm-character-content {
   align-content: start;
