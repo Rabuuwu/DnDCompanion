@@ -3451,16 +3451,18 @@ function renderApp(statusMessage = null) {
           const settings = await response.json();
           const isOwner = settings.campaign.role === 'owner';
           target.innerHTML = `
+            <div class="dm-settings-view">
             <div class="dm-module-toolbar"><div><p class="eyebrow">Panel DM</p><h3>Ustawienia kampanii</h3></div><button type="button" class="secondary" data-export-campaign>Eksportuj JSON</button></div>
             <form class="dm-workspace-form" data-campaign-settings>
               <label><span>Nazwa</span><input name="name" maxlength="100" value="${escapeHtml(settings.campaign.name)}" required${isOwner ? '' : ' disabled'}></label>
               <label><span>Opis</span><textarea name="description" maxlength="2000"${isOwner ? '' : ' disabled'}>${escapeHtml(settings.campaign.description || '')}</textarea></label>
               <label><span>Grafika kampanii</span><input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp"${isOwner ? '' : ' disabled'}></label>
               <div data-campaign-image-preview>${settings.campaign.image ? `<img class="dm-settings-image" src="${escapeHtml(settings.campaign.image)}" alt="Aktualna grafika kampanii">` : '<small>Brak grafiki kampanii.</small>'}</div>
-              ${isOwner ? '<div class="dm-form-actions"><button type="reset" class="secondary">Anuluj zmiany</button><button type="submit">Zapisz ustawienia</button></div>' : '<p class="section-note">Ustawienia kampanii może zmienić wyłącznie właściciel.</p>'}
+              ${isOwner ? '<div class="dm-form-actions campaign-settings-actions"><button type="reset" class="secondary">Anuluj zmiany</button><button type="submit">Zapisz ustawienia</button></div>' : '<p class="section-note">Ustawienia kampanii może zmienić wyłącznie właściciel.</p>'}
             </form>
-            <section><h3>Role i członkowie</h3><div class="dm-record-list">${settings.members.map((member) => `<article class="dm-member-role"><span><strong>${escapeHtml(member.username)}</strong><small>${escapeHtml(member.character_name || 'Bez postaci')}</small></span>${Number(member.user_id) === Number(settings.campaign.owner_id) ? '<strong>Właściciel</strong>' : `<div class="dm-member-role-actions"><select data-member-role="${member.user_id}"${isOwner ? '' : ' disabled'}><option value="player">Gracz</option><option value="co_dm"${member.role === 'co_dm' ? ' selected' : ''}>Współprowadzący</option></select>${isOwner ? `<button type="button" class="danger small" data-remove-campaign-member="${member.user_id}">Usuń</button>` : ''}</div>`}</article>`).join('')}</div></section>
-            ${isOwner ? '<button type="button" class="danger" data-archive-campaign>Archiwizuj kampanię</button>' : ''}`;
+            <section class="dm-settings-members"><h3>Role i członkowie</h3><div class="dm-record-list">${settings.members.map((member) => `<article class="dm-member-role"><span><strong>${escapeHtml(member.username)}</strong><small>${escapeHtml(member.character_name || 'Bez postaci')}</small></span>${Number(member.user_id) === Number(settings.campaign.owner_id) ? '<strong>Właściciel</strong>' : `<div class="dm-member-role-actions"><select data-member-role="${member.user_id}"${isOwner ? '' : ' disabled'}><option value="player">Gracz</option><option value="co_dm"${member.role === 'co_dm' ? ' selected' : ''}>Współprowadzący</option></select>${isOwner ? `<button type="button" class="danger small" data-remove-campaign-member="${member.user_id}">Usuń</button>` : ''}</div>`}</article>`).join('')}</div></section>
+            ${isOwner ? '<button type="button" class="danger" data-archive-campaign>Archiwizuj kampanię</button>' : ''}
+            </div>`;
           const form = target.querySelector('[data-campaign-settings]');
           let campaignImage = settings.campaign.image || '';
           form.addEventListener('reset', () => {

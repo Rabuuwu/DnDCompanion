@@ -1604,7 +1604,7 @@ select {
   z-index: 6;
   display: grid;
   width: 100%;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.4rem;
   padding: 0.5rem;
   border: 1px solid var(--border);
@@ -1629,7 +1629,22 @@ select {
 
 .dm-character-panel.active {
   display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 0.7rem;
+}
+
+.dm-character-panel,
+.dm-character-panel * {
+  min-width: 0;
+}
+
+.dm-character-panel p,
+.dm-character-panel span,
+.dm-character-panel strong,
+.dm-character-panel small,
+.dm-character-panel em {
+  overflow-wrap: anywhere;
 }
 
 .dm-character-panel .dm-note-field.general {
@@ -1657,10 +1672,18 @@ select {
 }
 
 .dm-subnav {
+  position: sticky;
+  z-index: 12;
+  top: 0;
   display: flex;
+  width: 100%;
+  min-width: 0;
   gap: 0.35rem;
   overflow-x: auto;
-  padding-bottom: 0.35rem;
+  padding: 0.4rem 0.15rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: #0a1221;
+  box-shadow: 0 0.45rem 0.8rem rgba(6, 8, 22, 0.42);
   scrollbar-width: thin;
 }
 
@@ -1683,7 +1706,6 @@ select {
   padding-bottom: 0.15rem;
 }
 
-.dm-record-create-active > .dm-subnav,
 .dm-record-create-active > .dm-module-toolbar,
 .dm-content-layout.editor-fullscreen > .dm-record-list,
 .dm-content-layout.editor-fullscreen > .dm-material-grid,
@@ -2197,6 +2219,25 @@ button.dm-record-card {
   padding-bottom: calc(0.75rem + 4px);
 }
 
+.dm-settings-view {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  align-content: start;
+  gap: 1rem;
+  padding-bottom: 4.5rem;
+}
+
+.dm-settings-members {
+  display: grid;
+  min-width: 0;
+  gap: 0.65rem;
+}
+
+.dm-settings-members > h3 {
+  margin: 0;
+}
+
 [data-campaign-settings] > .campaign-settings-actions {
   position: static;
   display: grid;
@@ -2208,6 +2249,88 @@ button.dm-record-card {
 [data-campaign-settings] > .campaign-settings-actions > button {
   width: 100%;
   min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .dm-character-screen > .section-heading {
+    align-items: start;
+    gap: 0.55rem;
+  }
+
+  .dm-character-screen > .section-heading > div {
+    min-width: 0;
+  }
+
+  .dm-character-screen > .section-heading h2,
+  .dm-character-screen > .section-heading p {
+    overflow-wrap: anywhere;
+  }
+
+  .dm-character-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding: 0.4rem;
+  }
+
+  .dm-character-tabs button {
+    min-height: 2.75rem;
+    padding: 0.5rem 0.35rem;
+    font-size: 0.76rem;
+    line-height: 1.2;
+  }
+
+  .dm-character-panel .sheet-profile,
+  .dm-character-panel .sheet-stat-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dm-character-panel .sheet-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .dm-character-panel .sheet-row > strong {
+    max-width: 9rem;
+    text-align: right;
+  }
+
+  .dm-character-panel .character-section-content {
+    padding-right: 0.65rem;
+    padding-left: 0.65rem;
+  }
+
+  .dm-settings-view .dm-module-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .dm-settings-view .dm-module-toolbar > button,
+  [data-campaign-settings] > .campaign-settings-actions > button {
+    width: 100%;
+  }
+
+  [data-campaign-settings] > .campaign-settings-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dm-settings-view .dm-member-role {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .dm-settings-view .dm-member-role-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  .dm-settings-view .dm-member-role-actions select {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .dm-material-grid {

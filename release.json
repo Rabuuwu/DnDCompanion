@@ -1,6 +1,6 @@
 {
-  "version": "1.6.0",
-  "androidVersionCode": 39,
+  "version": "1.6.1",
+  "androidVersionCode": 40,
   "androidPackageId": "pl.rabuuwu.dndcompanion",
   "repository": "Rabuuwu/DnDCompanion"
 }

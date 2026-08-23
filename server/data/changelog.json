@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.6.1",
+    "date": "2026-08-23",
+    "title": "Hotfix mobilnego Panelu DM",
+    "changes": [
+      "Naprawiono nakładanie się formularza, przycisków oraz listy członków w ustawieniach kampanii na telefonach.",
+      "Poprawiono szerokość zakładek, zawijanie treści i układ statystyk w mobilnym podglądzie postaci przez DM.",
+      "Nawigacja sekcji kampanii pozostaje widoczna nad przewijaną treścią oraz podczas dodawania i edycji wpisów."
+    ]
+  },
+  {
     "version": "1.6.0",
     "date": "2026-08-23",
     "title": "Centrum kampanii, Panel DM i rozbudowany ekwipunek",
