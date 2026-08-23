@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.6.0",
+    "date": "2026-08-23",
+    "title": "Centrum kampanii, Panel DM i rozbudowany ekwipunek",
+    "changes": [
+      "Rozbudowano Panel DM o przegląd członków, pełne karty postaci, ekwipunki oraz prywatne notatki mistrza gry.",
+      "Dodano zarządzanie zadaniami, materiałami, informacjami, NPC, lokacjami, wątkami i sekretami kampanii z widocznością dla wybranych odbiorców.",
+      "Gracze otrzymali dostęp do udostępnionych treści kampanii oraz współdzielonych notatek drużyny zabezpieczonych blokadą edycji.",
+      "Rozbudowano ekwipunek o opisy, szybki ekwipunek, kategorie, edycję nazw i ikon oraz wygodne przeciąganie z automatycznym przewijaniem.",
+      "Dodano pełnoekranowe i responsywne formularze kampanii, automatycznie dopasowywane pola tekstowe oraz własne okna potwierdzeń.",
+      "Kreator wzorów obsługuje człony kostek, zachowuje ich typ oraz używa wartości walecznych statystyk zgodnie z regułami karty.",
+      "Poprawiono nawigację Panelu DM i podglądu postaci, układ mobilny, widoki materiałów, ustawienia kampanii oraz liczne błędy interfejsu.",
+      "Usunięto porzucone moduły sesji, scen i historii kampanii oraz uzupełniono migracje, testy i dokumentację techniczną."
+    ]
+  },
+  {
     "version": "1.5.5",
     "date": "2026-08-14",
     "title": "Talenty, kolejność umiejętności i kreatory wzorów",

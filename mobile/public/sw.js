@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-mobile-cache-v27';
+const CACHE_NAME = 'dnd-mobile-cache-v28';
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const scopedPath = (file = '') => `${SCOPE_PATH}${file}`;
 const APP_SHELL = [

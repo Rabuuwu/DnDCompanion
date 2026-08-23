@@ -122,7 +122,7 @@ async function run() {
     assert.deepEqual(character.attributes.dexterity, { adventure: 3, combat: 1 });
     assert.deepEqual(character.attributes.intelligence, { adventure: -6, combat: -6 });
     assert.deepEqual(character.attributes.charisma, { adventure: 8, combat: 8 });
-    assert.equal(character.auxiliary.reflex.value, '3');
+    assert.equal(character.auxiliary.reflex.value, '1');
     assert.equal(character.auxiliary.intuition.value, '-6');
     assert.equal(character.auxiliary.arcana.value, '1');
     assert.equal(character.auxiliary.perception.value, '-6');
