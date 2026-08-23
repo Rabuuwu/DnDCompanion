@@ -3883,6 +3883,23 @@ button:disabled {
   flex: 1 1 6rem;
 }
 
+.formula-dice-field {
+  display: grid;
+  flex: 1 1 7rem;
+  gap: 0.25rem;
+}
+
+.formula-dice-field > span {
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.formula-dice-field > select {
+  width: 100%;
+  min-width: 0;
+}
+
 .ranged-formula-term > [data-remove-formula-term] {
   justify-self: end;
 }

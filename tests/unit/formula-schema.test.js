@@ -22,3 +22,12 @@ test('kostka zachowuje typ i nie jest automatycznie przeliczana', () => {
   assert.deepEqual(terms, [{ type: 'dice', count: 2, sides: 20 }]);
   assert.equal(_test.formulaValue(terms, attributes, true), 0);
 });
+
+test('kostki są ograniczone do listy dostępnej w kreatorze', () => {
+  assert.deepEqual(_test.rangedFormulaTerms([{ type: 'dice', count: 50, sides: 12 }]), [
+    { type: 'dice', count: 20, sides: 6 },
+  ]);
+  assert.deepEqual(_test.rangedFormulaTerms([{ type: 'dice', count: 3, sides: 100 }]), [
+    { type: 'dice', count: 3, sides: 100 },
+  ]);
+});

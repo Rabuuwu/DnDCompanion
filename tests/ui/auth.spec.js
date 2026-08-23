@@ -36,8 +36,28 @@ test('użytkownik tworzy postać i dodaje przedmiot do ekwipunku', async ({ page
   await page.locator('#character-form [name="name"]').fill('Testowy bohater');
   await page.locator('#character-form [name="race"]').fill('Człowiek');
   await page.locator('#character-form [name="classes"]').fill('Wojownik');
+  const combatSection = page
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: 'Statystyki walki' }) });
+  await combatSection.locator('summary').click();
+  const hitFormula = page.locator('[data-stat-formula-builder="combat-hit"]');
+  await hitFormula.locator('[data-add-formula-term]').click();
+  const diceTerm = hitFormula.locator('[data-ranged-formula-term]').last();
+  await diceTerm.locator('[data-formula-field="type"]').selectOption('dice');
+  await diceTerm.locator('[data-formula-field="count"]').selectOption('2');
+  await diceTerm.locator('[data-formula-field="sides"]').selectOption('20');
   await page.locator('#character-form button[type="submit"]').click();
   await expect(page.getByText('Testowy bohater').first()).toBeVisible();
+
+  await page.locator('[data-edit-character]').first().click();
+  const savedDiceTerm = page
+    .locator('[data-stat-formula-builder="combat-hit"] [data-ranged-formula-term]')
+    .filter({ has: page.locator('[data-formula-field="type"]') })
+    .last();
+  await expect(savedDiceTerm.locator('[data-formula-field="type"]')).toHaveValue('dice');
+  await expect(savedDiceTerm.locator('[data-formula-field="count"]')).toHaveValue('2');
+  await expect(savedDiceTerm.locator('[data-formula-field="sides"]')).toHaveValue('20');
+  await page.locator('#cancel-character-btn').click();
 
   await page.locator('[data-view-character]').first().click();
   await page.locator('[data-character-tab="inventory"]').click();

@@ -977,14 +977,23 @@ function renderApp(statusMessage = null) {
       CHARACTER_ATTRIBUTES.map(
         ([key, label]) => `<option value="${key}" ${key === selected ? 'selected' : ''}>${label}</option>`,
       ).join('');
+    const diceCountOptions = (selected = 1) =>
+      Array.from({ length: 20 }, (_, index) => index + 1)
+        .map((count) => `<option value="${count}" ${count === Number(selected) ? 'selected' : ''}>${count}</option>`)
+        .join('');
+    const diceSidesOptions = (selected = 6) =>
+      [4, 6, 8, 10, 20, 100]
+        .map((sides) => `<option value="${sides}" ${sides === Number(selected) ? 'selected' : ''}>k${sides}</option>`)
+        .join('');
     const rangedFormulaTermRow = (term = {}) => {
-      const type = ['percent', 'fraction', 'flat'].includes(term.type) ? term.type : 'percent';
+      const type = ['percent', 'fraction', 'flat', 'dice'].includes(term.type) ? term.type : 'percent';
       return `
         <div class="ranged-formula-term" data-ranged-formula-term>
           <select data-formula-field="type" aria-label="Rodzaj członu wzoru">
             <option value="percent" ${type === 'percent' ? 'selected' : ''}>Procent statystyki</option>
             <option value="fraction" ${type === 'fraction' ? 'selected' : ''}>Ułamek statystyki</option>
             <option value="flat" ${type === 'flat' ? 'selected' : ''}>Stała liczba</option>
+            <option value="dice" ${type === 'dice' ? 'selected' : ''}>Kostka</option>
           </select>
           ${
             type === 'percent'
@@ -1000,7 +1009,12 @@ function renderApp(statusMessage = null) {
             <input data-formula-field="denominator" type="number" min="1" max="100" value="${fieldValue(term.denominator, 2)}" aria-label="Mianownik" />
             <select data-formula-field="attribute" aria-label="Statystyka">${rangedAttributeOptions(term.attribute)}</select>
           `
-                : `
+                : type === 'dice'
+                  ? `
+            <label class="formula-dice-field"><span>Ilość kostek</span><select data-formula-field="count" aria-label="Ilość kostek">${diceCountOptions(term.count)}</select></label>
+            <label class="formula-dice-field"><span>Rodzaj kostki</span><select data-formula-field="sides" aria-label="Rodzaj kostki">${diceSidesOptions(term.sides)}</select></label>
+          `
+                  : `
             <input data-formula-field="value" type="number" min="-99999" max="99999" value="${fieldValue(term.value, 0)}" aria-label="Stała wartość" />
           `
           }
@@ -1025,6 +1039,9 @@ function renderApp(statusMessage = null) {
           denominator: Number(field('denominator')),
           attribute: field('attribute'),
         };
+      }
+      if (type === 'dice') {
+        return { type, count: Number(field('count')), sides: Number(field('sides')) };
       }
       return { type: 'flat', value: Number(field('value')) };
     };
@@ -1060,6 +1077,7 @@ function renderApp(statusMessage = null) {
       Math.trunc(
         terms.reduce((sum, term) => {
           if (term.type === 'flat') return sum + (Number(term.value) || 0);
+          if (term.type === 'dice') return sum;
           const base = Number(attributes[term.attribute]) || 0;
           if (base < 0) return sum + base;
           const scaled =
@@ -1077,6 +1095,7 @@ function renderApp(statusMessage = null) {
           if (term.type === 'fraction') {
             return `${Number(term.numerator) || 0}/${Math.max(1, Number(term.denominator) || 1)} ${attribute}`;
           }
+          if (term.type === 'dice') return `${Math.max(1, Number(term.count) || 1)}k${Number(term.sides) || 6}`;
           return String(Number(term.value) || 0);
         })
         .join(' + ')

@@ -41,6 +41,7 @@ const FEATURE_TYPES = {
   additionalSkills: {},
 };
 const INVENTORY_MAX_LENGTH = 100_000;
+const DICE_SIDES = new Set([4, 6, 8, 10, 20, 100]);
 
 function text(value, maxLength = 200) {
   return String(value || '')
@@ -129,10 +130,11 @@ function rangedFormulaTerms(value) {
       return { type, value: integer(term?.value, 0, -99999, 99999) };
     }
     if (type === 'dice') {
+      const sides = integer(term?.sides, 6, 2, 1000);
       return {
         type,
-        count: integer(term?.count, 1, 1, 100),
-        sides: integer(term?.sides, 6, 2, 1000),
+        count: integer(term?.count, 1, 1, 20),
+        sides: DICE_SIDES.has(sides) ? sides : 6,
       };
     }
     const attribute = ATTRIBUTE_KEYS.includes(term?.attribute) ? term.attribute : 'strength';

@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.6.3",
+    "date": "2026-08-23",
+    "title": "Pełna obsługa kostek w kreatorze wzorów",
+    "changes": [
+      "Dodano typ członu Kostka do kreatorów wzorów w formularzu tworzenia i edycji postaci.",
+      "Dodano wybór liczby kostek oraz rodzaju k4, k6, k8, k10, k20 lub k100.",
+      "Kostki są poprawnie zapisywane, ponownie wczytywane i prezentowane w zapisie takim jak 2k20.",
+      "Człony kostek pozostają informacyjne i nie wpływają na automatycznie obliczaną wartość statystyki.",
+      "Dodano test przeglądarkowy obejmujący utworzenie, zapis i ponowne otwarcie wzoru z kostką."
+    ]
+  },
+  {
     "version": "1.6.2",
     "date": "2026-08-23",
     "title": "Hotfix nawigacji kampanii i API Render",
