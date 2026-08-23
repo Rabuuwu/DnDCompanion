@@ -1,5 +1,17 @@
 import { expect, test } from '@playwright/test';
 
+test.afterEach(async ({ page }) => {
+  await page.evaluate(async () => {
+    const session = JSON.parse(sessionStorage.getItem('dnd-mobile-session') || 'null');
+    if (!session?.token) return;
+    await fetch('/api/auth/account', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'Browser-test-password-123!' }),
+    });
+  });
+});
+
 test('użytkownik może zarejestrować konto i wejść do aplikacji', async ({ page }) => {
   const username = `ui_${Date.now()}`;
   await page.goto('/');

@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS campaign_team_notes (
+  campaign_id BIGINT PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+  content VARCHAR(50000) NOT NULL DEFAULT '',
+  updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  locked_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  lock_token VARCHAR(100),
+  lock_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

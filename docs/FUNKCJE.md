@@ -31,8 +31,10 @@
 
 ## Ekwipunek
 
-- lista z ikoną, nazwą, ilością i opcjonalnym czasem trwania;
+- lista z ikoną, nazwą, ilością, opisem i opcjonalnym czasem trwania;
 - dodawanie i edycja po dotknięciu rekordu;
+- trzy opcjonalne sloty szybkiego ekwipunku;
+- własne kategorie z edycją, usuwaniem i przenoszeniem przedmiotów;
 - przeciąganie na telefonie i trwała kolejność;
 - automatyczne rozpoznawanie popularnych typów przedmiotów i ręczna zmiana ikony;
 - zgodność ze starym formatem tekstowym „jedna linia — jeden przedmiot”.
@@ -70,7 +72,7 @@
 - szybkie działania dostępne z pływającego przycisku „+”;
 - lekka lista/siatka drużyny bez renderowania wszystkich pełnych kart;
 - pełny podgląd danych członka ładowany dopiero po wybraniu postaci;
-- zakładki szczegółów postaci: podsumowanie, karta, ekwipunek, notatki i wątki;
+- zakładki szczegółów postaci: podsumowanie, karta, ekwipunek i notatki DM;
 - prywatne notatki DM dla kampanii i każdej postaci;
 - dodawanie przedmiotów bezpośrednio do ekwipunku gracza.
 - wiele prywatnych notatek z kategoriami, tagami, przypięciem, archiwum i autosave;
@@ -86,6 +88,7 @@
 - szczegóły zadania tylko do odczytu oraz wspólne notatki edytowane przez członków drużyny;
 - lista materiałów udostępnionych całej drużynie albo konkretnej postaci;
 - odkryte sekrety i wskazówki tylko dla właściwego odbiorcy;
+- osobny wspólny notatnik kampanii z autosave i blokadą przed równoczesnym nadpisaniem.
 
 ## Platformy
 

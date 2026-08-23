@@ -1,7 +1,9 @@
 # D&D Companion — plan rozwoju panelu DM do fizycznej gry przy stole
 
-Aktualizacja: 2026-08-18  
-Status: **obowiązująca specyfikacja produktu i instrukcja wykonawcza dla Codexa**
+Aktualizacja: 2026-08-23
+Status: **archiwalny plan — nie jest bieżącą specyfikacją**
+
+> Moduły sesji, scen, historii kampanii i ogólnych relacji zostały później świadomie wycofane z produktu. Ich opis poniżej pozostaje wyłącznie zapisem pierwotnej koncepcji.
 
 > Ten dokument zastępuje wcześniejsze propozycje rozwoju skupione na Trybie sesji karty postaci, cyfrowych rzutach kośćmi, automatyzacji HP, cooldownach, statusach oraz globalnej wyszukiwarce. Nie należy wdrażać tych funkcji w ramach obecnego zadania.
 

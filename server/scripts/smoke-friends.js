@@ -261,38 +261,6 @@ async function run() {
     assert.equal(notesResponse.status, 200);
     assert.ok((await notesResponse.json()).some((note) => note.title === 'Plan testowy 2'));
 
-    const createSessionResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${first.token}` },
-      body: JSON.stringify({ number: 1, title: 'Pierwsza sesja', plan: 'Plan sesji' }),
-    });
-    assert.equal(createSessionResponse.status, 201);
-    const createdSession = await createSessionResponse.json();
-    const sceneResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions/${createdSession.id}/scenes`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${first.token}` },
-      body: JSON.stringify({ title: 'Spotkanie w karczmie', description: 'Scena otwierająca' }),
-    });
-    assert.equal(sceneResponse.status, 201);
-    const eventResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions/${createdSession.id}/events`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${first.token}` },
-      body: JSON.stringify({
-        eventType: 'party_decision',
-        title: 'Wybór drogi',
-        content: 'Drużyna ruszyła na północ',
-        visibility: 'party',
-      }),
-    });
-    assert.equal(eventResponse.status, 201);
-    const sessionDetailsResponse = await request(`/api/campaigns/${campaign.id}/dm/sessions/${createdSession.id}`, {
-      headers: { Authorization: `Bearer ${first.token}` },
-    });
-    assert.equal(sessionDetailsResponse.status, 200);
-    const sessionDetails = await sessionDetailsResponse.json();
-    assert.equal(sessionDetails.scenes.length, 1);
-    assert.equal(sessionDetails.events.length, 1);
-
     const createdEntities = {};
     for (const [module, name] of [
       ['npcs', 'Karczmarz'],
@@ -395,6 +363,51 @@ async function run() {
     });
     assert.equal(ownerSharedResponse.status, 200);
     assert.equal((await ownerSharedResponse.json()).quests[0].party_notes, 'Wspólny trop drużyny');
+
+    const ownerLockToken = `owner-${suffix}`;
+    const playerLockToken = `player-${suffix}`;
+    const ownerLock = await request(`/api/campaigns/${campaign.id}/shared/notes/lock`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ lockToken: ownerLockToken }),
+    });
+    assert.equal(ownerLock.status, 200);
+    const competingLock = await request(`/api/campaigns/${campaign.id}/shared/notes/lock`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${second.token}` },
+      body: JSON.stringify({ lockToken: playerLockToken }),
+    });
+    assert.equal(competingLock.status, 423);
+    const writeWithoutLock = await request(`/api/campaigns/${campaign.id}/shared/notes`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${second.token}` },
+      body: JSON.stringify({ content: 'Nie wolno nadpisać', lockToken: playerLockToken }),
+    });
+    assert.equal(writeWithoutLock.status, 423);
+    const ownerWrite = await request(`/api/campaigns/${campaign.id}/shared/notes`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ content: 'Bezpieczna wspólna notatka', lockToken: ownerLockToken }),
+    });
+    assert.equal(ownerWrite.status, 200);
+    const ownerUnlock = await request(`/api/campaigns/${campaign.id}/shared/notes/lock`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ lockToken: ownerLockToken }),
+    });
+    assert.equal(ownerUnlock.status, 204);
+    const playerLock = await request(`/api/campaigns/${campaign.id}/shared/notes/lock`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${second.token}` },
+      body: JSON.stringify({ lockToken: playerLockToken }),
+    });
+    assert.equal(playerLock.status, 200);
+    assert.equal((await playerLock.json()).content, 'Bezpieczna wspólna notatka');
+    await request(`/api/campaigns/${campaign.id}/shared/notes/lock`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${second.token}` },
+      body: JSON.stringify({ lockToken: playerLockToken }),
+    });
 
     const roleResponse = await request(`/api/campaigns/${campaign.id}/dm/members/${second.user.id}/role`, {
       method: 'PUT',

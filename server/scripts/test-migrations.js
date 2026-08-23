@@ -35,7 +35,6 @@ async function run() {
       'characters',
       'campaigns',
       'dm_notes',
-      'campaign_sessions',
       'campaign_npcs',
       'campaign_locations',
       'campaign_factions',
@@ -43,9 +42,9 @@ async function run() {
       'campaign_story_threads',
       'campaign_secrets',
       'campaign_materials',
-      'campaign_timeline_events',
       'campaign_content_notifications',
       'quest_party_notes',
+      'campaign_team_notes',
     ];
     const result = await client.query(
       `SELECT table_name FROM information_schema.tables
@@ -53,6 +52,27 @@ async function run() {
       [schema, requiredTables],
     );
     assert.equal(result.rows.length, requiredTables.length);
+    const removedTables = [
+      'campaign_shared_content_notes',
+      'campaign_sessions',
+      'session_scenes',
+      'session_events',
+      'campaign_timeline_events',
+      'entity_relations',
+    ];
+    const removed = await client.query(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema=$1 AND table_name=ANY($2::text[])`,
+      [schema, removedTables],
+    );
+    assert.deepEqual(removed.rows, []);
+    const archivedTables = removedTables.map((table) => `legacy_${table}`);
+    const archived = await client.query(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema=$1 AND table_name=ANY($2::text[])`,
+      [schema, archivedTables],
+    );
+    assert.equal(archived.rows.length, archivedTables.length);
     console.log(`Migration test passed (${files.length} files, ${requiredTables.length} required tables)`);
   } finally {
     await client.query('RESET search_path').catch(() => {});

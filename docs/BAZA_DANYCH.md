@@ -30,23 +30,19 @@ Skrypt stosuje pliki `server/migrations/*.sql` alfabetycznie i zapisuje pełną 
 | `campaign_dm_notes`                         | prywatna notatka DM dla kampanii, maks. 50 000 znaków                      |
 | `campaign_character_dm_notes`               | prywatna notatka DM o konkretnej postaci                                   |
 | `dm_notes`                                  | wiele kategoryzowanych notatek DM; bezpieczna kopia starej notatki ogólnej |
-| `campaign_sessions`                         | plan, status, daty, uczestnicy, podsumowania, checklisty i notatki sesji   |
-| `session_scenes`                            | uporządkowane sceny należące do sesji                                      |
-| `session_events`                            | szybkie wydarzenia sesji z widocznością i powiązaniami                     |
 | `campaign_npcs`                             | NPC, opis publiczny/prywatny, status, widoczność i dane dodatkowe          |
 | `campaign_locations`                        | hierarchiczne lokacje i ich treści                                         |
 | `campaign_factions`                         | frakcje, nastawienie, symbol i prywatne plany                              |
 | `campaign_quests`, `quest_steps`            | zadania kampanii oraz uporządkowane cele cząstkowe                         |
 | `quest_party_notes`                         | wspólna notatka drużyny przypisana do udostępnionego zadania               |
+| `campaign_team_notes`                       | wspólny notatnik kampanii z czasową blokadą wyłącznej edycji               |
 | `campaign_story_threads`                    | niezależne wątki fabularne i ich statusy                                   |
 | `campaign_secrets`, `secret_recipients`     | sekrety oraz wiedza konkretnych postaci                                    |
 | `campaign_materials`, `material_recipients` | handouty tekstowe/linki i odbiorcy udostępnienia                           |
-| `campaign_timeline_events`                  | ręczna i automatyczna chronologia kampanii                                 |
-| `entity_relations`                          | uniwersalne powiązania elementów w granicach jednej kampanii               |
 | `user_ui_preferences`                       | JSONB ustawień interfejsu, np. zwinięte sekcje                             |
 | `audit_logs`                                | aktor, akcja, encja, HTTP, wynik, czas, IP, user-agent i metadata JSONB    |
 
-Wszystkie dane zależne od użytkownika są objęte `ON DELETE CASCADE` albo — dla pól historycznych — świadomą polityką z migracji. Usunięcie konta usuwa jego postacie, sesje i powiązane rekordy.
+Wszystkie dane zależne od użytkownika są objęte `ON DELETE CASCADE` albo — dla pól historycznych — świadomą polityką z migracji. Migracja `015` odłącza wycofane moduły sesji, scen, historii, relacji i prototyp notatek do materiałów, zachowując ich dane w tabelach z prefiksem `legacy_`.
 
 ## Dokument `characters.data`
 
@@ -57,7 +53,7 @@ JSONB zawiera m.in.:
 - statystyki walki, pomocnicze, podstatystyki standardowe i własne;
 - rozwój specjalny, gildie z rangą i profesją;
 - umiejętności, pasywki i obozówki z opisami/cooldownami;
-- ekwipunek w uporządkowanej tablicy;
+- tekstowy ekwipunek z metadanymi kolejności, kategorii, szybkich slotów, ikon, opisów i czasu trwania;
 - notatnik tekstowy i kreski kartki.
 
 API normalizuje limity, typy i wartości wyliczane przed zapisem. Zmiana modelu JSONB nie wymaga migracji SQL, ale wymaga zachowania kompatybilności w parserze i serializatorze.
@@ -70,10 +66,9 @@ Encje przestrzeni DM zawsze zawierają `campaign_id`. Najczęściej używane lis
 
 ## Operacje i utrzymanie
 
-Repozytorium nie dostarcza jeszcze automatycznej retencji. Należy wdrożyć okresowe:
+Serwer codziennie uruchamia automatyczną retencję. Domyślnie logi audytowe są przechowywane 90 dni, a okres ustawia `AUDIT_RETENTION_DAYS`. Rutynowe udane kontrole `/health` i `/ready` nie są zapisywane. Utrzymanie obejmuje:
 
-- usuwanie wygasłych/unieważnionych refresh tokenów i kodów zaproszeń;
-- archiwizację lub usuwanie starych `audit_logs`;
+- usuwanie wygasłych tokenów, zaproszeń, powiadomień i starych `audit_logs`;
 - backup `pg_dump` i test odtwarzania;
 - monitoring rozmiaru JSONB postaci, wiadomości i awatarów;
 - `VACUUM (ANALYZE)` zgodnie z obciążeniem.

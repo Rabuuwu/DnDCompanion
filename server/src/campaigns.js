@@ -1,6 +1,7 @@
 const { pool } = require('./db');
 const { serializeCharacter } = require('./characters');
 const { publishUserNotification } = require('./notifications');
+const INVENTORY_MAX_LENGTH = 100_000;
 
 function parseId(value) {
   const id = Number(value);
@@ -45,16 +46,6 @@ async function getDmDashboard(req, res) {
     pool.query(
       `SELECT
          (SELECT MAX(updated_at) FROM dm_notes WHERE campaign_id=$1 AND archived_at IS NULL) AS last_note_update,
-         (SELECT row_to_json(last_session) FROM (
-           SELECT id,title,actual_at FROM campaign_sessions
-           WHERE campaign_id=$1 AND status='completed' AND archived_at IS NULL
-           ORDER BY COALESCE(actual_at,updated_at) DESC LIMIT 1
-         ) last_session) AS last_session,
-         (SELECT row_to_json(next_session) FROM (
-           SELECT id,title,planned_at FROM campaign_sessions
-           WHERE campaign_id=$1 AND status='planned' AND archived_at IS NULL
-           ORDER BY planned_at NULLS LAST,number LIMIT 1
-         ) next_session) AS next_session,
          (SELECT COUNT(*) FROM campaign_quests WHERE campaign_id=$1 AND status='active' AND archived_at IS NULL) AS active_quests,
          (SELECT COUNT(*) FROM campaign_story_threads WHERE campaign_id=$1 AND status='active' AND archived_at IS NULL) AS active_threads,
          (SELECT COUNT(*) FROM campaign_npcs WHERE campaign_id=$1 AND archived_at IS NULL) AS npc_count,
@@ -71,8 +62,6 @@ async function getDmDashboard(req, res) {
       createdAt: campaign.created_at,
     },
     memberCount: members.rows.length,
-    lastSession: campaignState.rows[0]?.last_session || null,
-    nextSession: campaignState.rows[0]?.next_session || null,
     lastNoteUpdate: campaignState.rows[0]?.last_note_update || null,
     members: members.rows.map((row) => {
       const character = serializeCharacter({ id: row.id, name: row.name, data: row.data });
@@ -493,7 +482,10 @@ async function addDmCharacterInventoryItem(req, res) {
     .trim()
     .replace(/\r?\n/g, ' ')
     .slice(0, 150);
-  const quantity = Math.max(1, Math.min(9999, Math.trunc(Number(req.body?.quantity) || 1)));
+  const rawQuantity = req.body?.quantity;
+  const numericQuantity =
+    rawQuantity === '' || rawQuantity === null || rawQuantity === undefined ? 1 : Number(rawQuantity);
+  const quantity = Number.isFinite(numericQuantity) ? Math.max(0, Math.min(9999, Math.trunc(numericQuantity))) : 1;
   const duration = String(req.body?.duration || '')
     .trim()
     .replace(/\r?\n/g, ' ')
@@ -511,7 +503,9 @@ async function addDmCharacterInventoryItem(req, res) {
   if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
   const line = `${name} × ${quantity}${duration ? ` ⏱ ${duration}` : ''}${icon ? ` [icon=${icon}]` : ''}`;
   const current = String(result.rows[0].inventory || '').trim();
-  const inventory = `${current}${current ? '\n' : ''}${line}`.slice(0, 10_000);
+  const inventory = `${current}${current ? '\n' : ''}${line}`;
+  if (inventory.length > INVENTORY_MAX_LENGTH)
+    return res.status(413).json({ error: 'inventory_too_large', maxLength: INVENTORY_MAX_LENGTH });
   await pool.query(
     `UPDATE characters
      SET data = jsonb_set(COALESCE(data, '{}'::jsonb), '{inventory}', to_jsonb($1::text), true),
@@ -520,6 +514,53 @@ async function addDmCharacterInventoryItem(req, res) {
     [inventory, characterId],
   );
   return res.status(201).json({ inventory });
+}
+
+async function renameDmCharacterInventoryItem(req, res) {
+  const campaignId = parseId(req.params.campaignId);
+  const characterId = parseId(req.params.characterId);
+  const itemIndex = Number(req.params.itemIndex);
+  if (!campaignId || !characterId || !Number.isSafeInteger(itemIndex) || itemIndex < 0)
+    return res.status(400).json({ error: 'invalid_campaign_inventory_item' });
+  if (!(await requireCampaignDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
+  const name = String(req.body?.name || '')
+    .trim()
+    .replace(/\r?\n/g, ' ')
+    .slice(0, 150);
+  if (!name) return res.status(400).json({ error: 'invalid_inventory_item' });
+
+  const result = await pool.query(
+    `SELECT ch.data->>'inventory' AS inventory
+     FROM campaign_members cm
+     JOIN characters ch ON ch.id = cm.character_id
+     WHERE cm.campaign_id = $1 AND ch.id = $2`,
+    [campaignId, characterId],
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: 'character_not_found' });
+  const current = String(result.rows[0].inventory || '');
+  const lines = current
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const itemLinePositions = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => !/^\[inventory-category=/i.test(line));
+  const linePosition = itemLinePositions[itemIndex]?.index;
+  if (!Number.isSafeInteger(linePosition)) return res.status(404).json({ error: 'inventory_item_not_found' });
+  const metadata = lines[linePosition].match(/\s+×\s*\d+.*$/iu)?.[0];
+  lines[linePosition] = `${name}${metadata || ''}`;
+  const inventory = lines.join('\n');
+  if (inventory.length > INVENTORY_MAX_LENGTH)
+    return res.status(413).json({ error: 'inventory_too_large', maxLength: INVENTORY_MAX_LENGTH });
+  const updated = await pool.query(
+    `UPDATE characters
+     SET data = jsonb_set(COALESCE(data, '{}'::jsonb), '{inventory}', to_jsonb($1::text), true),
+         updated_at = NOW()
+     WHERE id = $2 AND COALESCE(data->>'inventory', '') = $3`,
+    [inventory, characterId, current],
+  );
+  if (!updated.rowCount) return res.status(409).json({ error: 'inventory_changed' });
+  return res.json({ inventory });
 }
 
 async function getCampaignCharacter(req, res) {
@@ -601,6 +642,7 @@ module.exports = {
   listCampaignInvitations,
   listOwnedCampaigns,
   respondToCampaignInvitation,
+  renameDmCharacterInventoryItem,
   updateDmCharacterNote,
   updateDmNote,
 };

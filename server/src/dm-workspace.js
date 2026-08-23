@@ -24,7 +24,7 @@ const ENTITY_CONFIG = {
     table: 'campaign_quests',
     labelColumn: 'name',
     statuses: ['prepared', 'available', 'active', 'paused', 'completed', 'failed', 'hidden'],
-    extra: ['started_session_id', 'completed_session_id'],
+    extra: [],
   },
   threads: {
     table: 'campaign_story_threads',
@@ -200,267 +200,6 @@ async function archiveDmNote(req, res) {
   return res.status(204).end();
 }
 
-async function listSessions(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  if (!campaignId) return;
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const { limit, offset } = pagination(req.query);
-  const status = text(req.query.status, 20);
-  const result = await pool.query(
-    `SELECT id, number, title, planned_at, actual_at, status, participants, summary,
-            created_at, updated_at
-     FROM campaign_sessions
-     WHERE campaign_id = $1 AND archived_at IS NULL
-       AND ($2::text = '' OR status = $2)
-     ORDER BY COALESCE(planned_at, created_at) DESC, number DESC
-     LIMIT $3 OFFSET $4`,
-    [campaignId, status, limit, offset],
-  );
-  return res.json(result.rows);
-}
-
-async function getSession(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const sessionId = parseId(req.params.sessionId);
-  if (!campaignId || !sessionId) return res.status(400).json({ error: 'invalid_session' });
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const [session, scenes, events] = await Promise.all([
-    pool.query('SELECT * FROM campaign_sessions WHERE id = $1 AND campaign_id = $2 AND archived_at IS NULL', [
-      sessionId,
-      campaignId,
-    ]),
-    pool.query('SELECT * FROM session_scenes WHERE session_id = $1 AND campaign_id = $2 ORDER BY sort_order, id', [
-      sessionId,
-      campaignId,
-    ]),
-    pool.query(
-      'SELECT * FROM session_events WHERE session_id = $1 AND campaign_id = $2 ORDER BY created_at DESC, id DESC LIMIT 200',
-      [sessionId, campaignId],
-    ),
-  ]);
-  if (!session.rows[0]) return res.status(404).json({ error: 'session_not_found' });
-  return res.json({ ...session.rows[0], scenes: scenes.rows, events: events.rows });
-}
-
-function sessionPayload(body) {
-  const status = ['planned', 'active', 'completed', 'cancelled'].includes(body?.status) ? body.status : 'planned';
-  return {
-    number: Math.max(1, Math.min(100_000, Math.trunc(Number(body?.number) || 1))),
-    title: text(body?.title, 200),
-    plannedAt: body?.plannedAt || null,
-    actualAt: body?.actualAt || null,
-    status,
-    participants: jsonArray(body?.participants).map(parseId).filter(Boolean).slice(0, 100),
-    summary: optionalText(body?.summary, 10_000),
-    publicSummary: optionalText(body?.publicSummary, 10_000),
-    privateSummary: optionalText(body?.privateSummary, 10_000),
-    plan: optionalText(body?.plan, 50_000),
-    liveNotes: optionalText(body?.liveNotes, 50_000),
-    rewards: optionalText(body?.rewards, 10_000),
-    checklist: jsonArray(body?.checklist).slice(0, 100),
-  };
-}
-
-async function createSession(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  if (!campaignId) return;
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const value = sessionPayload(req.body);
-  if (!value.title) return res.status(400).json({ error: 'invalid_session_title' });
-  const result = await pool.query(
-    `INSERT INTO campaign_sessions
-       (campaign_id, created_by, number, title, planned_at, actual_at, status, participants,
-        summary, public_summary, private_summary, plan, live_notes, rewards, checklist)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-     RETURNING *`,
-    [
-      campaignId,
-      req.user.id,
-      value.number,
-      value.title,
-      value.plannedAt,
-      value.actualAt,
-      value.status,
-      value.participants,
-      value.summary,
-      value.publicSummary,
-      value.privateSummary,
-      value.plan,
-      value.liveNotes,
-      value.rewards,
-      value.checklist,
-    ],
-  );
-  return res.status(201).json(result.rows[0]);
-}
-
-async function updateSession(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const sessionId = parseId(req.params.sessionId);
-  if (!campaignId || !sessionId) return res.status(400).json({ error: 'invalid_session' });
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const value = sessionPayload(req.body);
-  if (!value.title) return res.status(400).json({ error: 'invalid_session_title' });
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const previous = await client.query(
-      'SELECT status FROM campaign_sessions WHERE id = $1 AND campaign_id = $2 FOR UPDATE',
-      [sessionId, campaignId],
-    );
-    if (!previous.rows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'session_not_found' });
-    }
-    const result = await client.query(
-      `UPDATE campaign_sessions SET number=$3,title=$4,planned_at=$5,actual_at=$6,status=$7,
-        participants=$8,summary=$9,public_summary=$10,private_summary=$11,plan=$12,
-        live_notes=$13,rewards=$14,checklist=$15,updated_at=NOW()
-       WHERE id=$1 AND campaign_id=$2 RETURNING *`,
-      [
-        sessionId,
-        campaignId,
-        value.number,
-        value.title,
-        value.plannedAt,
-        value.actualAt,
-        value.status,
-        value.participants,
-        value.summary,
-        value.publicSummary,
-        value.privateSummary,
-        value.plan,
-        value.liveNotes,
-        value.rewards,
-        value.checklist,
-      ],
-    );
-    if (previous.rows[0].status !== value.status && ['active', 'completed'].includes(value.status)) {
-      await client.query(
-        `INSERT INTO campaign_timeline_events
-           (campaign_id, created_by, event_type, title, content, source_type, source_id, visibility)
-         VALUES ($1,$2,$3,$4,$5,'session',$6,'party')`,
-        [
-          campaignId,
-          req.user.id,
-          value.status === 'active' ? 'session_started' : 'session_completed',
-          `${value.status === 'active' ? 'Rozpoczęto' : 'Zakończono'} sesję: ${value.title}`,
-          value.status === 'completed' ? value.publicSummary : '',
-          sessionId,
-        ],
-      );
-    }
-    await client.query('COMMIT');
-    return res.json(result.rows[0]);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-async function addScene(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const sessionId = parseId(req.params.sessionId);
-  if (!campaignId || !sessionId) return res.status(400).json({ error: 'invalid_session' });
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const title = text(req.body?.title, 200);
-  if (!title) return res.status(400).json({ error: 'invalid_scene_title' });
-  const result = await pool.query(
-    `INSERT INTO session_scenes (campaign_id, session_id, title, description, sort_order, relations)
-     SELECT $1, id, $3, $4, COALESCE((SELECT MAX(sort_order)+1 FROM session_scenes WHERE session_id=$2),0), $5
-     FROM campaign_sessions WHERE id=$2 AND campaign_id=$1
-     RETURNING *`,
-    [campaignId, sessionId, title, optionalText(req.body?.description, 10_000), jsonValue(req.body?.relations, [])],
-  );
-  if (!result.rows[0]) return res.status(404).json({ error: 'session_not_found' });
-  return res.status(201).json(result.rows[0]);
-}
-
-async function updateScene(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const sessionId = parseId(req.params.sessionId);
-  const sceneId = parseId(req.params.sceneId);
-  if (!campaignId || !sessionId || !sceneId) return res.status(400).json({ error: 'invalid_scene' });
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const status = ['planned', 'completed', 'skipped', 'moved'].includes(req.body?.status) ? req.body.status : 'planned';
-  const result = await pool.query(
-    `UPDATE session_scenes SET title=$4,description=$5,status=$6,sort_order=$7,relations=$8,updated_at=NOW()
-     WHERE id=$1 AND session_id=$2 AND campaign_id=$3 RETURNING *`,
-    [
-      sceneId,
-      sessionId,
-      campaignId,
-      text(req.body?.title, 200),
-      optionalText(req.body?.description, 10_000),
-      status,
-      Math.max(0, Math.trunc(Number(req.body?.sortOrder) || 0)),
-      jsonValue(req.body?.relations, []),
-    ],
-  );
-  if (!result.rows[0]) return res.status(404).json({ error: 'scene_not_found' });
-  return res.json(result.rows[0]);
-}
-
-async function addSessionEvent(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const sessionId = parseId(req.params.sessionId);
-  if (!campaignId || !sessionId) return res.status(400).json({ error: 'invalid_session' });
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const title = text(req.body?.title, 200);
-  if (!title) return res.status(400).json({ error: 'invalid_event_title' });
-  const visibility = VISIBILITIES.has(req.body?.visibility) ? req.body.visibility : 'dm';
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const session = await client.query('SELECT 1 FROM campaign_sessions WHERE id=$1 AND campaign_id=$2', [
-      sessionId,
-      campaignId,
-    ]);
-    if (!session.rows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'session_not_found' });
-    }
-    const event = await client.query(
-      `INSERT INTO session_events (campaign_id,session_id,created_by,event_type,title,content,visibility,relations)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [
-        campaignId,
-        sessionId,
-        req.user.id,
-        text(req.body?.eventType, 40) || 'custom',
-        title,
-        optionalText(req.body?.content, 10_000),
-        visibility,
-        jsonValue(req.body?.relations, []),
-      ],
-    );
-    await client.query(
-      `INSERT INTO campaign_timeline_events
-         (campaign_id,created_by,event_type,title,content,source_type,source_id,visibility,relations)
-       VALUES ($1,$2,$3,$4,$5,'session_event',$6,$7,$8)`,
-      [
-        campaignId,
-        req.user.id,
-        text(req.body?.eventType, 40) || 'custom',
-        title,
-        optionalText(req.body?.content, 10_000),
-        event.rows[0].id,
-        visibility,
-        jsonValue(req.body?.relations, []),
-      ],
-    );
-    await client.query('COMMIT');
-    return res.status(201).json(event.rows[0]);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
 function entityConfig(req, res) {
   const config = ENTITY_CONFIG[req.params.module];
   if (!config) res.status(404).json({ error: 'dm_module_not_found' });
@@ -510,6 +249,20 @@ function entityPayload(config, body) {
   };
 }
 
+async function validateEntityVisibility(campaignId, config, value) {
+  const requested = Array.isArray(value.data?.visibilityCharacterIds)
+    ? [...new Set(value.data.visibilityCharacterIds.map(parseId).filter(Boolean))]
+    : [];
+  value.data.visibilityCharacterIds = value.visibility === 'dm' ? [] : requested;
+  if (!requested.length) return value.visibility !== 'selected';
+  const valid = await pool.query(
+    `SELECT character_id FROM campaign_members
+     WHERE campaign_id=$1 AND character_id=ANY($2::bigint[])`,
+    [campaignId, requested],
+  );
+  return valid.rows.length === requested.length;
+}
+
 async function createEntity(req, res) {
   const campaignId = requireCampaignId(req, res);
   const config = entityConfig(req, res);
@@ -517,6 +270,8 @@ async function createEntity(req, res) {
   if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
   const value = entityPayload(config, req.body);
   if (!value.label) return res.status(400).json({ error: 'invalid_entity_name' });
+  if (!(await validateEntityVisibility(campaignId, config, value)))
+    return res.status(400).json({ error: 'invalid_visibility_recipients' });
   const columns = ['campaign_id', 'created_by', config.labelColumn, 'public_content', 'private_content'];
   const values = [campaignId, req.user.id, value.label, value.publicContent, value.privateContent];
   if (config.statuses.length) {
@@ -541,6 +296,8 @@ async function updateEntity(req, res) {
   if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
   const value = entityPayload(config, req.body);
   if (!value.label) return res.status(400).json({ error: 'invalid_entity_name' });
+  if (!(await validateEntityVisibility(campaignId, config, value)))
+    return res.status(400).json({ error: 'invalid_visibility_recipients' });
   const assignments = [`${config.labelColumn}=$3`, 'public_content=$4', 'private_content=$5'];
   const values = [entityId, campaignId, value.label, value.publicContent, value.privateContent];
   if (config.statuses.length) {
@@ -571,22 +328,6 @@ async function updateEntity(req, res) {
        WHERE id=$1 AND campaign_id=$2 RETURNING *`,
       values,
     );
-    if (config.statuses.length && previous.rows[0].status !== value.status) {
-      await client.query(
-        `INSERT INTO campaign_timeline_events
-           (campaign_id,created_by,event_type,title,content,source_type,source_id,visibility)
-         VALUES ($1,$2,'status_changed',$3,$4,$5,$6,$7)`,
-        [
-          campaignId,
-          req.user.id,
-          `${value.label}: zmiana statusu`,
-          `${previous.rows[0].status} → ${value.status}`,
-          req.params.module,
-          entityId,
-          value.visibility,
-        ],
-      );
-    }
     await client.query('COMMIT');
     return res.json(result.rows[0]);
   } catch (error) {
@@ -753,13 +494,14 @@ async function listMaterials(req, res) {
   const campaignId = requireCampaignId(req, res);
   if (!campaignId) return;
   if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
+  const includeArchived = req.query.includeArchived === 'true';
   const result = await pool.query(
     `SELECT material.*, COALESCE(json_agg(json_build_object('characterId', recipients.character_id, 'sharedAt', recipients.shared_at))
       FILTER (WHERE recipients.character_id IS NOT NULL), '[]') AS recipients
      FROM campaign_materials material LEFT JOIN material_recipients recipients ON recipients.material_id=material.id
-     WHERE material.campaign_id=$1 AND material.archived_at IS NULL
+     WHERE material.campaign_id=$1 AND ($2::boolean OR material.archived_at IS NULL)
      GROUP BY material.id ORDER BY material.updated_at DESC LIMIT 100`,
-    [campaignId],
+    [campaignId, includeArchived],
   );
   return res.json(result.rows);
 }
@@ -799,16 +541,70 @@ async function updateMaterial(req, res) {
     : 'text';
   const visibility = VISIBILITIES.has(req.body?.visibility) ? req.body.visibility : 'dm';
   const externalUrl = text(req.body?.externalUrl, 2000);
+  const recipients = [...new Set(jsonArray(req.body?.characterIds).map(parseId).filter(Boolean).slice(0, 100))];
   if (!title || (externalUrl && !/^https?:\/\//i.test(externalUrl))) {
     return res.status(400).json({ error: 'invalid_material' });
   }
-  const result = await pool.query(
-    `UPDATE campaign_materials SET title=$3,material_type=$4,content=$5,external_url=$6,
-       visibility=$7,updated_at=NOW() WHERE id=$1 AND campaign_id=$2 RETURNING *`,
-    [materialId, campaignId, title, type, optionalText(req.body?.content, 50_000), externalUrl, visibility],
-  );
-  if (!result.rows[0]) return res.status(404).json({ error: 'material_not_found' });
-  return res.json(result.rows[0]);
+  if (visibility === 'selected' && !recipients.length)
+    return res.status(400).json({ error: 'material_recipients_required' });
+  const validRecipients = recipients.length
+    ? await pool.query(
+        `SELECT character_id,user_id FROM campaign_members
+         WHERE campaign_id=$1 AND character_id=ANY($2::bigint[])`,
+        [campaignId, recipients],
+      )
+    : { rows: [] };
+  if (validRecipients.rows.length !== recipients.length)
+    return res.status(400).json({ error: 'invalid_material_recipients' });
+  const client = await pool.connect();
+  const notifications = [];
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(
+      `UPDATE campaign_materials SET title=$3,material_type=$4,content=$5,external_url=$6,
+         visibility=$7,updated_at=NOW() WHERE id=$1 AND campaign_id=$2 RETURNING *`,
+      [materialId, campaignId, title, type, optionalText(req.body?.content, 50_000), externalUrl, visibility],
+    );
+    if (!result.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'material_not_found' });
+    }
+    if (visibility === 'selected') {
+      await client.query(
+        `DELETE FROM material_recipients
+         WHERE material_id=$1 AND NOT (character_id=ANY($2::bigint[]))`,
+        [materialId, recipients],
+      );
+      for (const recipient of validRecipients.rows) {
+        const inserted = await client.query(
+          `INSERT INTO material_recipients (material_id,campaign_id,character_id,shared_by,notified_at)
+           VALUES ($1,$2,$3,$4,NOW()) ON CONFLICT DO NOTHING RETURNING character_id`,
+          [materialId, campaignId, recipient.character_id, req.user.id],
+        );
+        if (inserted.rows[0]) {
+          await client.query(
+            `INSERT INTO campaign_content_notifications
+               (campaign_id,user_id,notification_type,entity_id,title)
+             VALUES ($1,$2,'campaign_material',$3,$4) ON CONFLICT DO NOTHING`,
+            [campaignId, recipient.user_id, materialId, title],
+          );
+          notifications.push(Number(recipient.user_id));
+        }
+      }
+    } else {
+      await client.query('DELETE FROM material_recipients WHERE material_id=$1', [materialId]);
+    }
+    await client.query('COMMIT');
+    notifications.forEach((userId) =>
+      publishUserNotification(userId, { type: 'campaign_material', campaignId, materialId }),
+    );
+    return res.json(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function archiveMaterial(req, res) {
@@ -929,6 +725,79 @@ async function shareMaterial(req, res) {
   return res.status(204).end();
 }
 
+async function revokeMaterialAccess(req, res) {
+  const campaignId = requireCampaignId(req, res);
+  const materialId = parseId(req.params.materialId);
+  const characterId = parseId(req.params.characterId);
+  if (!campaignId || !materialId || !characterId) return res.status(400).json({ error: 'invalid_material_recipient' });
+  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const materialResult = await client.query(
+      `SELECT id,visibility FROM campaign_materials
+       WHERE id=$1 AND campaign_id=$2 FOR UPDATE`,
+      [materialId, campaignId],
+    );
+    const material = materialResult.rows[0];
+    if (!material) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'material_not_found' });
+    }
+    const members = await client.query(
+      `SELECT character_id,user_id FROM campaign_members
+       WHERE campaign_id=$1 AND character_id IS NOT NULL`,
+      [campaignId],
+    );
+    const removedMember = members.rows.find((member) => Number(member.character_id) === characterId);
+    if (!removedMember) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'material_recipient_not_found' });
+    }
+    if (material.visibility === 'party') {
+      const remaining = members.rows.filter((member) => Number(member.character_id) !== characterId);
+      await client.query('DELETE FROM material_recipients WHERE material_id=$1', [materialId]);
+      for (const member of remaining) {
+        await client.query(
+          `INSERT INTO material_recipients (material_id,campaign_id,character_id,shared_by,notified_at)
+           VALUES ($1,$2,$3,$4,NOW())`,
+          [materialId, campaignId, member.character_id, req.user.id],
+        );
+      }
+      await client.query('UPDATE campaign_materials SET visibility=$2,updated_at=NOW() WHERE id=$1', [
+        materialId,
+        remaining.length ? 'selected' : 'dm',
+      ]);
+    } else {
+      const removed = await client.query(
+        'DELETE FROM material_recipients WHERE material_id=$1 AND character_id=$2 RETURNING character_id',
+        [materialId, characterId],
+      );
+      if (!removed.rows[0]) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'material_recipient_not_found' });
+      }
+      const remaining = await client.query('SELECT 1 FROM material_recipients WHERE material_id=$1 LIMIT 1', [
+        materialId,
+      ]);
+      if (!remaining.rows[0])
+        await client.query("UPDATE campaign_materials SET visibility='dm',updated_at=NOW() WHERE id=$1", [materialId]);
+    }
+    await client.query(
+      `DELETE FROM campaign_content_notifications
+       WHERE campaign_id=$1 AND user_id=$2 AND notification_type='campaign_material' AND entity_id=$3`,
+      [campaignId, removedMember.user_id, materialId],
+    );
+    await client.query('COMMIT');
+    return res.status(204).end();
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function listSharedCampaignContent(req, res) {
   const campaignId = requireCampaignId(req, res);
   if (!campaignId) return;
@@ -938,7 +807,7 @@ async function listSharedCampaignContent(req, res) {
   ]);
   const characterId = membership.rows[0]?.character_id;
   if (!characterId) return res.status(404).json({ error: 'campaign_not_found' });
-  const [materials, secrets, quests] = await Promise.all([
+  const [materials, secrets, quests, teamNotes] = await Promise.all([
     pool.query(
       `SELECT DISTINCT material.id,material.title,material.material_type,material.content,
               material.external_url,material.updated_at
@@ -979,13 +848,45 @@ async function listSharedCampaignContent(req, res) {
        FROM campaign_quests quest
        LEFT JOIN quest_steps step ON step.quest_id=quest.id
        LEFT JOIN quest_party_notes note ON note.quest_id=quest.id
-       WHERE quest.campaign_id=$1 AND quest.archived_at IS NULL AND quest.visibility='party'
+       WHERE quest.campaign_id=$1 AND quest.archived_at IS NULL
+         AND (
+           quest.visibility='party'
+           OR (
+             quest.visibility='selected'
+             AND EXISTS (
+               SELECT 1
+               FROM jsonb_array_elements_text(COALESCE(quest.data->'visibilityCharacterIds','[]'::jsonb)) recipient(value)
+               WHERE recipient.value ~ '^[0-9]+$' AND recipient.value::bigint=$2
+             )
+           )
+         )
        GROUP BY quest.id,note.content,note.updated_at
        ORDER BY quest.updated_at DESC,quest.id DESC`,
+      [campaignId, characterId],
+    ),
+    pool.query(
+      `SELECT note.content,note.updated_at,note.locked_by,note.lock_expires_at,user_account.username AS locked_by_username
+       FROM campaign_team_notes note
+       LEFT JOIN users user_account ON user_account.id=note.locked_by
+       WHERE note.campaign_id=$1`,
       [campaignId],
     ),
   ]);
-  return res.json({ materials: materials.rows, secrets: secrets.rows, quests: quests.rows });
+  return res.json({
+    materials: materials.rows,
+    secrets: secrets.rows,
+    quests: quests.rows,
+    teamNotes: teamNotes.rows[0]?.content || '',
+    teamNotesUpdatedAt: teamNotes.rows[0]?.updated_at || null,
+    teamNotesLock:
+      teamNotes.rows[0]?.locked_by && new Date(teamNotes.rows[0].lock_expires_at).getTime() > Date.now()
+        ? {
+            lockedBy: Number(teamNotes.rows[0].locked_by),
+            username: teamNotes.rows[0].locked_by_username || 'Inny gracz',
+            expiresAt: teamNotes.rows[0].lock_expires_at,
+          }
+        : null,
+  });
 }
 
 async function updateSharedQuestNotes(req, res) {
@@ -997,7 +898,18 @@ async function updateSharedQuestNotes(req, res) {
     `SELECT quest.id
      FROM campaign_quests quest
      JOIN campaign_members member ON member.campaign_id=quest.campaign_id AND member.user_id=$3
-     WHERE quest.id=$1 AND quest.campaign_id=$2 AND quest.archived_at IS NULL AND quest.visibility='party'`,
+     WHERE quest.id=$1 AND quest.campaign_id=$2 AND quest.archived_at IS NULL
+       AND (
+         quest.visibility='party'
+         OR (
+           quest.visibility='selected'
+           AND EXISTS (
+             SELECT 1
+             FROM jsonb_array_elements_text(COALESCE(quest.data->'visibilityCharacterIds','[]'::jsonb)) recipient(value)
+             WHERE recipient.value ~ '^[0-9]+$' AND recipient.value::bigint=member.character_id
+           )
+         )
+       )`,
     [questId, campaignId, req.user.id],
   );
   if (!access.rows[0]) return res.status(404).json({ error: 'quest_not_found' });
@@ -1012,98 +924,76 @@ async function updateSharedQuestNotes(req, res) {
   return res.json(result.rows[0]);
 }
 
-async function listTimeline(req, res) {
+async function updateCampaignTeamNotes(req, res) {
   const campaignId = requireCampaignId(req, res);
   if (!campaignId) return;
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const { limit, offset } = pagination(req.query);
-  const result = await pool.query(
-    `SELECT * FROM campaign_timeline_events WHERE campaign_id=$1
-     ORDER BY occurred_at DESC,id DESC LIMIT $2 OFFSET $3`,
-    [campaignId, limit, offset],
-  );
-  return res.json(result.rows);
-}
-
-async function createTimelineEvent(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  if (!campaignId) return;
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const title = text(req.body?.title, 200);
-  if (!title) return res.status(400).json({ error: 'invalid_timeline_title' });
-  const visibility = VISIBILITIES.has(req.body?.visibility) ? req.body.visibility : 'dm';
-  const result = await pool.query(
-    `INSERT INTO campaign_timeline_events
-       (campaign_id,created_by,occurred_at,world_date,event_type,title,content,visibility,relations)
-     VALUES ($1,$2,COALESCE($3,NOW()),$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [
-      campaignId,
-      req.user.id,
-      req.body?.occurredAt || null,
-      text(req.body?.worldDate, 100),
-      text(req.body?.eventType, 40) || 'manual',
-      title,
-      optionalText(req.body?.content, 10_000),
-      visibility,
-      jsonValue(req.body?.relations, []),
-    ],
-  );
-  return res.status(201).json(result.rows[0]);
-}
-
-async function listRelations(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const sourceId = parseId(req.query.sourceId);
-  const sourceType = text(req.query.sourceType, 40);
-  if (!campaignId || !sourceId || !sourceType) return res.status(400).json({ error: 'invalid_relation_source' });
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const result = await pool.query(
-    `SELECT * FROM entity_relations WHERE campaign_id=$1 AND source_type=$2 AND source_id=$3
-     ORDER BY created_at,id`,
-    [campaignId, sourceType, sourceId],
-  );
-  return res.json(result.rows);
-}
-
-async function createRelation(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const sourceId = parseId(req.body?.sourceId);
-  const targetId = parseId(req.body?.targetId);
-  const sourceType = text(req.body?.sourceType, 40);
-  const targetType = text(req.body?.targetType, 40);
-  if (!campaignId || !sourceId || !targetId || !sourceType || !targetType) {
-    return res.status(400).json({ error: 'invalid_relation' });
-  }
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const result = await pool.query(
-    `INSERT INTO entity_relations
-       (campaign_id,source_type,source_id,target_type,target_id,relation_type,created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
-     ON CONFLICT (campaign_id,source_type,source_id,target_type,target_id,relation_type)
-     DO UPDATE SET relation_type=EXCLUDED.relation_type RETURNING *`,
-    [
-      campaignId,
-      sourceType,
-      sourceId,
-      targetType,
-      targetId,
-      text(req.body?.relationType, 40) || 'related',
-      req.user.id,
-    ],
-  );
-  return res.status(201).json(result.rows[0]);
-}
-
-async function deleteRelation(req, res) {
-  const campaignId = requireCampaignId(req, res);
-  const relationId = parseId(req.params.relationId);
-  if (!campaignId || !relationId) return res.status(400).json({ error: 'invalid_relation' });
-  if (!(await requireDm(campaignId, req.user.id))) return res.status(403).json({ error: 'dm_access_required' });
-  const result = await pool.query('DELETE FROM entity_relations WHERE id=$1 AND campaign_id=$2 RETURNING id', [
-    relationId,
+  const content = optionalText(req.body?.content, 50_000);
+  const lockToken = text(req.body?.lockToken, 100);
+  if (!lockToken) return res.status(423).json({ error: 'team_notes_lock_required' });
+  const access = await pool.query('SELECT 1 FROM campaign_members WHERE campaign_id=$1 AND user_id=$2', [
     campaignId,
+    req.user.id,
   ]);
-  if (!result.rows[0]) return res.status(404).json({ error: 'relation_not_found' });
+  if (!access.rows[0]) return res.status(404).json({ error: 'campaign_not_found' });
+  const result = await pool.query(
+    `UPDATE campaign_team_notes
+     SET content=$2,updated_by=$3,updated_at=NOW()
+     WHERE campaign_id=$1 AND lock_token=$4 AND locked_by=$3 AND lock_expires_at>NOW()
+     RETURNING content,updated_at`,
+    [campaignId, content, req.user.id, lockToken],
+  );
+  if (!result.rows[0]) return res.status(423).json({ error: 'team_notes_lock_lost' });
+  return res.json(result.rows[0]);
+}
+
+async function lockCampaignTeamNotes(req, res) {
+  const campaignId = requireCampaignId(req, res);
+  if (!campaignId) return;
+  const lockToken = text(req.body?.lockToken, 100);
+  if (!lockToken) return res.status(400).json({ error: 'invalid_lock_token' });
+  const membership = await pool.query('SELECT 1 FROM campaign_members WHERE campaign_id=$1 AND user_id=$2', [
+    campaignId,
+    req.user.id,
+  ]);
+  if (!membership.rows[0]) return res.status(404).json({ error: 'campaign_not_found' });
+  await pool.query(
+    `INSERT INTO campaign_team_notes (campaign_id,content)
+     VALUES ($1,'') ON CONFLICT (campaign_id) DO NOTHING`,
+    [campaignId],
+  );
+  const locked = await pool.query(
+    `UPDATE campaign_team_notes
+     SET locked_by=$2,lock_token=$3,lock_expires_at=NOW()+INTERVAL '60 seconds'
+     WHERE campaign_id=$1
+       AND (lock_expires_at IS NULL OR lock_expires_at<=NOW() OR (locked_by=$2 AND lock_token=$3))
+     RETURNING content,lock_expires_at`,
+    [campaignId, req.user.id, lockToken],
+  );
+  if (locked.rows[0]) return res.json({ locked: true, ...locked.rows[0] });
+  const owner = await pool.query(
+    `SELECT user_account.username,note.lock_expires_at
+     FROM campaign_team_notes note
+     LEFT JOIN users user_account ON user_account.id=note.locked_by
+     WHERE note.campaign_id=$1`,
+    [campaignId],
+  );
+  return res.status(423).json({
+    error: 'team_notes_locked',
+    username: owner.rows[0]?.username || 'Inny gracz',
+    expiresAt: owner.rows[0]?.lock_expires_at || null,
+  });
+}
+
+async function unlockCampaignTeamNotes(req, res) {
+  const campaignId = requireCampaignId(req, res);
+  if (!campaignId) return;
+  const lockToken = text(req.body?.lockToken, 100);
+  await pool.query(
+    `UPDATE campaign_team_notes
+     SET locked_by=NULL,lock_token=NULL,lock_expires_at=NULL
+     WHERE campaign_id=$1 AND locked_by=$2 AND lock_token=$3`,
+    [campaignId, req.user.id, lockToken],
+  );
   return res.status(204).end();
 }
 
@@ -1199,22 +1089,18 @@ async function exportCampaign(req, res) {
   const tables = [
     'campaign_members',
     'dm_notes',
-    'campaign_sessions',
-    'session_scenes',
-    'session_events',
     'campaign_npcs',
     'campaign_locations',
     'campaign_factions',
     'campaign_quests',
     'quest_steps',
     'quest_party_notes',
+    'campaign_team_notes',
     'campaign_story_threads',
     'campaign_secrets',
     'secret_recipients',
     'campaign_materials',
     'material_recipients',
-    'campaign_timeline_events',
-    'entity_relations',
   ];
   const data = {};
   for (const table of tables) {
@@ -1225,8 +1111,6 @@ async function exportCampaign(req, res) {
 }
 
 module.exports = {
-  addScene,
-  addSessionEvent,
   archiveDmNote,
   archiveCampaign,
   archiveEntity,
@@ -1236,26 +1120,19 @@ module.exports = {
   createDmNote,
   createEntity,
   createMaterial,
-  createRelation,
   createSecret,
-  createSession,
-  createTimelineEvent,
   exportCampaign,
   getCampaignSettings,
-  getSession,
   listDmNotes,
   listEntities,
   listMaterials,
   listQuestSteps,
-  listRelations,
   listSecrets,
   listSharedCampaignContent,
-  listSessions,
-  listTimeline,
   requireDm,
   revealSecret,
+  revokeMaterialAccess,
   removeCampaignMember,
-  deleteRelation,
   shareMaterial,
   updateCampaignRole,
   updateCampaignSettings,
@@ -1263,9 +1140,10 @@ module.exports = {
   updateEntity,
   updateMaterial,
   updateQuestStep,
-  updateScene,
   updateSecret,
   updateSharedQuestNotes,
-  updateSession,
+  updateCampaignTeamNotes,
+  lockCampaignTeamNotes,
+  unlockCampaignTeamNotes,
   deleteQuestStep,
 };

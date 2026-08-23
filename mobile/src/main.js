@@ -15,8 +15,24 @@ import {
   CHARACTER_SKILL_GROUPS,
   CHARACTER_SPECIAL,
 } from './character-schema.js';
-import { automaticInventoryIcon, INVENTORY_ICON_KEYS, INVENTORY_ICONS } from './inventory-schema.js';
-import { avatarMarkup, escapeHtml, formatFeatureText, prepareProfileImage } from './ui-utils.js';
+import {
+  automaticInventoryIcon,
+  inventoryQuantity,
+  INVENTORY_ICON_KEYS,
+  INVENTORY_ICONS,
+  parseInventory,
+  parseInventoryCategories,
+  serializeInventory,
+} from './inventory-schema.js';
+import {
+  avatarMarkup,
+  escapeHtml,
+  formatFeatureText,
+  prepareProfileImage,
+  showConfirmationDialog,
+  showMessageDialog,
+  showPromptDialog,
+} from './ui-utils.js';
 
 const app = document.querySelector('#app');
 let currentAppVersion = WEB_APP_VERSION;
@@ -360,46 +376,10 @@ function inventoryDurationControl(duration = '') {
   `;
 }
 
-function parseInventory(value) {
-  return String(value || '')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const iconMatch = line.match(/\s+\[icon=([a-z_]+)\]\s*$/i);
-      const icon = INVENTORY_ICON_KEYS.has(iconMatch?.[1]) ? iconMatch[1] : '';
-      const cleanLine = iconMatch ? line.slice(0, iconMatch.index).trim() : line;
-      const durationMatch = cleanLine.match(/^(.*?)\s+⏱\s*(.+)$/u);
-      const itemLine = durationMatch ? durationMatch[1].trim() : cleanLine;
-      const duration = durationMatch ? durationMatch[2].trim().slice(0, 100) : '';
-      const quantityMatch = itemLine.match(/^(.*?)\s+×\s*(\d+)$/u);
-      if (!quantityMatch) return { name: itemLine, quantity: 1, duration, icon };
-      return {
-        name: quantityMatch[1].trim(),
-        quantity: Math.max(1, Math.min(9999, Number(quantityMatch[2]) || 1)),
-        duration,
-        icon,
-      };
-    })
-    .filter((item) => item.name);
-}
-
-function serializeInventory(items) {
-  return items
-    .map((item) => {
-      const name = String(item.name || '').trim();
-      const quantity = Math.max(1, Math.min(9999, Number(item.quantity) || 1));
-      const duration = String(item.duration || '')
-        .trim()
-        .replace(/\r?\n/g, ' ')
-        .slice(0, 100);
-      const icon = INVENTORY_ICON_KEYS.has(item.icon) ? item.icon : '';
-      return `${name} × ${quantity}${duration ? ` ⏱ ${duration}` : ''}${icon ? ` [icon=${icon}]` : ''}`;
-    })
-    .filter((line) => !line.startsWith(' × '))
-    .join('\n')
-    .slice(0, 10000);
-}
+// Starsze komunikaty korzystają z tego samego komponentu.
+window.alert = (message) => {
+  void showMessageDialog(message);
+};
 
 async function loadUserUiPreferences() {
   userUiPreferences = { collapsedSections: {} };
@@ -1247,7 +1227,7 @@ function renderApp(statusMessage = null) {
       }).join('');
       const combat = CHARACTER_COMBAT.map(
         ([key, label]) => `
-        <div class="formula-row${key === 'initiative' ? ' value-only' : ''}">
+        <div class="formula-row combat-formula-row${key === 'initiative' ? ' value-only' : ''}">
           <label><span>${label}</span><input name="combat-${key}-value" data-formula-result="combat-${key}" placeholder="Wartość" value="${fieldValue(character?.combat?.[key]?.value, 0)}" ${key === 'initiative' ? '' : 'readonly'} /></label>
           ${
             key === 'initiative'
@@ -1338,7 +1318,7 @@ function renderApp(statusMessage = null) {
             : [];
 
       editor.innerHTML = `
-        <form id="character-form" class="character-form">
+        <form id="character-form" class="character-form" novalidate>
           <h3>${character ? 'Edytuj postać' : 'Nowa postać'}</h3>
           ${section(
             'Dane podstawowe',
@@ -1437,16 +1417,25 @@ function renderApp(statusMessage = null) {
       });
 
       const recalculateStatFormulas = () => {
-        const attributeValues = Object.fromEntries(
+        const adventureAttributeValues = Object.fromEntries(
           CHARACTER_ATTRIBUTES.map(([attributeKey]) => [
             attributeKey,
             Number(editor.querySelector(`[name="attribute-${attributeKey}"]`)?.value) || 0,
           ]),
         );
+        const combatAttributeValues = Object.fromEntries(
+          CHARACTER_ATTRIBUTES.map(([attributeKey]) => [
+            attributeKey,
+            combatAttribute(attributeKey, adventureAttributeValues[attributeKey]),
+          ]),
+        );
         editor.querySelectorAll('[data-stat-formula-builder]').forEach((builder) => {
           const terms = [...builder.querySelectorAll('[data-ranged-formula-term]')].map(rangedFormulaTermValue);
           const output = editor.querySelector(`[data-formula-result="${builder.dataset.statFormulaBuilder}"]`);
-          if (output) output.value = evaluateFormulaTerms(terms, attributeValues);
+          const formulaAttributes = builder.dataset.statFormulaBuilder === 'combat-hp'
+            ? adventureAttributeValues
+            : combatAttributeValues;
+          if (output) output.value = evaluateFormulaTerms(terms, formulaAttributes);
         });
       };
 
@@ -1557,6 +1546,8 @@ function renderApp(statusMessage = null) {
           const nextTerm =
             nextType === 'fraction'
               ? { type: nextType, numerator: 1, denominator: 2, attribute }
+              : nextType === 'dice'
+                ? { type: nextType, count: 1, sides: 6 }
               : {
                   type: nextType,
                   value: Number.isFinite(previousValue) ? previousValue : nextType === 'percent' ? 100 : 0,
@@ -1609,6 +1600,23 @@ function renderApp(statusMessage = null) {
         const form = event.currentTarget;
         const submitButton = form.querySelector('button[type="submit"]');
         const errorElement = form.querySelector('#character-form-error');
+        const invalidField = [...form.elements].find(
+          (field) => typeof field.checkValidity === 'function' && !field.checkValidity(),
+        );
+        if (invalidField) {
+          const containingSection = invalidField.closest('details.character-section');
+          if (containingSection) containingSection.open = true;
+          const fieldLabel = invalidField.closest('label')?.querySelector(':scope > span')?.textContent?.trim();
+          errorElement.textContent = fieldLabel
+            ? `Uzupełnij lub popraw pole „${fieldLabel}”.`
+            : 'Uzupełnij lub popraw oznaczone pole.';
+          window.requestAnimationFrame(() => {
+            invalidField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            invalidField.focus({ preventScroll: true });
+            invalidField.reportValidity();
+          });
+          return;
+        }
         const formData = new FormData(form);
         const payload = {
           name: formData.get('name'),
@@ -1893,6 +1901,11 @@ function renderApp(statusMessage = null) {
             </section>
             <section class="character-tab-panel" data-character-panel="inventory">
               <div class="inventory-screen">
+                <section class="quick-inventory-section">
+                  <div><p class="eyebrow">Pod ręką</p><h3>Szybki ekwipunek</h3></div>
+                  <div id="quick-inventory" class="quick-inventory" aria-label="Trzy miejsca szybkiego ekwipunku"></div>
+                  <small>Przeciągnij tutaj przedmiot z ekwipunku. Przeciągnij go z powrotem na listę, aby zwolnić miejsce.</small>
+                </section>
                 <div id="inventory-list" class="inventory-list"></div>
                 <section class="inventory-add-card">
                   <button id="open-add-inventory-item" class="inventory-add-trigger" type="button">
@@ -1909,14 +1922,28 @@ function renderApp(statusMessage = null) {
                     </label>
                   <label>
                     <span>Ilość</span>
-                    <input name="quantity" type="number" min="1" max="9999" value="1" inputmode="numeric" required />
+                    <input name="quantity" type="number" min="0" max="9999" value="1" inputmode="numeric" required />
+                  </label>
+                  <label class="inventory-description-field">
+                    <span>Opis</span>
+                    <textarea name="description" maxlength="1000" rows="3" placeholder="Opis przedmiotu, jego działanie lub pochodzenie"></textarea>
                   </label>
                   ${inventoryDurationControl()}
-                  ${inventoryIconPicker()}
+                  ${inventoryIconPicker('backpack', true)}
                   <div class="dm-form-actions">
                     <button type="button" class="secondary" data-cancel-inventory-add>Anuluj</button>
                     <button type="submit">Dodaj do ekwipunku</button>
                   </div>
+                  </form>
+                </section>
+                <section class="inventory-add-card">
+                  <button id="open-add-inventory-category" class="inventory-add-trigger" type="button">
+                    <span class="inventory-icon add">+</span>
+                    <span><strong>Dodaj kategorię</strong><small>Uporządkuj przedmioty w ekwipunku</small></span>
+                  </button>
+                  <form id="inventory-category-form" class="inventory-item-form inventory-category-form hidden">
+                    <label><span>Nazwa kategorii</span><input name="name" maxlength="100" placeholder="np. Mikstury" required /></label>
+                    <div class="dm-form-actions"><button type="button" class="secondary" data-cancel-inventory-category>Anuluj</button><button type="submit">Dodaj kategorię</button></div>
                   </form>
                 </section>
                 <p id="inventory-status" class="inventory-status" role="status"></p>
@@ -2833,7 +2860,6 @@ function renderApp(statusMessage = null) {
               <button class="secondary" data-dm-character-tab="sheet">Karta postaci</button>
               <button class="secondary" data-dm-character-tab="inventory">Ekwipunek</button>
               <button class="secondary" data-dm-character-tab="notes">Notatki DM</button>
-              <button class="secondary" data-dm-character-tab="threads">Wątki i sekrety</button>
             </div>
             <div class="dm-character-panel" data-dm-character-panel="summary">
               <div class="character-profile-banner"><div>${avatarMarkup(teammate.avatar, teammate.name, 'character-avatar large')}<strong>${escapeHtml(teammate.name)}</strong></div>${teammate.motto ? `<em>${escapeHtml(teammate.motto)}</em>` : ''}</div>
@@ -2860,7 +2886,6 @@ function renderApp(statusMessage = null) {
             <div class="dm-character-panel" data-dm-character-panel="notes">
               <label class="dm-note-field general"><span>Prywatne notatki DM o tej postaci</span><textarea data-dm-character-note maxlength="50000" placeholder="Twoje prywatne notatki…">${escapeHtml(teammate.dmNote)}</textarea></label>
             </div>
-            <div class="dm-character-panel" data-dm-character-panel="threads"><div class="empty-state"><h3>Wątki i sekrety</h3><p>Ten moduł zostanie dodany w kolejnym etapie rozwoju Panelu DM.</p></div></div>
           `;
           const setCharacterTab = (tab) => {
             target
@@ -3063,134 +3088,6 @@ function renderApp(statusMessage = null) {
               button.addEventListener('click', () =>
                 openEditor(notes.find((note) => Number(note.id) === Number(button.dataset.dmNoteId))),
               ),
-            );
-        };
-        const loadSessionDetails = async (sessionId) => {
-          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${sessionId}`);
-          if (!response.ok) throw new Error('dm_session_load_failed');
-          const session = await response.json();
-          const dateInput = (value) => (value ? new Date(value).toISOString().slice(0, 16) : '');
-          target.innerHTML = `<div class="dm-module-toolbar"><button type="button" class="secondary" data-back-sessions>← Sesje</button><div><p class="eyebrow">Sesja ${session.number}</p><h3>${escapeHtml(session.title)}</h3></div></div>
-            <form class="dm-workspace-form" data-session-editor>
-              <div class="dm-form-row"><label><span>Tytuł</span><input name="title" maxlength="200" value="${escapeHtml(session.title)}" required></label><label><span>Status</span><select name="status">${[
-                ['planned', 'Planowana'],
-                ['active', 'W trakcie'],
-                ['completed', 'Zakończona'],
-                ['cancelled', 'Anulowana'],
-              ]
-                .map(
-                  ([value, label]) =>
-                    `<option value="${value}"${session.status === value ? ' selected' : ''}>${label}</option>`,
-                )
-                .join('')}</select></label></div>
-              <div class="dm-form-row"><label><span>Planowana data</span><input name="plannedAt" type="datetime-local" value="${dateInput(session.planned_at)}"></label><label><span>Faktyczna data</span><input name="actualAt" type="datetime-local" value="${dateInput(session.actual_at)}"></label></div>
-              <div class="dm-session-columns"><label><span>Plan DM</span><textarea name="plan" maxlength="50000">${escapeHtml(session.plan)}</textarea></label><label><span>Notatki na żywo</span><textarea name="liveNotes" maxlength="50000">${escapeHtml(session.live_notes)}</textarea></label><label><span>Podsumowanie robocze</span><textarea name="summary" maxlength="10000">${escapeHtml(session.summary)}</textarea></label><label><span>Podsumowanie dla graczy</span><textarea name="publicSummary" maxlength="10000">${escapeHtml(session.public_summary)}</textarea></label><label><span>Prywatne podsumowanie DM</span><textarea name="privateSummary" maxlength="10000">${escapeHtml(session.private_summary)}</textarea></label><label><span>Możliwe nagrody</span><textarea name="rewards" maxlength="10000">${escapeHtml(session.rewards)}</textarea></label></div>
-              <div class="dm-form-actions"><small data-session-save-state>Zmiany zapisują się automatycznie.</small></div>
-            </form>
-            <section><div class="dm-module-toolbar"><h3>Sceny</h3><button type="button" class="small" data-add-scene>+ Scena</button></div><div class="dm-record-list">${session.scenes.length ? session.scenes.map((scene, index) => `<article class="dm-scene-row"><div><strong>${escapeHtml(scene.title)}</strong><small>${escapeHtml(scene.description || '')}</small></div><select data-scene-status="${scene.id}"><option value="planned"${scene.status === 'planned' ? ' selected' : ''}>Planowana</option><option value="completed"${scene.status === 'completed' ? ' selected' : ''}>Zrealizowana</option><option value="skipped"${scene.status === 'skipped' ? ' selected' : ''}>Pominięta</option><option value="moved"${scene.status === 'moved' ? ' selected' : ''}>Przeniesiona</option></select><div><button class="small secondary" data-scene-up="${scene.id}"${index === 0 ? ' disabled' : ''}>↑</button><button class="small secondary" data-scene-down="${scene.id}"${index === session.scenes.length - 1 ? ' disabled' : ''}>↓</button></div></article>`).join('') : '<div class="empty-state"><p>Brak scen w planie.</p></div>'}</div></section>
-            <section><div class="dm-module-toolbar"><h3>Wydarzenia</h3><button type="button" class="small" data-add-event>+ Wydarzenie</button></div><div class="dm-record-list">${session.events.length ? session.events.map((event) => `<article class="dm-record-card"><strong>${escapeHtml(event.title)}</strong><small>${escapeHtml(event.event_type)} • ${new Date(event.created_at).toLocaleString('pl-PL')}</small><p>${escapeHtml(event.content)}</p></article>`).join('') : '<div class="empty-state"><p>Brak zapisanych wydarzeń.</p></div>'}</div></section>`;
-          target.querySelector('[data-back-sessions]')?.addEventListener('click', () => loadSessions());
-          const editor = target.querySelector('[data-session-editor]');
-          let timer;
-          editor.addEventListener('input', () => {
-            const state = editor.querySelector('[data-session-save-state]');
-            state.textContent = 'Zapisywanie…';
-            window.clearTimeout(timer);
-            timer = window.setTimeout(async () => {
-              const data = new FormData(editor);
-              const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                  number: session.number,
-                  title: data.get('title'),
-                  status: data.get('status'),
-                  plannedAt: data.get('plannedAt') || null,
-                  actualAt: data.get('actualAt') || null,
-                  participants: session.participants,
-                  summary: data.get('summary'),
-                  publicSummary: data.get('publicSummary'),
-                  privateSummary: data.get('privateSummary'),
-                  plan: data.get('plan'),
-                  liveNotes: data.get('liveNotes'),
-                  rewards: data.get('rewards'),
-                  checklist: session.checklist,
-                }),
-              });
-              state.textContent = result.ok ? 'Zapisano.' : 'Błąd zapisu.';
-            }, 700);
-          });
-          target.querySelector('[data-add-scene]')?.addEventListener('click', async () => {
-            const title = window.prompt('Tytuł sceny:');
-            if (!title) return;
-            const description = window.prompt('Krótki opis sceny:') || '';
-            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}/scenes`, {
-              method: 'POST',
-              body: JSON.stringify({ title, description }),
-            });
-            if (result.ok) await loadSessionDetails(session.id);
-          });
-          const updateSceneRecord = async (scene, updates) =>
-            authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}/scenes/${scene.id}`, {
-              method: 'PUT',
-              body: JSON.stringify({
-                title: scene.title,
-                description: scene.description,
-                status: updates.status ?? scene.status,
-                sortOrder: updates.sortOrder ?? scene.sort_order,
-                relations: scene.relations,
-              }),
-            });
-          target.querySelectorAll('[data-scene-status]').forEach((select) =>
-            select.addEventListener('change', async () => {
-              const scene = session.scenes.find((item) => Number(item.id) === Number(select.dataset.sceneStatus));
-              await updateSceneRecord(scene, { status: select.value });
-            }),
-          );
-          const moveScene = async (id, direction) => {
-            const index = session.scenes.findIndex((item) => Number(item.id) === Number(id));
-            const other = session.scenes[index + direction];
-            if (!other) return;
-            await Promise.all([
-              updateSceneRecord(session.scenes[index], { sortOrder: other.sort_order }),
-              updateSceneRecord(other, { sortOrder: session.scenes[index].sort_order }),
-            ]);
-            await loadSessionDetails(session.id);
-          };
-          target
-            .querySelectorAll('[data-scene-up]')
-            .forEach((button) => button.addEventListener('click', () => moveScene(button.dataset.sceneUp, -1)));
-          target
-            .querySelectorAll('[data-scene-down]')
-            .forEach((button) => button.addEventListener('click', () => moveScene(button.dataset.sceneDown, 1)));
-          target.querySelector('[data-add-event]')?.addEventListener('click', async () => {
-            const title = window.prompt('Tytuł wydarzenia:');
-            if (!title) return;
-            const content = window.prompt('Opis wydarzenia:') || '';
-            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions/${session.id}/events`, {
-              method: 'POST',
-              body: JSON.stringify({ eventType: 'custom', title, content, visibility: 'dm' }),
-            });
-            if (result.ok) await loadSessionDetails(session.id);
-          });
-        };
-        const loadSessions = async () => {
-          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions`);
-          if (!response.ok) throw new Error('dm_sessions_load_failed');
-          const sessions = await response.json();
-          target.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Prawdziwa gra przy stole</p><h3>Sesje</h3></div><button type="button" data-create-session>+ Nowa sesja</button></div><div class="dm-record-list">${sessions.length ? sessions.map((session) => `<button type="button" class="dm-record-card" data-session-id="${session.id}"><strong>#${session.number} ${escapeHtml(session.title)}</strong><small>${escapeHtml(session.status)} • ${formatDate(session.planned_at || session.actual_at)}</small><p>${escapeHtml(session.summary || 'Brak podsumowania')}</p></button>`).join('') : '<div class="empty-state"><p>Nie zaplanowano jeszcze żadnej sesji.</p></div>'}</div>`;
-          target.querySelector('[data-create-session]')?.addEventListener('click', async () => {
-            const title = window.prompt('Tytuł sesji:');
-            if (!title) return;
-            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/sessions`, {
-              method: 'POST',
-              body: JSON.stringify({ title, number: (sessions[0]?.number || 0) + 1 }),
-            });
-            if (result.ok) await loadSessionDetails((await result.json()).id);
-          });
-          target
-            .querySelectorAll('[data-session-id]')
-            .forEach((button) =>
-              button.addEventListener('click', () => loadSessionDetails(Number(button.dataset.sessionId))),
             );
         };
         const campaignModules = {
@@ -3482,23 +3379,6 @@ function renderApp(statusMessage = null) {
             }),
           );
         };
-        const loadTimeline = async () => {
-          const response = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/timeline`);
-          if (!response.ok) throw new Error('dm_timeline_load_failed');
-          const events = await response.json();
-          target.innerHTML = `${campaignSubnav('history')}<div class="dm-module-toolbar"><h3>Historia kampanii</h3><button data-new-timeline>+ Wydarzenie</button></div><div class="dm-timeline">${events.map((event) => `<article><time>${formatDate(event.occurred_at)}</time><div><strong>${escapeHtml(event.title)}</strong><small>${escapeHtml(event.event_type)}${event.world_date ? ` • ${escapeHtml(event.world_date)}` : ''}</small><p>${escapeHtml(event.content)}</p></div></article>`).join('') || '<div class="empty-state"><p>Historia jest jeszcze pusta.</p></div>'}</div>`;
-          bindCampaignSubnav();
-          target.querySelector('[data-new-timeline]')?.addEventListener('click', async () => {
-            const title = window.prompt('Tytuł wydarzenia:');
-            if (!title) return;
-            const content = window.prompt('Opis:') || '';
-            const result = await authenticatedFetch(`/api/campaigns/${campaignId}/dm/timeline`, {
-              method: 'POST',
-              body: JSON.stringify({ title, content, visibility: 'dm' }),
-            });
-            if (result.ok) await loadTimeline();
-          });
-        };
         const loadMaterials = async () => {
           const [materialResponse, teamResponse] = await Promise.all([
             authenticatedFetch(`/api/campaigns/${campaignId}/dm/materials`),
@@ -3775,7 +3655,91 @@ function renderApp(statusMessage = null) {
                   failed: 'Nieudane',
                   hidden: 'Ukryte',
                 };
-                sharedTarget.innerHTML = `<section><h3>Zadania drużyny</h3><div class="dm-record-list">${(shared.quests || []).map((quest) => `<article class="dm-record-card campaign-shared-quest" data-open-shared-quest="${quest.id}" role="button" tabindex="0"><div class="dm-module-toolbar"><strong>${escapeHtml(quest.name)}</strong><small>${escapeHtml(questStatus[quest.status] || quest.status)}</small></div>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : ''}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}<small>Kliknij, aby zobaczyć szczegóły i wspólne notatki.</small></article>`).join('') || '<p class="section-note">DM nie udostępnił jeszcze żadnych zadań.</p>'}</div></section><section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card campaign-shared-material" data-open-shared-material="${material.id}" role="button" tabindex="0"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content.slice(0, 160))}${material.content.length > 160 ? '…' : ''}</p><small>Kliknij, aby otworzyć pełną treść.</small></article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section><dialog class="shared-quest-dialog" data-shared-quest-dialog></dialog><dialog class="shared-material-dialog" data-shared-material-dialog></dialog>`;
+                sharedTarget.innerHTML = `<section><h3>Zadania drużyny</h3><div class="dm-record-list">${(shared.quests || []).map((quest) => `<article class="dm-record-card campaign-shared-quest" data-open-shared-quest="${quest.id}" role="button" tabindex="0"><div class="dm-module-toolbar"><strong>${escapeHtml(quest.name)}</strong><small>${escapeHtml(questStatus[quest.status] || quest.status)}</small></div>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : ''}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}<small>Kliknij, aby zobaczyć szczegóły i wspólne notatki.</small></article>`).join('') || '<p class="section-note">DM nie udostępnił jeszcze żadnych zadań.</p>'}</div></section><section><h3>Materiały</h3><div class="dm-material-grid">${shared.materials.map((material) => `<article class="dm-material-card campaign-shared-material" data-open-shared-material="${material.id}" role="button" tabindex="0"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content.slice(0, 160))}${material.content.length > 160 ? '…' : ''}</p><small>Kliknij, aby otworzyć pełną treść.</small></article>`).join('') || '<p class="section-note">Brak udostępnionych materiałów.</p>'}</div></section><section><h3>Odkryte informacje</h3><div class="dm-record-list">${shared.secrets.map((secret) => `<article class="dm-record-card"><strong>${escapeHtml(secret.title)}</strong><small>${escapeHtml(secret.secret_type)}</small><p>${escapeHtml(secret.content)}</p></article>`).join('') || '<p class="section-note">Brak odkrytych informacji.</p>'}</div></section><section class="campaign-team-notes"><div class="section-heading"><h3>Notatki drużyny</h3><button type="button" class="secondary small" data-toggle-team-notes-edit>Edytuj notatki</button></div><label class="dm-note-field general"><span>Wspólny notatnik kampanii</span><textarea data-campaign-team-notes maxlength="50000" readonly>${escapeHtml(shared.teamNotes || '')}</textarea><small data-campaign-team-notes-status>${shared.teamNotesLock ? `Notatki edytuje obecnie ${escapeHtml(shared.teamNotesLock.username)}.` : 'Wybierz „Edytuj notatki”, aby rozpocząć bezpieczną edycję.'}</small></label></section><dialog class="shared-quest-dialog" data-shared-quest-dialog></dialog><dialog class="shared-material-dialog" data-shared-material-dialog></dialog>`;
+                let teamNotesTimer;
+                let teamNotesHeartbeat;
+                let hasTeamNotesLock = false;
+                const teamNotesLockToken = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+                const teamNotesTextarea = sharedTarget.querySelector('[data-campaign-team-notes]');
+                const teamNotesStatus = sharedTarget.querySelector('[data-campaign-team-notes-status]');
+                const teamNotesButton = sharedTarget.querySelector('[data-toggle-team-notes-edit]');
+                const saveTeamNotes = async () => {
+                  teamNotesStatus.textContent = 'Zapisywanie…';
+                  const result = await authenticatedFetch(`/api/campaigns/${campaignId}/shared/notes`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ content: teamNotesTextarea.value, lockToken: teamNotesLockToken }),
+                  });
+                  if (result.ok) {
+                    teamNotesStatus.textContent = 'Zapisano dla całej drużyny.';
+                    return true;
+                  }
+                  hasTeamNotesLock = false;
+                  teamNotesTextarea.readOnly = true;
+                  teamNotesButton.textContent = 'Edytuj notatki';
+                  window.clearInterval(teamNotesHeartbeat);
+                  teamNotesStatus.textContent = 'Utracono blokadę edycji. Odśwież notatki przed kolejną zmianą.';
+                  return false;
+                };
+                teamNotesTextarea.addEventListener('input', () => {
+                  if (!hasTeamNotesLock) return;
+                  window.clearTimeout(teamNotesTimer);
+                  teamNotesTimer = window.setTimeout(saveTeamNotes, 600);
+                });
+                teamNotesButton.addEventListener('click', async () => {
+                  if (hasTeamNotesLock) {
+                    window.clearTimeout(teamNotesTimer);
+                    if (!(await saveTeamNotes())) return;
+                    await authenticatedFetch(`/api/campaigns/${campaignId}/shared/notes/lock`, {
+                      method: 'DELETE',
+                      body: JSON.stringify({ lockToken: teamNotesLockToken }),
+                    });
+                    hasTeamNotesLock = false;
+                    window.clearInterval(teamNotesHeartbeat);
+                    teamNotesTextarea.readOnly = true;
+                    teamNotesButton.textContent = 'Edytuj notatki';
+                    teamNotesStatus.textContent = 'Edycja zakończona. Notatki są dostępne dla całej drużyny.';
+                    return;
+                  }
+                  teamNotesButton.disabled = true;
+                  const result = await authenticatedFetch(`/api/campaigns/${campaignId}/shared/notes/lock`, {
+                    method: 'POST',
+                    body: JSON.stringify({ lockToken: teamNotesLockToken }),
+                  });
+                  const data = await result.json().catch(() => ({}));
+                  teamNotesButton.disabled = false;
+                  if (!result.ok) {
+                    teamNotesStatus.textContent = `Notatki edytuje obecnie ${data.username || 'inny gracz'}.`;
+                    return;
+                  }
+                  hasTeamNotesLock = true;
+                  teamNotesTextarea.value = data.content || '';
+                  teamNotesTextarea.readOnly = false;
+                  teamNotesButton.textContent = 'Zakończ edycję';
+                  teamNotesStatus.textContent = 'Masz wyłączną blokadę edycji. Zmiany zapisują się automatycznie.';
+                  teamNotesTextarea.focus();
+                  teamNotesHeartbeat = window.setInterval(async () => {
+                    if (!teamNotesTextarea.isConnected) {
+                      hasTeamNotesLock = false;
+                      window.clearInterval(teamNotesHeartbeat);
+                      await authenticatedFetch(`/api/campaigns/${campaignId}/shared/notes/lock`, {
+                        method: 'DELETE',
+                        body: JSON.stringify({ lockToken: teamNotesLockToken }),
+                      }).catch(() => {});
+                      return;
+                    }
+                    const heartbeat = await authenticatedFetch(`/api/campaigns/${campaignId}/shared/notes/lock`, {
+                      method: 'POST',
+                      body: JSON.stringify({ lockToken: teamNotesLockToken }),
+                    });
+                    if (!heartbeat.ok) {
+                      hasTeamNotesLock = false;
+                      teamNotesTextarea.readOnly = true;
+                      teamNotesButton.textContent = 'Edytuj notatki';
+                      window.clearInterval(teamNotesHeartbeat);
+                      teamNotesStatus.textContent = 'Blokada edycji wygasła.';
+                    }
+                  }, 20000);
+                });
                 const questDialog = sharedTarget.querySelector('[data-shared-quest-dialog]');
                 const openSharedQuest = (quest) => {
                   questDialog.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Zadanie drużyny</p><h3>${escapeHtml(quest.name)}</h3></div><button type="button" class="secondary small" data-close-shared-quest>Zamknij</button></div><div class="shared-quest-details"><p><strong>Status:</strong> ${escapeHtml(questStatus[quest.status] || quest.status)}</p>${quest.public_content ? `<p>${escapeHtml(quest.public_content)}</p>` : '<p class="section-note">Brak dodatkowego opisu.</p>'}${quest.main_goal ? `<p><strong>Cel:</strong> ${escapeHtml(quest.main_goal)}</p>` : ''}${quest.commissioner ? `<p><strong>Zleceniodawca:</strong> ${escapeHtml(quest.commissioner)}</p>` : ''}${quest.steps?.length ? `<div><strong>Etapy:</strong><ul>${quest.steps.map((step) => `<li${step.is_completed ? ' class="completed"' : ''}>${step.is_completed ? '✓' : '○'} ${escapeHtml(step.title)}</li>`).join('')}</ul></div>` : ''}${quest.rewards ? `<p><strong>Nagrody:</strong> ${escapeHtml(quest.rewards)}</p>` : ''}</div><label class="dm-note-field general"><span>Wspólne notatki drużyny</span><textarea data-shared-quest-notes maxlength="20000" placeholder="Ustalenia, tropy i pomysły drużyny…">${escapeHtml(quest.party_notes || '')}</textarea><small data-shared-quest-note-status>Zmiany zapisują się automatycznie i są widoczne dla całej drużyny.</small></label>`;
@@ -3869,17 +3833,31 @@ function renderApp(statusMessage = null) {
 
       loadCharacterTeams();
       let inventoryItems = parseInventory(character.inventory);
+      let inventoryCategories = parseInventoryCategories(character.inventory);
       let editingInventoryIndex = null;
+      let editingInventoryIconIndex = null;
+      let editingInventoryCategoryId = null;
       const inventoryList = document.querySelector('#inventory-list');
+      const quickInventory = document.querySelector('#quick-inventory');
       const inventoryStatus = document.querySelector('#inventory-status');
       const inventoryForm = document.querySelector('#inventory-item-form');
+      const inventoryCategoryForm = document.querySelector('#inventory-category-form');
+
+      function updateInventoryIconSelector(form, icon) {
+        if (!form || !INVENTORY_ICON_KEYS.has(icon)) return;
+        const preview = form.querySelector('[data-inventory-selected-icon]');
+        if (preview) preview.src = `./img/${icon}.png`;
+      }
 
       function selectAutomaticInventoryIcon(form) {
         if (!form || form.dataset.iconManuallySelected === 'true') return;
         const automaticIcon = automaticInventoryIcon(form?.querySelector('input[name="name"]')?.value);
         if (!automaticIcon) return;
         const iconInput = form.querySelector(`input[name="icon"][value="${automaticIcon}"]`);
-        if (iconInput) iconInput.checked = true;
+        if (iconInput) {
+          iconInput.checked = true;
+          updateInventoryIconSelector(form, automaticIcon);
+        }
       }
 
       function toggleInventoryDuration(checkbox) {
@@ -3897,17 +3875,33 @@ function renderApp(statusMessage = null) {
       }
 
       function renderInventoryItems() {
-        if (!inventoryList) return;
-        inventoryList.innerHTML = inventoryItems.length
-          ? inventoryItems
+        if (!inventoryList || !quickInventory) return;
+        quickInventory.innerHTML = [0, 1, 2]
+          .map((slot) => {
+            const index = inventoryItems.findIndex((item) => item.quickSlot === slot);
+            const item = index >= 0 ? inventoryItems[index] : null;
+            return `<div class="quick-inventory-slot${item ? ' occupied' : ''}" data-quick-slot="${slot}">
+              ${
+                item
+                  ? `<button class="inventory-drag-handle quick" type="button" data-inventory-drag-handle="${index}" aria-label="Przenieś ${escapeHtml(item.name)}" title="Przeciągnij, aby przenieść">⠿</button><span class="inventory-icon">${inventoryIconMarkup(item)}</span><span><strong>${escapeHtml(item.name)}</strong><small>×&nbsp;${item.quantity}</small></span>`
+                  : `<span class="quick-slot-number">${slot + 1}</span><small>Puste miejsce</small>`
+              }
+            </div>`;
+          })
+          .join('');
+        const regularItems = inventoryItems
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => ![0, 1, 2].includes(item.quickSlot));
+        inventoryList.innerHTML = regularItems.length
+          ? regularItems
               .map((item, index) =>
-                editingInventoryIndex === index
+                editingInventoryIndex === item.index
                   ? `
-              <form class="inventory-edit-form" data-edit-inventory-form="${index}">
-                <input name="name" maxlength="150" value="${escapeHtml(item.name)}" aria-label="Nazwa przedmiotu" required />
-                <input name="quantity" type="number" min="1" max="9999" value="${item.quantity}" inputmode="numeric" aria-label="Ilość" required />
-                ${inventoryDurationControl(item.duration)}
-                ${inventoryIconPicker(item.icon)}
+              <form class="inventory-edit-form" data-edit-inventory-form="${item.index}">
+                <input name="name" maxlength="150" value="${escapeHtml(item.item.name)}" aria-label="Nazwa przedmiotu" required />
+                <input name="quantity" type="number" min="0" max="9999" value="${item.item.quantity}" inputmode="numeric" aria-label="Ilość" required />
+                <label class="inventory-description-field"><span>Opis</span><textarea name="description" maxlength="1000" rows="3" placeholder="Opis przedmiotu, jego działanie lub pochodzenie">${escapeHtml(item.item.description || '')}</textarea></label>
+                ${inventoryDurationControl(item.item.duration)}
                 <div>
                   <button type="submit" class="small">Zapisz</button>
                   <button type="button" class="secondary small" data-cancel-inventory-edit>Anuluj</button>
@@ -3915,24 +3909,61 @@ function renderApp(statusMessage = null) {
               </form>
             `
                   : `
-              <article class="inventory-item" data-edit-inventory-item="${index}" tabindex="0" title="Kliknij, aby edytować">
-                <button class="inventory-drag-handle" type="button" data-inventory-drag-handle="${index}" aria-label="Przesuń ${escapeHtml(item.name)}" title="Przeciągnij, aby zmienić kolejność">⠿</button>
-                <span class="inventory-icon">${inventoryIconMarkup(item)}</span>
+              <article class="inventory-item" data-edit-inventory-item="${item.index}" tabindex="0" title="Kliknij, aby edytować">
+                <button class="inventory-drag-handle" type="button" data-inventory-drag-handle="${item.index}" aria-label="Przesuń ${escapeHtml(item.item.name)}" title="Przeciągnij, aby zmienić kolejność">⠿</button>
+                <button class="inventory-icon inventory-icon-edit-trigger" type="button" data-edit-inventory-icon="${item.index}" aria-label="Zmień ikonę ${escapeHtml(item.item.name)}" title="Zmień ikonę">${inventoryIconMarkup(item.item)}</button>
                 <span class="inventory-details">
-                  <strong>${escapeHtml(item.name)}</strong>
-                  ${item.duration ? `<small>⏱ ${escapeHtml(item.duration)}</small>` : ''}
+                  <strong>${escapeHtml(item.item.name)}</strong>
+                  ${item.item.duration ? `<small>⏱ ${escapeHtml(item.item.duration)}</small>` : ''}
+                  ${item.item.description ? `<small class="inventory-description">${escapeHtml(item.item.description).replace(/\r?\n/g, '<br>')}</small>` : ''}
                 </span>
-                <span class="inventory-quantity" aria-label="Ilość: ${item.quantity}">×&nbsp;${item.quantity}</span>
-                <button class="inventory-remove" type="button" data-remove-inventory-item="${index}" aria-label="Usuń ${escapeHtml(item.name)}" title="Usuń">×</button>
+                <span class="inventory-quantity" aria-label="Ilość: ${item.item.quantity}">×&nbsp;${item.item.quantity}</span>
+                <button class="inventory-remove" type="button" data-remove-inventory-item="${item.index}" aria-label="Usuń ${escapeHtml(item.item.name)}" title="Usuń">×</button>
               </article>
+              ${editingInventoryIconIndex === item.index ? `<form class="inventory-icon-menu" data-inventory-icon-menu="${item.index}">${inventoryIconPicker(item.item.icon)}<button type="button" class="secondary small" data-cancel-inventory-icon>Zamknij</button></form>` : ''}
             `,
               )
               .join('')
           : '<div class="inventory-empty"><span aria-hidden="true">🎒</span><p>Ekwipunek jest pusty.</p></div>';
+
+        const renderedNodes = [...inventoryList.children];
+        inventoryList.innerHTML = '';
+        const categorySections = [
+          { id: '', name: 'Bez kategorii' },
+          ...inventoryCategories,
+        ].map((category) => {
+          const sectionElement = document.createElement('section');
+          sectionElement.className = 'inventory-category';
+          sectionElement.dataset.inventoryCategory = category.id;
+          sectionElement.innerHTML = `${
+            category.id
+              ? `<div class="inventory-category-heading"><h3>${escapeHtml(category.name)}</h3><div><button type="button" class="secondary small" data-edit-inventory-category="${escapeHtml(category.id)}">Edytuj</button><button type="button" class="danger small" data-delete-inventory-category="${escapeHtml(category.id)}">Usuń</button></div></div>${
+                  editingInventoryCategoryId === category.id
+                    ? `<form class="inventory-category-edit-form" data-inventory-category-edit-form="${escapeHtml(category.id)}"><label><span>Nazwa kategorii</span><input name="name" maxlength="100" value="${escapeHtml(category.name)}" required /></label><div><button type="button" class="secondary small" data-cancel-inventory-category-edit>Anuluj</button><button type="submit" class="small">Zapisz</button></div></form>`
+                    : ''
+                }`
+              : '<div class="inventory-category-heading"><h3>Bez kategorii</h3></div>'
+          }<div class="inventory-category-items" data-inventory-category-drop="${escapeHtml(category.id)}"></div>`;
+          inventoryList.appendChild(sectionElement);
+          return { id: category.id, target: sectionElement.querySelector('[data-inventory-category-drop]') };
+        });
+        renderedNodes.forEach((node) => {
+          const indexedElement = node.matches('[data-edit-inventory-item], [data-edit-inventory-form], [data-inventory-icon-menu]')
+            ? node
+            : node.querySelector?.('[data-edit-inventory-item], [data-edit-inventory-form], [data-inventory-icon-menu]');
+          const index = Number(
+            indexedElement?.dataset.editInventoryItem ??
+              indexedElement?.dataset.editInventoryForm ??
+              indexedElement?.dataset.inventoryIconMenu,
+          );
+          const storedCategory = Number.isSafeInteger(index) ? inventoryItems[index]?.categoryId || '' : '';
+          const section = categorySections.find(({ id }) => id === storedCategory) || categorySections[0];
+          section.target.appendChild(node);
+        });
       }
 
-      async function saveInventory(nextItems) {
-        const inventory = serializeInventory(nextItems);
+      async function saveInventory(nextItems, nextCategories = inventoryCategories) {
+        const inventory = serializeInventory(nextItems, nextCategories);
         const response = await authenticatedFetch(`/api/characters/${character.id}/inventory`, {
           method: 'PATCH',
           body: JSON.stringify({ inventory }),
@@ -3941,6 +3972,7 @@ function renderApp(statusMessage = null) {
         const updated = await response.json();
         character.inventory = updated.inventory;
         inventoryItems = parseInventory(updated.inventory);
+        inventoryCategories = parseInventoryCategories(updated.inventory);
         renderInventoryItems();
       }
 
@@ -3959,8 +3991,80 @@ function renderApp(statusMessage = null) {
         inventoryForm.classList.add('hidden');
         document.querySelector('#open-add-inventory-item')?.classList.remove('open');
       });
+      document.querySelector('#open-add-inventory-category')?.addEventListener('click', (event) => {
+        inventoryCategoryForm?.classList.toggle('hidden');
+        event.currentTarget.classList.toggle('open');
+        if (!inventoryCategoryForm?.classList.contains('hidden')) {
+          inventoryCategoryForm.querySelector('input[name="name"]')?.focus();
+        }
+      });
+      inventoryCategoryForm?.querySelector('[data-cancel-inventory-category]')?.addEventListener('click', () => {
+        inventoryCategoryForm.reset();
+        inventoryCategoryForm.classList.add('hidden');
+        document.querySelector('#open-add-inventory-category')?.classList.remove('open');
+      });
+      inventoryCategoryForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const name = String(new FormData(inventoryCategoryForm).get('name') || '').trim().slice(0, 100);
+        if (!name) return;
+        const id = `category-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        const button = inventoryCategoryForm.querySelector('button[type="submit"]');
+        button.disabled = true;
+        try {
+          await saveInventory(inventoryItems, [...inventoryCategories, { id, name }]);
+          inventoryCategoryForm.reset();
+          inventoryCategoryForm.classList.add('hidden');
+          document.querySelector('#open-add-inventory-category')?.classList.remove('open');
+          inventoryStatus.textContent = 'Kategoria została dodana.';
+        } catch {
+          inventoryStatus.textContent = 'Nie udało się dodać kategorii.';
+        } finally {
+          button.disabled = false;
+        }
+      });
 
       inventoryList?.addEventListener('click', async (event) => {
+        const editCategoryButton = event.target.closest('[data-edit-inventory-category]');
+        if (editCategoryButton) {
+          editingInventoryCategoryId = editCategoryButton.dataset.editInventoryCategory;
+          renderInventoryItems();
+          inventoryList.querySelector('[data-inventory-category-edit-form] input[name="name"]')?.select();
+          return;
+        }
+        if (event.target.closest('[data-cancel-inventory-category-edit]')) {
+          editingInventoryCategoryId = null;
+          renderInventoryItems();
+          return;
+        }
+        const deleteCategoryButton = event.target.closest('[data-delete-inventory-category]');
+        if (deleteCategoryButton) {
+          const categoryId = deleteCategoryButton.dataset.deleteInventoryCategory;
+          const category = inventoryCategories.find((item) => item.id === categoryId);
+          if (!category) return;
+          const confirmed = await showConfirmationDialog({
+            title: 'Usunąć kategorię?',
+            message: `Kategoria „${category.name}” zostanie usunięta. Wszystkie jej przedmioty trafią do „Bez kategorii”.`,
+            confirmLabel: 'Usuń kategorię',
+          });
+          if (!confirmed) return;
+          deleteCategoryButton.disabled = true;
+          inventoryStatus.textContent = 'Usuwanie kategorii…';
+          try {
+            const nextItems = inventoryItems.map((item) =>
+              item.categoryId === categoryId ? { ...item, categoryId: '' } : item,
+            );
+            await saveInventory(
+              nextItems,
+              inventoryCategories.filter((item) => item.id !== categoryId),
+            );
+            editingInventoryCategoryId = null;
+            inventoryStatus.textContent = 'Kategoria została usunięta. Przedmioty przeniesiono bez kategorii.';
+          } catch {
+            deleteCategoryButton.disabled = false;
+            inventoryStatus.textContent = 'Nie udało się usunąć kategorii.';
+          }
+          return;
+        }
         const removeButton = event.target.closest('[data-remove-inventory-item]');
         if (removeButton) {
           const index = Number(removeButton.dataset.removeInventoryItem);
@@ -3969,6 +4073,7 @@ function renderApp(statusMessage = null) {
           inventoryStatus.textContent = '';
           try {
             editingInventoryIndex = null;
+            editingInventoryIconIndex = null;
             await saveInventory(nextItems);
             inventoryStatus.textContent = 'Przedmiot usunięty.';
           } catch {
@@ -3983,12 +4088,27 @@ function renderApp(statusMessage = null) {
           renderInventoryItems();
           return;
         }
+        if (event.target.closest('[data-cancel-inventory-icon]')) {
+          editingInventoryIconIndex = null;
+          renderInventoryItems();
+          return;
+        }
         if (event.target.closest('[data-inventory-drag-handle]')) return;
         if (event.target.closest('.inventory-edit-form')) return;
+
+        const iconButton = event.target.closest('[data-edit-inventory-icon]');
+        if (iconButton) {
+          const index = Number(iconButton.dataset.editInventoryIcon);
+          editingInventoryIndex = null;
+          editingInventoryIconIndex = editingInventoryIconIndex === index ? null : index;
+          renderInventoryItems();
+          return;
+        }
 
         const item = event.target.closest('[data-edit-inventory-item]');
         if (!item) return;
         editingInventoryIndex = Number(item.dataset.editInventoryItem);
+        editingInventoryIconIndex = null;
         renderInventoryItems();
         inventoryList.querySelector('[data-edit-inventory-form] input[name="name"]')?.select();
       });
@@ -3999,6 +4119,7 @@ function renderApp(statusMessage = null) {
         if (!item) return;
         event.preventDefault();
         editingInventoryIndex = Number(item.dataset.editInventoryItem);
+        editingInventoryIconIndex = null;
         renderInventoryItems();
         inventoryList.querySelector('[data-edit-inventory-form] input[name="name"]')?.select();
       });
@@ -4009,8 +4130,30 @@ function renderApp(statusMessage = null) {
       });
       inventoryList?.addEventListener('change', (event) => {
         if (event.target.matches('input[name="icon"]')) {
+          const iconMenu = event.target.closest('[data-inventory-icon-menu]');
+          if (iconMenu) {
+            const index = Number(iconMenu.dataset.inventoryIconMenu);
+            const icon = INVENTORY_ICON_KEYS.has(event.target.value) ? event.target.value : 'backpack';
+            editingInventoryIconIndex = null;
+            inventoryStatus.textContent = 'Zapisywanie ikony…';
+            saveInventory(
+              inventoryItems.map((item, itemIndex) => (itemIndex === index ? { ...item, icon } : item)),
+            )
+              .then(() => {
+                inventoryStatus.textContent = 'Ikona została zmieniona.';
+              })
+              .catch(() => {
+                editingInventoryIconIndex = index;
+                renderInventoryItems();
+                inventoryStatus.textContent = 'Nie udało się zmienić ikony.';
+              });
+            return;
+          }
           const form = event.target.closest('form');
-          if (form) form.dataset.iconManuallySelected = 'true';
+          if (form) {
+            form.dataset.iconManuallySelected = 'true';
+            updateInventoryIconSelector(form, event.target.value);
+          }
         }
         if (event.target.matches('input[name="hasDuration"]')) {
           toggleInventoryDuration(event.target);
@@ -4025,14 +4168,23 @@ function renderApp(statusMessage = null) {
       inventoryForm?.addEventListener('change', (event) => {
         if (event.target.matches('input[name="icon"]')) {
           inventoryForm.dataset.iconManuallySelected = 'true';
+          updateInventoryIconSelector(inventoryForm, event.target.value);
         }
       });
 
-      inventoryList?.addEventListener('pointerdown', (event) => {
+      document.querySelector('.inventory-screen')?.addEventListener('pointerdown', (event) => {
         const handle = event.target.closest('[data-inventory-drag-handle]');
-        if (!handle || editingInventoryIndex !== null || event.isPrimary === false) return;
-        const draggedItem = handle.closest('[data-edit-inventory-item]');
-        if (!draggedItem) return;
+        if (
+          !handle ||
+          editingInventoryIndex !== null ||
+          editingInventoryIconIndex !== null ||
+          event.isPrimary === false
+        )
+          return;
+        const sourceIndex = Number(handle.dataset.inventoryDragHandle);
+        const draggedItem = handle.closest('[data-edit-inventory-item], [data-quick-slot]');
+        if (!draggedItem || !Number.isSafeInteger(sourceIndex) || !inventoryItems[sourceIndex]) return;
+        const sourceQuickSlot = inventoryItems[sourceIndex].quickSlot;
 
         event.preventDefault();
         try {
@@ -4042,12 +4194,37 @@ function renderApp(statusMessage = null) {
         }
         draggedItem.classList.add('dragging');
         inventoryList.classList.add('reordering');
+        const scrollContainer = document.querySelector('.character-tab-panels') || contentPanel;
+        let dragPointerY = event.clientY;
+        let autoScrollFrame = 0;
+        const runInventoryAutoScroll = () => {
+          const bounds = scrollContainer.getBoundingClientRect();
+          const edgeSize = Math.min(110, Math.max(60, bounds.height * 0.2));
+          let speed = 0;
+          if (dragPointerY < bounds.top + edgeSize) {
+            const intensity = Math.min(1, Math.max(0, (bounds.top + edgeSize - dragPointerY) / edgeSize));
+            speed = -(1 + intensity * 5.5);
+          } else if (dragPointerY > bounds.bottom - edgeSize) {
+            const intensity = Math.min(1, Math.max(0, (dragPointerY - (bounds.bottom - edgeSize)) / edgeSize));
+            speed = 1 + intensity * 5.5;
+          }
+          if (speed) scrollContainer.scrollBy({ top: speed, behavior: 'auto' });
+          autoScrollFrame = window.requestAnimationFrame(runInventoryAutoScroll);
+        };
+        autoScrollFrame = window.requestAnimationFrame(runInventoryAutoScroll);
 
         const moveDraggedItem = (moveEvent) => {
           if (moveEvent.pointerId !== event.pointerId) return;
           moveEvent.preventDefault();
+          dragPointerY = moveEvent.clientY;
 
-          const siblings = [...inventoryList.querySelectorAll('[data-edit-inventory-item]')].filter(
+          document.querySelectorAll('[data-quick-slot]').forEach((slot) => slot.classList.remove('drop-target'));
+          document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest('[data-quick-slot]')?.classList.add('drop-target');
+
+          const targetCategoryItems = document
+            .elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+            ?.closest('[data-inventory-category-drop]');
+          const siblings = [...(targetCategoryItems?.querySelectorAll('[data-edit-inventory-item]') || [])].filter(
             (item) => item !== draggedItem,
           );
           const nextItem = siblings.find((item) => {
@@ -4055,39 +4232,67 @@ function renderApp(statusMessage = null) {
             return moveEvent.clientY < bounds.top + bounds.height / 2;
           });
 
-          if (nextItem) {
-            inventoryList.insertBefore(draggedItem, nextItem);
-          } else {
-            inventoryList.appendChild(draggedItem);
+          if (targetCategoryItems && draggedItem.matches('[data-edit-inventory-item]') && nextItem) {
+            targetCategoryItems.insertBefore(draggedItem, nextItem);
+          } else if (targetCategoryItems && draggedItem.matches('[data-edit-inventory-item]')) {
+            targetCategoryItems.appendChild(draggedItem);
           }
 
-          const scrollBounds = contentPanel.getBoundingClientRect();
-          const scrollEdge = Math.min(80, scrollBounds.height * 0.18);
-          if (moveEvent.clientY < scrollBounds.top + scrollEdge) {
-            contentPanel.scrollBy({ top: -18, behavior: 'auto' });
-          } else if (moveEvent.clientY > scrollBounds.bottom - scrollEdge) {
-            contentPanel.scrollBy({ top: 18, behavior: 'auto' });
-          }
         };
 
         const finishReorder = async (finishEvent) => {
+          const dropElement = document.elementFromPoint(finishEvent.clientX, finishEvent.clientY);
+          const targetSlotElement = dropElement?.closest('[data-quick-slot]');
+          const targetCategoryItems = dropElement?.closest('[data-inventory-category-drop]');
+          const droppedOnInventory = Boolean(targetCategoryItems);
           window.removeEventListener('pointermove', moveDraggedItem);
           window.removeEventListener('pointerup', finishReorder);
           window.removeEventListener('pointercancel', cancelReorder);
+          window.cancelAnimationFrame(autoScrollFrame);
           if (handle.hasPointerCapture?.(finishEvent.pointerId)) {
             handle.releasePointerCapture(finishEvent.pointerId);
           }
           draggedItem.classList.remove('dragging');
           inventoryList.classList.remove('reordering');
+          document.querySelectorAll('[data-quick-slot]').forEach((slot) => slot.classList.remove('drop-target'));
 
-          const orderedIndices = [...inventoryList.querySelectorAll('[data-edit-inventory-item]')].map((item) =>
-            Number(item.dataset.editInventoryItem),
-          );
-          const nextItems = orderedIndices.map((index) => inventoryItems[index]);
-          inventoryStatus.textContent = 'Zapisywanie kolejności…';
+          if (!targetSlotElement && !droppedOnInventory) {
+            renderInventoryItems();
+            return;
+          }
+
+          let nextItems = inventoryItems.map((item) => ({ ...item }));
+          if (targetSlotElement) {
+            const targetSlot = Number(targetSlotElement.dataset.quickSlot);
+            const occupiedIndex = nextItems.findIndex(
+              (item, itemIndex) => itemIndex !== sourceIndex && item.quickSlot === targetSlot,
+            );
+            if (occupiedIndex >= 0) {
+              nextItems[occupiedIndex].quickSlot = [0, 1, 2].includes(sourceQuickSlot) ? sourceQuickSlot : null;
+            }
+            nextItems[sourceIndex].quickSlot = targetSlot;
+          } else {
+            nextItems[sourceIndex].quickSlot = null;
+            const targetCategoryId = targetCategoryItems?.dataset.inventoryCategoryDrop || '';
+            const orderedRegularItems = [...inventoryList.querySelectorAll('[data-edit-inventory-item]')].map(
+              (element) => ({
+                ...inventoryItems[Number(element.dataset.editInventoryItem)],
+                quickSlot: null,
+                categoryId: element.closest('[data-inventory-category-drop]')?.dataset.inventoryCategoryDrop || '',
+              }),
+            );
+            if ([0, 1, 2].includes(sourceQuickSlot)) {
+              orderedRegularItems.push({ ...inventoryItems[sourceIndex], quickSlot: null, categoryId: targetCategoryId });
+            }
+            const remainingQuickItems = inventoryItems
+              .filter((item, itemIndex) => itemIndex !== sourceIndex && [0, 1, 2].includes(item.quickSlot))
+              .map((item) => ({ ...item }));
+            nextItems = [...orderedRegularItems, ...remainingQuickItems];
+          }
+          inventoryStatus.textContent = 'Zapisywanie ekwipunku…';
           try {
             await saveInventory(nextItems);
-            inventoryStatus.textContent = 'Kolejność ekwipunku została zapisana.';
+            inventoryStatus.textContent = 'Ekwipunek został zaktualizowany.';
           } catch {
             renderInventoryItems();
             inventoryStatus.textContent = 'Nie udało się zapisać kolejności.';
@@ -4098,11 +4303,13 @@ function renderApp(statusMessage = null) {
           window.removeEventListener('pointermove', moveDraggedItem);
           window.removeEventListener('pointerup', finishReorder);
           window.removeEventListener('pointercancel', cancelReorder);
+          window.cancelAnimationFrame(autoScrollFrame);
           if (handle.hasPointerCapture?.(cancelEvent.pointerId)) {
             handle.releasePointerCapture(cancelEvent.pointerId);
           }
           renderInventoryItems();
           inventoryList.classList.remove('reordering');
+          document.querySelectorAll('[data-quick-slot]').forEach((slot) => slot.classList.remove('drop-target'));
         };
 
         window.addEventListener('pointermove', moveDraggedItem, { passive: false });
@@ -4111,6 +4318,29 @@ function renderApp(statusMessage = null) {
       });
 
       inventoryList?.addEventListener('submit', async (event) => {
+        const categoryForm = event.target.closest('[data-inventory-category-edit-form]');
+        if (categoryForm) {
+          event.preventDefault();
+          const categoryId = categoryForm.dataset.inventoryCategoryEditForm;
+          const name = String(new FormData(categoryForm).get('name') || '').trim().slice(0, 100);
+          if (!name) return;
+          const button = categoryForm.querySelector('button[type="submit"]');
+          button.disabled = true;
+          inventoryStatus.textContent = 'Zapisywanie kategorii…';
+          try {
+            await saveInventory(
+              inventoryItems,
+              inventoryCategories.map((category) => (category.id === categoryId ? { ...category, name } : category)),
+            );
+            editingInventoryCategoryId = null;
+            renderInventoryItems();
+            inventoryStatus.textContent = 'Nazwa kategorii została zmieniona.';
+          } catch {
+            button.disabled = false;
+            inventoryStatus.textContent = 'Nie udało się zmienić nazwy kategorii.';
+          }
+          return;
+        }
         const form = event.target.closest('[data-edit-inventory-form]');
         if (!form) return;
         event.preventDefault();
@@ -4120,19 +4350,20 @@ function renderApp(statusMessage = null) {
           .trim()
           .replace(/\r?\n/g, ' ')
           .slice(0, 150);
-        const quantity = Math.max(1, Math.min(9999, Number(formData.get('quantity')) || 1));
+        const quantity = inventoryQuantity(formData.get('quantity'));
         const duration = String(formData.get('duration') || '')
           .trim()
           .replace(/\r?\n/g, ' ')
           .slice(0, 100);
-        const icon = INVENTORY_ICON_KEYS.has(formData.get('icon')) ? formData.get('icon') : 'backpack';
+        const description = String(formData.get('description') || '').trim().slice(0, 1000);
+        const icon = INVENTORY_ICON_KEYS.has(inventoryItems[index]?.icon) ? inventoryItems[index].icon : 'backpack';
         if (!name) return;
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
         inventoryStatus.textContent = '';
         try {
           const nextItems = inventoryItems.map((item, itemIndex) =>
-            itemIndex === index ? { name, quantity, duration, icon } : item,
+            itemIndex === index ? { ...item, name, quantity, duration, icon, description } : item,
           );
           await saveInventory(nextItems);
           editingInventoryIndex = null;
@@ -4153,17 +4384,18 @@ function renderApp(statusMessage = null) {
           .trim()
           .replace(/\r?\n/g, ' ')
           .slice(0, 150);
-        const quantity = Math.max(1, Math.min(9999, Number(formData.get('quantity')) || 1));
+        const quantity = inventoryQuantity(formData.get('quantity'));
         const duration = String(formData.get('duration') || '')
           .trim()
           .replace(/\r?\n/g, ' ')
           .slice(0, 100);
+        const description = String(formData.get('description') || '').trim().slice(0, 1000);
         const icon = INVENTORY_ICON_KEYS.has(formData.get('icon')) ? formData.get('icon') : 'backpack';
         if (!name) return;
         button.disabled = true;
         inventoryStatus.textContent = '';
         try {
-          await saveInventory([...inventoryItems, { name, quantity, duration, icon }]);
+          await saveInventory([...inventoryItems, { name, quantity, duration, icon, description }]);
           form.reset();
           delete form.dataset.iconManuallySelected;
           form.querySelector('input[name="quantity"]').value = '1';
@@ -4246,7 +4478,7 @@ function renderApp(statusMessage = null) {
       list.querySelectorAll('[data-delete-character]').forEach((button) => {
         button.addEventListener('click', async () => {
           const character = characters.find((item) => item.id === Number(button.dataset.deleteCharacter));
-          if (!window.confirm(`Usunąć postać „${character.name}”?`)) return;
+          if (!(await showConfirmationDialog({ title: 'Usunąć postać?', message: `Postać „${character.name}” zostanie trwale usunięta.`, confirmLabel: 'Usuń postać' }))) return;
           button.disabled = true;
           try {
             const response = await authenticatedFetch(`/api/characters/${character.id}`, { method: 'DELETE' });
@@ -4514,10 +4746,12 @@ function renderApp(statusMessage = null) {
       });
 
       const deleteAccountForm = document.querySelector('#delete-account-form');
-      document.querySelector('#open-delete-account')?.addEventListener('click', (event) => {
-        const confirmed = window.confirm(
-          'Czy na pewno chcesz rozpocząć usuwanie konta? Wszystkie dane zostaną trwale usunięte.',
-        );
+      document.querySelector('#open-delete-account')?.addEventListener('click', async (event) => {
+        const confirmed = await showConfirmationDialog({
+          title: 'Rozpocząć usuwanie konta?',
+          message: 'Wszystkie dane konta zostaną trwale usunięte.',
+          confirmLabel: 'Kontynuuj',
+        });
         if (!confirmed) return;
         event.currentTarget.classList.add('hidden');
         deleteAccountForm?.classList.remove('hidden');
@@ -4535,9 +4769,11 @@ function renderApp(statusMessage = null) {
         const submitButton = form.querySelector('button[type="submit"]');
         const errorElement = document.querySelector('#delete-account-error');
         const password = new FormData(form).get('password');
-        const finalConfirmation = window.confirm(
-          'To ostatnie potwierdzenie. Usunąć konto i wszystkie dane bez możliwości odzyskania?',
-        );
+        const finalConfirmation = await showConfirmationDialog({
+          title: 'Ostatnie potwierdzenie',
+          message: 'Usunąć konto i wszystkie dane bez możliwości odzyskania?',
+          confirmLabel: 'Usuń konto',
+        });
         if (!finalConfirmation) return;
 
         submitButton.disabled = true;

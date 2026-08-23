@@ -21,7 +21,7 @@ Aktualizacja: 2026-08-18
 - Pulpit wyświetla nagłówek kampanii, skróconą drużynę, stan notatek i kafelki obszarów kampanii;
 - zastąpiono karuzelę pełnych kart listą/siatką członków;
 - pełna karta jest pobierana dopiero po wybraniu konkretnej postaci;
-- szczegóły postaci podzielono na Podsumowanie, Kartę postaci, Ekwipunek, Notatki DM, Wątki i sekrety oraz Historię;
+- szczegóły postaci podzielono na Podsumowanie, Kartę postaci, Ekwipunek i Notatki DM;
 - zachowano prywatną notatkę ogólną, notatkę o postaci, pełną kartę, notatnik gracza i dodawanie przedmiotów przez DM;
 - autosave notatki ogólnej pokazuje stan zapisywania, sukces albo błąd;
 - dodano menu szybkich działań „+”;
@@ -32,7 +32,7 @@ Aktualizacja: 2026-08-18
 ## Dalsze etapy
 
 - system wielu notatek DM i migracja starej notatki — Etap 2: **wykonano**;
-- sesje, sceny i wydarzenia zostały wycofane z interfejsu jako zbędne dla obecnego sposobu prowadzenia kampanii;
+- sesje, sceny, wydarzenia, historia kampanii i ogólne relacje zostały wycofane z interfejsu oraz API jako zbędne dla obecnego sposobu prowadzenia kampanii;
 - NPC, zadania i wątki — Etap 4: **wykonano**;
 - lokacje, frakcje i sekrety — Etap 5: **wykonano**;
 - handouty tekstowe i linki — Etap 6: **wykonano**;

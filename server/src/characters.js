@@ -40,6 +40,7 @@ const FEATURE_TYPES = {
   talents: {},
   additionalSkills: {},
 };
+const INVENTORY_MAX_LENGTH = 100_000;
 
 function text(value, maxLength = 200) {
   return String(value || '')
@@ -78,19 +79,19 @@ function calculatedSkillValue(baseValue, percent) {
 function calculatedAuxiliary(attributes) {
   return {
     reflex: {
-      value: String(scaledAuxiliaryAttribute(attributes.dexterity.adventure, 1)),
+      value: String(scaledAuxiliaryAttribute(attributes.dexterity.combat, 1)),
       formula: '100% zręczności',
     },
     intuition: {
-      value: String(scaledAuxiliaryAttribute(attributes.intelligence.adventure, 2)),
+      value: String(scaledAuxiliaryAttribute(attributes.intelligence.combat, 2)),
       formula: '50% inteligencji',
     },
     arcana: {
-      value: String(scaledAuxiliaryAttribute(attributes.wisdom.adventure, 4)),
+      value: String(scaledAuxiliaryAttribute(attributes.wisdom.combat, 4)),
       formula: '25% mądrości',
     },
     perception: {
-      value: String(scaledAuxiliaryAttribute(attributes.intelligence.adventure, 2)),
+      value: String(scaledAuxiliaryAttribute(attributes.intelligence.combat, 2)),
       formula: '50% inteligencji',
     },
   };
@@ -111,7 +112,7 @@ function characterAuxiliary(value, attributes) {
       return [
         key,
         {
-          value: terms.length ? String(Math.trunc(formulaValue(terms, attributes))) : fallback.value,
+          value: terms.length ? String(Math.trunc(formulaValue(terms, attributes, true))) : fallback.value,
           formula: text(value?.[key]?.formula, 250) || fallback.formula,
           formulaTerms: terms,
         },
@@ -123,9 +124,16 @@ function characterAuxiliary(value, attributes) {
 function rangedFormulaTerms(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 20).map((term) => {
-    const type = ['percent', 'fraction', 'flat'].includes(term?.type) ? term.type : 'flat';
+    const type = ['percent', 'fraction', 'flat', 'dice'].includes(term?.type) ? term.type : 'flat';
     if (type === 'flat') {
       return { type, value: integer(term?.value, 0, -99999, 99999) };
+    }
+    if (type === 'dice') {
+      return {
+        type,
+        count: integer(term?.count, 1, 1, 100),
+        sides: integer(term?.sides, 6, 2, 1000),
+      };
     }
     const attribute = ATTRIBUTE_KEYS.includes(term?.attribute) ? term.attribute : 'strength';
     if (type === 'percent') {
@@ -140,20 +148,24 @@ function rangedFormulaTerms(value) {
   });
 }
 
-function formulaValue(terms, attributes) {
+function formulaValue(terms, attributes, useCombatValues = false) {
   return terms.reduce((sum, term) => {
+    if (term.type === 'dice') return sum;
     if (term.type === 'flat') return sum + term.value;
-    const base = attributes[term.attribute]?.adventure || 0;
+    const attribute = attributes[term.attribute];
+    const base = (useCombatValues ? attribute?.combat : attribute?.adventure) || 0;
     if (base < 0) return sum + base;
     const scaled = term.type === 'percent' ? (base * term.value) / 100 : (base * term.numerator) / term.denominator;
     return sum + (scaled > 0 ? Math.max(1, scaled) : scaled);
   }, 0);
 }
 
-function formulaStat(value, attributes) {
+function formulaStat(value, attributes, useCombatValues = true) {
   const terms = rangedFormulaTerms(value?.formulaTerms);
   return {
-    value: terms.length ? String(Math.trunc(formulaValue(terms, attributes))) : text(value?.value, 100),
+    value: terms.length
+      ? String(Math.trunc(formulaValue(terms, attributes, useCombatValues)))
+      : text(value?.value, 100),
     formula: text(value?.formula, 250),
     formulaTerms: terms,
   };
@@ -264,7 +276,7 @@ function parseCharacterPayload(body = {}) {
     combat[key] =
       key === 'initiative'
         ? { value: text(body.combat?.[key]?.value, 100), formula: '', formulaTerms: [] }
-        : formulaStat(body.combat?.[key], attributes);
+        : formulaStat(body.combat?.[key], attributes, key !== 'hp');
   }
 
   const auxiliary = characterAuxiliary(body.auxiliary, attributes);
@@ -325,7 +337,7 @@ function parseCharacterPayload(body = {}) {
         talents: featureList(body.features?.talents),
         additionalSkills: featureList(body.features?.additionalSkills),
       },
-      inventory: text(body.inventory, 10000),
+      inventory: text(body.inventory, INVENTORY_MAX_LENGTH),
       notebook: notebookData(body.notebook),
     },
   };
@@ -384,7 +396,7 @@ function serializeCharacter(row) {
       key,
       key === 'initiative'
         ? { ...(data.combat?.[key] || {}), formula: '', formulaTerms: [] }
-        : formulaStat(data.combat?.[key], attributes),
+        : formulaStat(data.combat?.[key], attributes, key !== 'hp'),
     ]),
   );
 
@@ -454,6 +466,8 @@ async function getCharacter(req, res) {
 }
 
 async function createCharacter(req, res) {
+  if (String(req.body?.inventory || '').length > INVENTORY_MAX_LENGTH)
+    return res.status(413).json({ error: 'inventory_too_large', maxLength: INVENTORY_MAX_LENGTH });
   const character = parseCharacterPayload(req.body);
   if (character.error) return res.status(400).json({ error: character.error });
   const result = await pool.query(
@@ -468,6 +482,8 @@ async function createCharacter(req, res) {
 async function updateCharacter(req, res) {
   const id = parseCharacterId(req.params.id);
   if (!id) return res.status(400).json({ error: 'invalid_character_id' });
+  if (String(req.body?.inventory || '').length > INVENTORY_MAX_LENGTH)
+    return res.status(413).json({ error: 'inventory_too_large', maxLength: INVENTORY_MAX_LENGTH });
   const character = parseCharacterPayload(req.body);
   if (character.error) return res.status(400).json({ error: character.error });
   const result = await pool.query(
@@ -495,7 +511,10 @@ async function deleteCharacter(req, res) {
 async function updateCharacterInventory(req, res) {
   const id = parseCharacterId(req.params.id);
   if (!id) return res.status(400).json({ error: 'invalid_character_id' });
-  const inventory = text(req.body?.inventory, 10000);
+  const rawInventory = String(req.body?.inventory || '');
+  if (rawInventory.length > INVENTORY_MAX_LENGTH)
+    return res.status(413).json({ error: 'inventory_too_large', maxLength: INVENTORY_MAX_LENGTH });
+  const inventory = text(rawInventory, INVENTORY_MAX_LENGTH);
   const result = await pool.query(
     `UPDATE characters
      SET data = jsonb_set(COALESCE(data, '{}'::jsonb), '{inventory}', to_jsonb($1::text), true),
@@ -561,4 +580,5 @@ module.exports = {
   updateCharacterFeatureOrder,
   updateCharacterNotebook,
   serializeCharacter,
+  _test: { formulaValue, rangedFormulaTerms },
 };

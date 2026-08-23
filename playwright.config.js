@@ -1,5 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
+if (String(process.env.VITE_API_PROXY_TARGET || '').includes('onrender.com')) {
+  throw new Error('Testy UI nie mogą korzystać z produkcyjnego API Render.');
+}
+
 export default defineConfig({
   testDir: './tests/ui',
   timeout: 30_000,

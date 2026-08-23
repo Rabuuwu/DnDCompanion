@@ -99,7 +99,12 @@ backups/
 
 # Private local release planning
 RELEASE_TODO_LOCAL.md
+APP_FEATURE_IDEAS_LOCAL.md
 release-secrets/
+
+# Local browser test artifacts
+test-results/
+playwright-report/
 
 # Editors and operating systems
 .DS_Store

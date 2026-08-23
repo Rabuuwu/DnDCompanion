@@ -49,6 +49,7 @@ jobs:
       - run: npm run test:unit
       - run: npm audit
       - run: npm run db:migrate
+      - run: npm run test:migrations --workspace server
       - name: Start test API
         run: |
           npm start > /tmp/dnd-test-api.log 2>&1 &

@@ -25,7 +25,7 @@ Serwer Express składa się z modułów:
 - `characters.js` — walidacja i serializacja całego modelu postaci, szybkie aktualizacje ekwipunku i notatnika;
 - `friends.js` / `social.js` — relacje, wiadomości, pseudonimy, blokady i zgłoszenia;
 - `campaigns.js` — drużyny, zaproszenia, dostęp do postaci, lekkie podsumowanie Pulpitu i podstawowy Panel DM;
-- `dm-workspace.js` — notatki, sesje, treści kampanii, widoczność, materiały, historia, role i eksport;
+- `dm-workspace.js` — notatki, treści kampanii, widoczność, materiały, role i eksport;
 - `notifications.js` — kanał SSE, lista bieżących powiadomień i dystrybucja zdarzeń przez PostgreSQL `LISTEN/NOTIFY`;
 - `preferences.js` — trwałe ustawienia interfejsu użytkownika;
 - `audit.js` — dziennik zdarzeń i żądań w bazie;
@@ -38,7 +38,7 @@ Walidacja domenowa odbywa się po stronie API; klient nie jest źródłem zaufan
 
 Migracje są wykonywane rosnąco według nazwy, a pełna nazwa pliku trafia do `schema_migrations`. Dwa istniejące pliki zaczynają się od `006_`; nie należy ich zmieniać po wdrożeniu, ponieważ oba są identyfikowane pełną nazwą. Nowe migracje powinny używać kolejnego wolnego numeru.
 
-Model postaci jest przechowywany głównie jako JSONB, natomiast konta, sesje, relacje, kampanie, wiadomości, preferencje i notatki DM mają osobne tabele. Szczegóły opisuje [BAZA_DANYCH.md](BAZA_DANYCH.md).
+Model postaci jest przechowywany głównie jako JSONB, natomiast konta, kampanie, wiadomości, preferencje i notatki mają osobne tabele. Szczegóły opisuje [BAZA_DANYCH.md](BAZA_DANYCH.md).
 
 ## Przepływy
 
@@ -55,7 +55,7 @@ Po zalogowaniu klient otwiera SSE `/api/notifications/stream`. API publikuje zda
 
 ### Postać i ekwipunek
 
-Pełny zapis przechodzi przez `PUT /api/characters/:id`. Ekwipunek i notatnik mają lżejsze endpointy PATCH dla autozapisu. Kolejność przedmiotów wynika z kolejności tablicy w danych postaci. Stary ekwipunek tekstowy jest podczas odczytu przekształcany według zasady „jedna linia = jeden przedmiot”. Automatyczny dobór ikony działa jako podpowiedź; ręczny wybór użytkownika ma pierwszeństwo.
+Pełny zapis przechodzi przez `PUT /api/characters/:id`. Ekwipunek i notatnik mają lżejsze endpointy PATCH dla autozapisu. Kolejność, kategorie i szybkie sloty są kodowane w kompatybilnych metadanych tekstowych. Stary format zachowuje zasadę „jedna linia = jeden przedmiot”. Serwer odrzuca ekwipunek większy niż 100 000 znaków zamiast ucinać dane.
 
 ### Kampania i DM
 
@@ -82,5 +82,5 @@ DNS i adresy są obecnie przywiązane do interfejsu `enp5s0`, hosta `192.168.1.5
 - Vite Preview i Python `http.server` są wygodne w LAN, ale nie są docelowym reverse proxy dla Internetu.
 - Awatary są przechowywane jako Data URL w PostgreSQL i powiększają odpowiedzi.
 - Dziennik audytowy ma retencję czasową, ale przy dużej skali może wymagać partycjonowania.
-- CI obejmuje kompilację, migrację od pustej bazy i smoke testy auth/znajomych; nadal brakuje testów kampanii, Panelu DM i UI.
+- CI obejmuje kompilację, migrację od pustej bazy, kontrolę usuniętych tabel, testy UI i smoke testy auth/znajomych; nadal należy rozwijać scenariusze kampanii i Panelu DM.
 - Repozytorium zawiera szyfrowany workflow backupu z próbą odtworzenia; wymaga skonfigurowania sekretów GitHub i okresowego ręcznego testu odzyskiwania.

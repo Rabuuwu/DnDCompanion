@@ -56,6 +56,16 @@ const ACTIONS = new Map(
       'add_dm_inventory_item',
       'character',
     ],
+    'DELETE /api/campaigns/:campaignId/dm/materials/:materialId/share/:characterId': [
+      'campaign_dm',
+      'revoke_material_access',
+      'campaign',
+    ],
+    'PATCH /api/campaigns/:campaignId/dm/characters/:characterId/inventory/:itemIndex': [
+      'campaign_dm',
+      'rename_dm_inventory_item',
+      'character',
+    ],
     'GET /api/characters/:characterId/teams': ['campaign', 'view_character_team', 'character'],
     'GET /api/campaigns/:campaignId/characters/:characterId': ['campaign', 'view_team_character', 'character'],
     'DELETE /api/characters/:characterId/campaigns/:campaignId': ['campaign', 'leave_campaign', 'campaign'],
@@ -162,6 +172,7 @@ function auditMiddleware(req, res, next) {
 
   res.once('finish', () => {
     const routePath = req.route?.path || req.path;
+    if (res.statusCode < 400 && (routePath === '/health' || routePath === '/ready')) return;
     const key = `${req.method} ${routePath}`;
     const [eventType, action, entityType] = ACTIONS.get(key) || [
       'http',
