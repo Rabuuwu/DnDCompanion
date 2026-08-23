@@ -1673,18 +1673,28 @@ select {
 
 .dm-subnav {
   position: sticky;
-  z-index: 12;
-  top: 0;
+  z-index: 40;
+  top: -0.1rem;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0.4rem;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 0.8rem;
+  background: linear-gradient(135deg, rgba(39, 30, 75, 0.98), rgba(17, 38, 57, 0.98));
+  box-shadow: 0 0.55rem 1rem rgba(6, 8, 22, 0.5);
+  isolation: isolate;
+}
+
+.dm-subnav-scroll {
   display: flex;
   width: 100%;
   min-width: 0;
   gap: 0.35rem;
   overflow-x: auto;
-  padding: 0.4rem 0.15rem 0.5rem;
-  border-bottom: 1px solid var(--border);
-  background: #0a1221;
-  box-shadow: 0 0.45rem 0.8rem rgba(6, 8, 22, 0.42);
+  padding-bottom: 0.1rem;
   scrollbar-width: thin;
+  overscroll-behavior-x: contain;
 }
 
 .dm-subnav button {

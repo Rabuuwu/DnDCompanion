@@ -3293,7 +3293,7 @@ function renderApp(statusMessage = null) {
             );
         };
         const campaignSubnav = (active) =>
-          `<div class="dm-subnav">${[
+          `<div class="dm-subnav"><div class="dm-subnav-scroll">${[
             ['quests', 'Zadania'],
             ['npcs', 'NPC'],
             ['locations', 'Lokacje'],
@@ -3306,7 +3306,7 @@ function renderApp(statusMessage = null) {
               ([key, label]) =>
                 `<button type="button" class="secondary${active === key ? ' active' : ''}" data-campaign-module="${key}">${label}</button>`,
             )
-            .join('')}</div>`;
+            .join('')}</div></div>`;
         const bindCampaignSubnav = () =>
           target
             .querySelectorAll('[data-campaign-module]')

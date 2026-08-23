@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.6.2",
+    "date": "2026-08-23",
+    "title": "Hotfix nawigacji kampanii i API Render",
+    "changes": [
+      "Naprawiono warstwę mobilnej nawigacji Kampanii w Panelu DM, aby treść nie mogła jej zasłaniać.",
+      "Zastąpiono czarne tło nawigacji spójnym tłem Panelu DM i zachowano poziome przewijanie kategorii.",
+      "Skonfigurowano zaufanie do reverse proxy Rendera, dzięki czemu limity zapytań poprawnie rozpoznają adresy użytkowników."
+    ]
+  },
+  {
     "version": "1.6.1",
     "date": "2026-08-23",
     "title": "Hotfix mobilnego Panelu DM",

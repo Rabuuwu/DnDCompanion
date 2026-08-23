@@ -112,6 +112,9 @@ const {
 const app = express();
 
 // Middleware
+// Render terminates HTTPS at a single reverse proxy. Trust only that first hop so
+// rate limiters use the real client address supplied in X-Forwarded-For.
+app.set('trust proxy', 1);
 app.use(helmet());
 const nativeOrigins = ['https://localhost', 'capacitor://localhost'];
 const allowedOrigins = new Set([
