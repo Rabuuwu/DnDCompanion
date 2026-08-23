@@ -136,6 +136,7 @@ app.use(auditMiddleware);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
+  skip: () => process.env.NODE_ENV === 'test',
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'too_many_attempts' },
