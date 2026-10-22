@@ -105,17 +105,18 @@ npm run format:check
 npm run test:unit
 npm run test:auth --workspace server
 npm run test:friends --workspace server
+API_BASE=http://127.0.0.1:3000 npm run test:security --workspace server
 npm audit
 npm run hooks:install # jednorazowo włącza lokalny pre-commit
 ```
 
-Testy `test:*` są testami integracyjnymi i wymagają działającego API oraz bazy testowej. Nie należy uruchamiać ich przeciw bazie produkcyjnej.
+Testy `test:unit` nie uruchamiają API. Skrypty `test:auth`, `test:friends` i `test:migrations` są integracyjne: wymagają jawnych `NODE_ENV=test` i `DATABASE_URL` z nazwą bazy zawierającą osobny segment `test` (np. `dnd_test`). Guard działa przed odczytem `.env`. Skonfiguruj również `API_BASE` na izolowane API testowe; nazwa bazy nie dowodzi izolacji serwera. Nie uruchamiaj ich przeciw produkcji. Przykład: `NODE_ENV=test DATABASE_URL=postgresql://localhost/dnd_test npm run test:auth --workspace server`.
 
 ## Bezpieczeństwo i ograniczenia
 
 - domena `dndcompanion.pl` jest obecnie rozwiązywana przez lokalny DNS na `192.168.1.5`;
 - lokalny certyfikat CA musi być zaufany na urządzeniu, aby PWA działała poprawnie po HTTPS;
-- tokeny klienta są dziś przechowywane w `localStorage`; przed publicznym wdrożeniem wymaga to utwardzenia;
+- tokeny klienta web są przechowywane w `sessionStorage`, a na urządzeniach natywnych przez SecureStorage (`mobile/src/session-store.js`); XSS nadal zagraża sesji web;
 - narzędzia budowania Vite/Capacitor mają znane podatności opisane w [raporcie audytu](docs/AUDYT.md);
 - logi audytowe, tokeny i wiadomości wymagają polityki retencji oraz automatycznego sprzątania.
 
@@ -128,3 +129,13 @@ Monitoring dostępności przez UptimeRobot opisuje [docs/MONITORING.md](docs/MON
 ## Licencja i zasoby
 
 Kod jest udostępniony na zasadzie „wszelkie prawa zastrzeżone”; szczegóły zawiera [LICENSE](LICENSE). Zasoby zewnętrzne podlegają osobnym warunkom opisanym w [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Przegląd inżynierski
+
+Dowody, wyniki lokalnych testów i ograniczenia weryfikacji: [audyt career engineering](docs/career-engineering-audit.md).
+
+### Izolowana weryfikacja bezpieczeństwa i odtwarzania
+
+`python3 scripts/run-isolated-career-verification.py` wymaga zainstalowanych zależności, Node w PATH i lokalnych binariów PostgreSQL 17 (`CAREER_PG_BIN`, domyślnie `/usr/local/opt/postgresql@17/bin`). Tworzy jednorazowy klaster i dwie bazy testowe, kopiuje API bez `.env`, uruchamia migracje, smoke auth/friends i testy dostępu/współbieżności, następnie wykonuje `pg_dump`/`pg_restore` i porównuje fixture użytkownika oraz rejestr migracji. Na końcu zatrzymuje procesy i usuwa wyłącznie własny katalog tymczasowy. Test sprawdza lokalną odtwarzalność danych; nie dowodzi kompletności produkcyjnej polityki backupów ani RPO/RTO.
+
+`node scripts/verify-career-regressions.mjs` sprawdza pięć celowych regresji w kopiach tymczasowych bez modyfikacji źródeł.

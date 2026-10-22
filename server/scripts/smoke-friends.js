@@ -1,3 +1,5 @@
+require('./test-safety').requireTestEnvironment();
+
 require('dotenv').config({ path: require('node:path').resolve(__dirname, '../../.env') });
 
 const assert = require('node:assert/strict');

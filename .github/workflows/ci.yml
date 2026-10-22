@@ -62,6 +62,9 @@ jobs:
           exit 1
       - run: npm run test:auth --workspace server
       - run: npm run test:friends --workspace server
+      - run: npm run test:security --workspace server
+        env:
+          API_BASE: http://127.0.0.1:3000
       - name: Install browser for UI tests
         run: npx playwright install --with-deps chromium
       - name: Run browser UI tests
