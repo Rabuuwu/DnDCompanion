@@ -11,6 +11,7 @@ const bodyParser = require('body-parser');
 const { rateLimit } = require('express-rate-limit');
 const { checkDatabase, pool } = require('./db');
 const { auditMiddleware, writeAuditLog } = require('./audit');
+const { handleHttpError } = require('./http-errors');
 const changelog = require('../data/changelog.json');
 const privacyPolicy = require('../data/privacy.json');
 const helpContent = require('../data/help.json');
@@ -331,10 +332,7 @@ app.get('/api/campaigns/:campaignId/characters/:characterId', requireAuth, getCa
 app.delete('/api/characters/:characterId/campaigns/:campaignId', requireAuth, leaveCampaign);
 
 // Global error handler
-app.use((err, req, res, _next) => {
-  console.error(err && err.stack ? err.stack : err);
-  res.status(500).json({ error: 'server_error' });
-});
+app.use(handleHttpError);
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
