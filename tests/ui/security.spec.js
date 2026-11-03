@@ -18,8 +18,8 @@ test('actual DOM treats malicious campaign text as one attribute value', async (
 });
 
 test('framed app does not render account controls', async ({ page, baseURL }) => {
-  // Distinct origin on the same network avoids unrelated Local Network Access prompts.
-  const frameHost = 'http://localhost:4173/audit-frame-host';
+  // Same-origin framing isolates the application guard from network access policy.
+  const frameHost = new URL('/audit-frame-host', baseURL).href;
   await page.route(frameHost, (route) =>
     route.fulfill({
       contentType: 'text/html',
