@@ -12,7 +12,7 @@ Data przygotowania: 2026-11-03. Android `versionCode`: 43. Identyfikator pakietu
 
 ## Testy
 
-W izolowanym katalogu wydania lokalnie przeszły: build klienta i składnia API, 47 testów jednostkowych, ESLint, Prettier, walidacja wersji oraz skan sekretów.
+W izolowanym katalogu wydania lokalnie przeszły: build klienta i składnia API, 49 testów jednostkowych, ESLint, Prettier, walidacja wersji oraz skan sekretów.
 
 CI dla PR i `main` wykonuje dodatkowo aktualny `npm audit`, migracje na PostgreSQL, smoke auth/friends oraz regresje sesji, współbieżnego refresh i kwot, limitu SSE i odcięcia SSE po wylogowaniu. Start API w CI przechodzi przez ten sam runner migracji co produkcja. Playwright sprawdza dodawanie i edycję milionowych ilości złota, powrót do czarnego pióra i zapis czarnej kreski, a także kodowanie atrybutów i odrzucenie osadzenia aplikacji.
 
@@ -40,3 +40,6 @@ Docelowa strona wydania: [v1.6.4](https://github.com/Rabuuwu/DnDCompanion/releas
 Przed scaleniem CI wykryło komunikaty opublikowane po poprzedniej aktualizacji lockfile. Wydanie wymaga `body-parser` 2.4.0 lub nowszego, `glob` 14.0.2 i `minimatch` 11.0.1; zależności przechodnie są kontrolowane przez `overrides`. Zgodność narzędzi ESLint/Capacitor jest sprawdzana w CI i buildzie Androida. API dodatkowo odrzuca skompresowane requesty z kodem 415; klient aplikacji wysyła zwykły JSON.
 
 Źródła: [body-parser](https://github.com/advisories/GHSA-27r3-jxmh-p828), [glob](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4), [minimatch](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+
+
+Skrypt APK rozwiązuje położenie Capacitor CLI przez resolver Node, zarówno dla instalacji wewnątrz `mobile/node_modules`, jak i zależności przeniesionej przez npm do głównego `node_modules`. Oba układy mają osobne regresje jednostkowe.
