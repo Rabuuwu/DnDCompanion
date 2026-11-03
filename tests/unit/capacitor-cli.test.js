@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -17,6 +17,6 @@ for (const location of ['workspace', 'hoisted']) {
     writeFileSync(path.join(packageDir, 'package.json'), '{"name":"@capacitor/cli","version":"8.4.2"}');
     const executable = path.join(packageDir, 'bin', 'capacitor');
     writeFileSync(executable, '// Fixture executable; never run.');
-    assert.equal(resolveCapacitorCli(mobile), executable);
+    assert.equal(resolveCapacitorCli(mobile), realpathSync(executable));
   });
 }
