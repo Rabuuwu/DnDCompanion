@@ -3,6 +3,7 @@ require('./test-safety').requireTestEnvironment();
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { gzipSync } = require('node:zlib');
 const { pool } = require('../src/db');
 
 const apiBase = process.env.API_BASE;
@@ -37,6 +38,17 @@ async function run() {
   try {
     const first = await session('/api/auth/register');
     const second = await session('/api/auth/login');
+    const compressed = await fetch(`${apiBase}/api/ui-preferences`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${first.token}`,
+        'Content-Type': 'application/json',
+        'Content-Encoding': 'gzip',
+      },
+      body: Buffer.concat([gzipSync(Buffer.from('{}')), Buffer.from([255, 255])]),
+    });
+    assert.equal(compressed.status, 415);
+    assert.equal((await fetch(`${apiBase}/health`)).status, 200);
     assert.notEqual(jwt.decode(first.token).sid, jwt.decode(second.token).sid);
     const cors = await request('/api/characters', first);
     assert.equal(cors.status, 200);

@@ -9,3 +9,10 @@ test('quota violations return an actionable error without exposing SQL details',
   });
   assert.equal(errorResponse({ code: '23514', constraint: 'different_constraint' }).status, 500);
 });
+
+test('compressed request rejection returns 415 without exposing parser internals', () => {
+  assert.deepEqual(errorResponse({ type: 'encoding.unsupported', message: 'private parser data' }), {
+    status: 415,
+    error: 'unsupported_content_encoding',
+  });
+});

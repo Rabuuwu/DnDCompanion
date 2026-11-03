@@ -132,8 +132,8 @@ app.use('/api/auth', (_req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });
-app.use(bodyParser.json({ limit: '1mb' }));
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '1mb', inflate: false }));
+app.use(bodyParser.urlencoded({ extended: true, inflate: false }));
 app.use(auditMiddleware);
 
 const authLimiter = rateLimit({

@@ -2,6 +2,7 @@
 // errors remain opaque, even when an exception contains a status property.
 function errorResponse(error) {
   if (error?.type === 'entity.parse.failed') return { status: 400, error: 'invalid_json' };
+  if (error?.type === 'encoding.unsupported') return { status: 415, error: 'unsupported_content_encoding' };
   if (error?.type === 'entity.too.large') return { status: 413, error: 'payload_too_large' };
   if (error?.message === 'origin_not_allowed') return { status: 403, error: 'origin_not_allowed' };
   if (error?.code === '23514' && error?.constraint === 'account_resource_quota')
