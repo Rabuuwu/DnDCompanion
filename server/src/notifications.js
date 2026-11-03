@@ -1,4 +1,8 @@
 const { pool } = require('./db');
+const { isSessionActive } = require('./sessions');
+const MAX_STREAMS_PER_USER = 3;
+const MAX_STREAMS = 300;
+let streamCount = 0;
 
 const notificationStreams = new Map();
 const NOTIFICATION_CHANNEL = 'dnd_user_notifications';
@@ -8,14 +12,21 @@ let listenerReconnectTimer = null;
 function deliverUserNotification(userId, event) {
   const streams = notificationStreams.get(Number(userId));
   if (!streams) return;
+  if (event.type === 'session_revoked') {
+    for (const stream of [...streams]) {
+      if (!event.sessionId || stream.sessionId === event.sessionId) stream.close();
+    }
+    return;
+  }
   const payload = `data: ${JSON.stringify(event)}\n\n`;
-  for (const response of streams) response.write(payload);
+  for (const stream of streams) void stream.send(payload);
 }
 
 async function connectNotificationListener() {
   if (listenerClient) return;
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
     listenerClient = client;
     client.on('notification', (message) => {
       if (message.channel !== NOTIFICATION_CHANNEL || !message.payload) return;
@@ -38,6 +49,13 @@ async function connectNotificationListener() {
     console.log('[NOTIFICATIONS] PostgreSQL listener connected');
   } catch (error) {
     listenerClient = null;
+    if (client) {
+      client.removeAllListeners('notification');
+      client.removeAllListeners('error');
+      try {
+        client.release(true);
+      } catch {}
+    }
     console.error('[NOTIFICATIONS] listener connection failed:', error.message);
     scheduleNotificationReconnect();
   }
@@ -53,6 +71,9 @@ function scheduleNotificationReconnect() {
 }
 
 async function stopNotificationListener() {
+  for (const streams of notificationStreams.values()) {
+    for (const stream of [...streams]) stream.close();
+  }
   if (listenerReconnectTimer) {
     clearTimeout(listenerReconnectTimer);
     listenerReconnectTimer = null;
@@ -80,26 +101,64 @@ void connectNotificationListener();
 
 function streamNotifications(req, res) {
   const userId = Number(req.user.id);
+  const streams = notificationStreams.get(userId) || new Set();
+  if (streams.size >= MAX_STREAMS_PER_USER || streamCount >= MAX_STREAMS) {
+    res.set('Retry-After', '20');
+    return res.status(429).json({ error: 'too_many_notification_streams' });
+  }
+  const lifetime = Math.min(req.auth.expiresAt - Date.now(), 10 * 60_000);
+  if (lifetime <= 0) return res.status(401).json({ error: 'unauthorized' });
+  let closed = false;
+  let checking = false;
+  let heartbeat;
+  let expiry;
+  const stream = {
+    sessionId: req.auth.sessionId,
+    close() {
+      if (closed) return;
+      closed = true;
+      clearInterval(heartbeat);
+      clearTimeout(expiry);
+      streams.delete(stream);
+      streamCount -= 1;
+      if (!streams.size) notificationStreams.delete(userId);
+      res.off('close', stream.close);
+      res.off('error', stream.close);
+      req.off('close', stream.close);
+      // Destroy rather than flushing a potentially blocked output queue.
+      res.destroy();
+    },
+    async send(payload) {
+      if (closed || checking) return;
+      checking = true;
+      try {
+        if (Date.now() >= req.auth.expiresAt || !(await isSessionActive(req.auth.sessionId, userId)))
+          return stream.close();
+        if (!closed && !res.write(payload)) stream.close();
+      } catch {
+        stream.close();
+      } finally {
+        checking = false;
+      }
+    },
+  };
+  streams.add(stream);
+  notificationStreams.set(userId, streams);
+  streamCount += 1;
+  req.once('close', stream.close);
+  res.once('close', stream.close);
+  res.once('error', stream.close);
   res.status(200);
   res.set({
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
+    'Cache-Control': 'no-store, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
   res.flushHeaders();
-  res.write('event: connected\ndata: {}\n\n');
-
-  const streams = notificationStreams.get(userId) || new Set();
-  streams.add(res);
-  notificationStreams.set(userId, streams);
-  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 20_000);
-
-  req.on('close', () => {
-    clearInterval(heartbeat);
-    streams.delete(res);
-    if (streams.size === 0) notificationStreams.delete(userId);
-  });
+  heartbeat = setInterval(() => void stream.send(': heartbeat\n\n'), 20_000);
+  expiry = setTimeout(stream.close, lifetime);
+  if (!res.write('event: connected\ndata: {}\n\n')) stream.close();
 }
 
 async function listNotifications(req, res) {

@@ -2,11 +2,24 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   automaticInventoryIcon,
+  inventoryQuantity,
+  INVENTORY_MAX_QUANTITY,
   INVENTORY_ICON_KEYS,
   parseInventory,
   parseInventoryCategories,
   serializeInventory,
 } from '../../mobile/src/inventory-schema.js';
+
+test('ilości przedmiotów i złota powyżej 9999 zachowują się po zapisie i odczycie', () => {
+  for (const quantity of [10_000, 1_000_000, INVENTORY_MAX_QUANTITY]) {
+    const saved = serializeInventory([{ name: 'Gold coins', quantity, icon: 'gold' }]);
+    assert.equal(parseInventory(saved)[0].quantity, quantity);
+  }
+  assert.equal(inventoryQuantity(-1), 0);
+  assert.equal(inventoryQuantity(12.9), 12);
+  assert.equal(inventoryQuantity('invalid'), 1);
+  assert.equal(inventoryQuantity(Number.MAX_VALUE), INVENTORY_MAX_QUANTITY);
+});
 
 test('automatyczny wybór rozpoznaje polskie i angielskie nazwy przedmiotów', () => {
   assert.equal(automaticInventoryIcon('Mikstura leczenia'), 'potion_red');

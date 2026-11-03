@@ -2813,6 +2813,15 @@ button:disabled {
   box-shadow: 0 0.8rem 1.8rem rgba(0, 0, 0, 0.38);
 }
 
+.notebook-black-color {
+  width: 100%;
+  margin: 0.4rem 0 0;
+}
+
+.notebook-black-color[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
 #notebook-color-wheel {
   width: 5.25rem;
   height: 5.25rem;

@@ -47,6 +47,18 @@ function text(value, max = 10_000) {
     .slice(0, max);
 }
 
+function externalUrl(value) {
+  const input = String(value || '').trim();
+  if (!input) return '';
+  if (input.length > 2000) return null;
+  try {
+    const url = new URL(input);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function optionalText(value, max = 10_000) {
   return String(value || '').slice(0, max);
 }
@@ -518,12 +530,12 @@ async function createMaterial(req, res) {
     : 'text';
   const visibility = VISIBILITIES.has(req.body?.visibility) ? req.body.visibility : 'dm';
   if (!title) return res.status(400).json({ error: 'invalid_material_title' });
-  const externalUrl = text(req.body?.externalUrl, 2000);
-  if (externalUrl && !/^https?:\/\//i.test(externalUrl)) return res.status(400).json({ error: 'invalid_material_url' });
+  const materialUrl = externalUrl(req.body?.externalUrl);
+  if (materialUrl === null) return res.status(400).json({ error: 'invalid_material_url' });
   const result = await pool.query(
     `INSERT INTO campaign_materials (campaign_id,created_by,title,material_type,content,external_url,visibility)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [campaignId, req.user.id, title, type, optionalText(req.body?.content, 50_000), externalUrl, visibility],
+    [campaignId, req.user.id, title, type, optionalText(req.body?.content, 50_000), materialUrl, visibility],
   );
   return res.status(201).json(result.rows[0]);
 }
@@ -540,9 +552,9 @@ async function updateMaterial(req, res) {
     ? req.body.materialType
     : 'text';
   const visibility = VISIBILITIES.has(req.body?.visibility) ? req.body.visibility : 'dm';
-  const externalUrl = text(req.body?.externalUrl, 2000);
+  const materialUrl = externalUrl(req.body?.externalUrl);
   const recipients = [...new Set(jsonArray(req.body?.characterIds).map(parseId).filter(Boolean).slice(0, 100))];
-  if (!title || (externalUrl && !/^https?:\/\//i.test(externalUrl))) {
+  if (!title || materialUrl === null) {
     return res.status(400).json({ error: 'invalid_material' });
   }
   if (visibility === 'selected' && !recipients.length)
@@ -563,7 +575,7 @@ async function updateMaterial(req, res) {
     const result = await client.query(
       `UPDATE campaign_materials SET title=$3,material_type=$4,content=$5,external_url=$6,
          visibility=$7,updated_at=NOW() WHERE id=$1 AND campaign_id=$2 RETURNING *`,
-      [materialId, campaignId, title, type, optionalText(req.body?.content, 50_000), externalUrl, visibility],
+      [materialId, campaignId, title, type, optionalText(req.body?.content, 50_000), materialUrl, visibility],
     );
     if (!result.rows[0]) {
       await client.query('ROLLBACK');

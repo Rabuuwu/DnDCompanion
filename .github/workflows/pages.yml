@@ -1,13 +1,15 @@
 name: Deploy PWA to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [Continuous integration]
+    branches: [main]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -17,11 +19,38 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Require successful CI for this commit
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const sha = context.payload.workflow_run?.head_sha || context.sha;
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'ci.yml', head_sha: sha, branch: 'main', event: 'push', per_page: 20,
+            });
+            const latest = data.workflow_runs[0];
+            if (latest?.head_sha !== sha || latest?.conclusion !== 'success') {
+              core.setFailed('Publication requires successful CI for the exact commit.');
+            }
+            const { data: branch } = await github.rest.repos.getBranch({
+              owner: context.repo.owner, repo: context.repo.repo, branch: 'main',
+            });
+            if (branch.commit.sha !== sha) {
+              core.setFailed('Refusing to publish a superseded commit.');
+            }
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

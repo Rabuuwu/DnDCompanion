@@ -72,6 +72,32 @@ const ACTIONS = new Map(
   }),
 );
 
+const MAX_AUDIT_WRITES = 4;
+let auditWrites = 0;
+let budgetStartedAt = Date.now();
+let remainingAuditWrites = 1200;
+let remainingAnonymousWrites = 100;
+let droppedAuditWrites = 0;
+
+function admitAuditWrite(entry) {
+  const now = Date.now();
+  if (now - budgetStartedAt >= 60_000) {
+    if (droppedAuditWrites) console.warn('[AUDIT] suppressed events:', droppedAuditWrites);
+    budgetStartedAt = now;
+    remainingAuditWrites = 1200;
+    remainingAnonymousWrites = 100;
+    droppedAuditWrites = 0;
+  }
+  const anonymous = !entry.actorUserId && entry.eventType !== 'system';
+  if (auditWrites >= MAX_AUDIT_WRITES || remainingAuditWrites <= 0 || (anonymous && remainingAnonymousWrites <= 0)) {
+    droppedAuditWrites += 1;
+    return false;
+  }
+  remainingAuditWrites -= 1;
+  if (anonymous) remainingAnonymousWrites -= 1;
+  return true;
+}
+
 function safeText(value, maxLength = 200) {
   return String(value ?? '')
     .trim()
@@ -84,7 +110,7 @@ function requestMetadata(req, action) {
   const fields = Object.keys(body).filter(
     (key) => !['password', 'currentPassword', 'newPassword', 'token', 'refreshToken', 'avatar'].includes(key),
   );
-  if (fields.length) metadata.changedFields = fields.slice(0, 50);
+  if (fields.length) metadata.changedFields = fields.slice(0, 50).map((field) => safeText(field, 80));
 
   if (['login', 'register'].includes(action)) metadata.username = safeText(body.username, 50);
   if (action === 'create_character' || action === 'update_character') {
@@ -123,6 +149,8 @@ function entityId(req, entityType) {
 }
 
 async function writeAuditLog(entry) {
+  if (!admitAuditWrite(entry)) return;
+  auditWrites += 1;
   try {
     await pool.query(
       `INSERT INTO audit_logs (
@@ -143,7 +171,7 @@ async function writeAuditLog(entry) {
         entry.entityType || null,
         entry.entityId == null ? null : String(entry.entityId).slice(0, 100),
         entry.method || null,
-        entry.path || null,
+        safeText(entry.path, 500) || null,
         entry.statusCode || null,
         entry.success !== false,
         entry.durationMs ?? null,
@@ -153,7 +181,9 @@ async function writeAuditLog(entry) {
       ],
     );
   } catch (error) {
-    console.error(`[AUDIT] failed action=${entry.action}: ${error.message}`);
+    console.error(`[AUDIT] failed action=${safeText(entry.action, 100)} code=${safeText(error.code, 20)}`);
+  } finally {
+    auditWrites -= 1;
   }
 }
 
@@ -182,7 +212,7 @@ function auditMiddleware(req, res, next) {
     const actor = req.user || req.auditActor || {};
     const metadata = requestMetadata(req, action);
     if (req.auditError) metadata.error = req.auditError;
-    if (!ACTIONS.has(key)) metadata.route = routePath;
+    if (!ACTIONS.has(key)) metadata.route = safeText(routePath, 500);
 
     void writeAuditLog({
       requestId,

@@ -1,3 +1,5 @@
+require('./test-safety').requireTestEnvironment();
+
 require('dotenv').config({ path: require('node:path').resolve(__dirname, '../../.env') });
 
 const assert = require('node:assert/strict');
@@ -32,6 +34,7 @@ async function run() {
     }
     const requiredTables = [
       'users',
+      'auth_sessions',
       'characters',
       'campaigns',
       'dm_notes',

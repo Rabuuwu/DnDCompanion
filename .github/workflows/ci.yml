@@ -27,6 +27,7 @@ jobs:
           --health-retries 10
     env:
       NODE_ENV: test
+      DISABLE_TEST_RATE_LIMITS: 'true'
       HOST: 127.0.0.1
       PORT: 3000
       DATABASE_URL: postgresql://dnd_test:dnd_test@127.0.0.1:5432/dnd_test
@@ -52,7 +53,7 @@ jobs:
       - run: npm run test:migrations --workspace server
       - name: Start test API
         run: |
-          npm start > /tmp/dnd-test-api.log 2>&1 &
+          MIGRATE_ON_START=true npm start > /tmp/dnd-test-api.log 2>&1 &
           echo $! > /tmp/dnd-test-api.pid
           for attempt in {1..30}; do
             curl -fsS http://127.0.0.1:3000/ready && exit 0
@@ -62,6 +63,9 @@ jobs:
           exit 1
       - run: npm run test:auth --workspace server
       - run: npm run test:friends --workspace server
+      - run: npm run test:security-fixes --workspace server
+        env:
+          API_BASE: http://127.0.0.1:3000
       - name: Install browser for UI tests
         run: npx playwright install --with-deps chromium
       - name: Run browser UI tests

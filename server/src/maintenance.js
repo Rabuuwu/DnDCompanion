@@ -18,6 +18,9 @@ async function runDatabaseMaintenance() {
     const auditLogs = await client.query(`DELETE FROM audit_logs WHERE created_at < NOW() - ($1 * INTERVAL '1 day')`, [
       AUDIT_RETENTION_DAYS,
     ]);
+    const sessions = await client.query(
+      "DELETE FROM auth_sessions WHERE expires_at<NOW() OR revoked_at<NOW()-INTERVAL '7 days'",
+    );
     const refreshTokens = await client.query(
       `DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked_at < NOW() - INTERVAL '7 days'`,
     );
@@ -38,6 +41,7 @@ async function runDatabaseMaintenance() {
     return {
       skipped: false,
       deleted: {
+        sessions: sessions.rowCount,
         auditLogs: auditLogs.rowCount,
         refreshTokens: refreshTokens.rowCount,
         friendInvites: friendInvites.rowCount,

@@ -2,7 +2,7 @@
 
 Mobilny companion do prowadzenia postaci i kampanii RPG. Jeden frontend działa jako aplikacja Android/iOS (Capacitor) oraz instalowalna PWA, a dane synchronizuje z API Node.js i PostgreSQL.
 
-> Status: aktywny rozwój, wersja aplikacji `1.5.5`. PWA i API mają wdrożenie internetowe, a podpisany APK jest publikowany przez GitHub Releases.
+> Status: aktywny rozwój, wersja aplikacji `1.6.4`. PWA i API mają wdrożenie internetowe, a podpisany APK jest publikowany przez GitHub Releases.
 
 ## Najważniejsze funkcje
 
@@ -109,15 +109,19 @@ npm audit
 npm run hooks:install # jednorazowo włącza lokalny pre-commit
 ```
 
-Testy `test:*` są testami integracyjnymi i wymagają działającego API oraz bazy testowej. Nie należy uruchamiać ich przeciw bazie produkcyjnej.
+Testy `test:unit` nie uruchamiają API. Skrypty `test:auth`, `test:friends` i `test:migrations` są integracyjne: wymagają jawnych `NODE_ENV=test` i `DATABASE_URL` z nazwą bazy zawierającą osobny segment `test` (np. `dnd_test`). Guard działa przed odczytem `.env`. Skonfiguruj również `API_BASE` na izolowane API testowe; nazwa bazy nie dowodzi izolacji serwera. Nie uruchamiaj ich przeciw produkcji. Przykład: `NODE_ENV=test DATABASE_URL=postgresql://localhost/dnd_test npm run test:auth --workspace server`.
 
 ## Bezpieczeństwo i ograniczenia
 
-- domena `dndcompanion.pl` jest obecnie rozwiązywana przez lokalny DNS na `192.168.1.5`;
-- lokalny certyfikat CA musi być zaufany na urządzeniu, aby PWA działała poprawnie po HTTPS;
-- tokeny klienta są dziś przechowywane w `localStorage`; przed publicznym wdrożeniem wymaga to utwardzenia;
-- narzędzia budowania Vite/Capacitor mają znane podatności opisane w [raporcie audytu](docs/AUDYT.md);
-- logi audytowe, tokeny i wiadomości wymagają polityki retencji oraz automatycznego sprzątania.
+- Produkcyjna PWA jest publikowana przez GitHub Pages, API i PostgreSQL działają na Render. Materiały LAN w `deploy/` opisują wariant pomocniczy.
+- Access token jest powiązany z sesją w bazie; wylogowanie odcina jedną sesję, a zmiana hasła wszystkie. Aktualizacja do 1.6.4 wymaga ponownego logowania.
+- Sesja web korzysta z `sessionStorage`, a klient natywny z SecureStorage. Dane wyświetlane w atrybutach HTML są kodowane, a klient blokuje inicjalizację w ramce.
+- API ogranicza żądania, aktywne SSE, zapis logów i liczbę zasobów konta. Nowe hasła mają minimum 8 znaków i najwyżej 72 bajty UTF-8.
+- Ilości przedmiotów i złota mogą przekraczać 9999, do `Number.MAX_SAFE_INTEGER` (9 007 199 254 740 991). W palecie kartki można przywrócić kolor „Czarny”.
+- Wynik kontroli zależności i pełnych testów należy sprawdzać w CI dla konkretnego wydania; wcześniejszy audyt nie zastępuje aktualnego wyniku.
+- Przy starcie produkcyjnym/Render `npm start` stosuje brakujące migracje przed otwarciem API. Błąd migracji przerywa start; backup i kontrola wdrożenia nadal są wymagane.
+
+Opis zmian i procedura wdrożenia: [wydanie 1.6.4](docs/WYDANIE_1.6.4.md), [poprawki bezpieczeństwa](docs/POPRAWKI_BEZPIECZENSTWA_2026-11-03.md).
 
 Zgłoszenie podatności powinno odbywać się prywatnie do właściciela wdrożenia, bez publikowania sekretów i danych użytkowników.
 
@@ -128,3 +132,7 @@ Monitoring dostępności przez UptimeRobot opisuje [docs/MONITORING.md](docs/MON
 ## Licencja i zasoby
 
 Kod jest udostępniony na zasadzie „wszelkie prawa zastrzeżone”; szczegóły zawiera [LICENSE](LICENSE). Zasoby zewnętrzne podlegają osobnym warunkom opisanym w [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Przegląd inżynierski
+
+Dowody, wyniki lokalnych testów i ograniczenia weryfikacji: [audyt career engineering](docs/career-engineering-audit.md).

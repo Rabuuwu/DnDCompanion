@@ -67,7 +67,48 @@ test('użytkownik tworzy postać i dodaje przedmiot do ekwipunku', async ({ page
   await page.locator('#inventory-item-form button[type="submit"]').click();
   await expect(page.getByText('Mikstura leczenia').first()).toBeVisible();
 
+  await page.locator('#open-add-inventory-item').click();
+  await page.locator('#inventory-item-form [name="name"]').fill('Gold coins');
+  await page.locator('#inventory-item-form [name="quantity"]').fill('1000000');
+  const goldSaved = page.waitForResponse(
+    (response) => response.url().endsWith('/inventory') && response.request().method() === 'PATCH',
+  );
+  await page.locator('#inventory-item-form button[type="submit"]').click();
+  expect((await (await goldSaved).json()).inventory).toContain('Gold coins × 1000000');
+
+  await page.locator('[data-edit-inventory-item]').filter({ hasText: 'Gold coins' }).click();
+  await page.locator('[data-edit-inventory-form] [name="quantity"]').fill('2000000');
+  const goldEdited = page.waitForResponse(
+    (response) => response.url().endsWith('/inventory') && response.request().method() === 'PATCH',
+  );
+  await page.locator('[data-edit-inventory-form] button[type="submit"]').click();
+  expect((await (await goldEdited).json()).inventory).toContain('Gold coins × 2000000');
+
   await page.locator('[data-character-tab="notebook"]').click();
   await page.locator('#notebook-text').fill('Notatka zapisywana automatycznie');
   await expect(page.locator('#notebook-text')).toHaveValue('Notatka zapisywana automatycznie');
+
+  await page.locator('[data-notebook-menu-toggle]').click();
+  await page.locator('[data-notebook-mode="draw"]').click();
+  await page.locator('[data-notebook-color-toggle]').click();
+  await page.locator('#notebook-color-wheel').click({ position: { x: 65, y: 40 } });
+  const black = page.getByRole('button', { name: 'Czarny', exact: true });
+  await expect(black).toHaveAttribute('aria-pressed', 'false');
+  await black.click();
+  await expect(black).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#notebook-color-preview')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+  await page.locator('[data-notebook-menu-toggle]').click();
+  const canvas = await page.locator('#notebook-canvas').boundingBox();
+  expect(canvas).not.toBeNull();
+  const strokeSaved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/notebook') &&
+      response.request().method() === 'PATCH' &&
+      response.request().postDataJSON().notebook.strokes.length > 0,
+  );
+  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + canvas.width / 2 + 20, canvas.y + canvas.height / 2 + 10);
+  await page.mouse.up();
+  expect((await (await strokeSaved).json()).notebook.strokes.at(-1).color).toBe('#000000');
 });
