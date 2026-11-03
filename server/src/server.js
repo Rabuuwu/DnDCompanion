@@ -18,6 +18,7 @@ const changelog = require('../data/changelog.json');
 const privacyPolicy = require('../data/privacy.json');
 const helpContent = require('../data/help.json');
 const release = require('../../release.json');
+const { getServerBindOptions } = require('./server-bind');
 const { openapiDocument } = require('./openapi');
 const {
   changePassword,
@@ -335,8 +336,7 @@ app.delete('/api/characters/:characterId/campaigns/:campaignId', requireAuth, le
 // Global error handler
 app.use(handleHttpError);
 
-const PORT = Number(process.env.PORT || 3000);
-const HOST = process.env.HOST || '127.0.0.1';
+const { port: PORT, host: HOST } = getServerBindOptions();
 const server = app.listen(PORT, HOST, () => {
   console.log(`aplikacja_dnd server listening on ${HOST}:${PORT}`);
   void writeAuditLog({
