@@ -32,6 +32,7 @@
 ## Ekwipunek
 
 - lista z ikoną, nazwą, ilością, opisem i opcjonalnym czasem trwania;
+- ilości powyżej 9999 dla przedmiotów i złota, także przy dodawaniu przez DM (maksimum 9 007 199 254 740 991);
 - dodawanie i edycja po dotknięciu rekordu;
 - trzy opcjonalne sloty szybkiego ekwipunku;
 - własne kategorie z edycją, usuwaniem i przenoszeniem przedmiotów;
@@ -44,7 +45,7 @@
 - tryb tekstowy i automatyczny zapis bez przycisku;
 - nieskończona kartka do rysowania;
 - zoom gestem, przesuwanie, cofanie, rysowanie i gumka;
-- pełne koło wyboru koloru i kompaktowe wysuwane narzędzia.
+- pełne koło wyboru koloru, przycisk „Czarny” przywracający czarne pióro i kompaktowe wysuwane narzędzia.
 
 ## Znajomi i wiadomości
 

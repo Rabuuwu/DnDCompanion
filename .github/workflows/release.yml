@@ -5,25 +5,73 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+  workflow_run:
+    workflows: [Continuous integration]
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: write
+  actions: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
 
 jobs:
   android:
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve release and require successful CI
+        id: release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('node:fs');
+            const release = JSON.parse(fs.readFileSync('release.json', 'utf8'));
+            const tag = `v${release.version}`;
+            const sha = context.payload.workflow_run?.head_sha || context.sha;
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id: 'ci.yml', head_sha: sha, branch: 'main', event: 'push', per_page: 20,
+            });
+            const latest = data.workflow_runs[0];
+            if (latest?.head_sha !== sha || latest?.conclusion !== 'success') {
+              throw new Error('Release requires successful main CI for this exact commit.');
+            }
+            const { data: branch } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
+            if (branch.commit.sha !== sha) throw new Error('Refusing to release a superseded commit.');
+            let exists = false;
+            try {
+              await github.rest.repos.getReleaseByTag({ ...context.repo, tag });
+              exists = true;
+            } catch (error) { if (error.status !== 404) throw error; }
+            core.setOutput('needed', String(!exists));
+            core.setOutput('tag', tag);
+            core.setOutput('sha', sha);
+            const entry = JSON.parse(fs.readFileSync('server/data/changelog.json', 'utf8'))[0];
+            fs.writeFileSync('release-notes.md', `## ${entry.title}\n\n${entry.changes.map(change => `- ${change}`).join('\n')}\n`);
 
       - name: Setup Node.js
+        if: steps.release.outputs.needed == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
 
       - name: Setup Java
+        if: steps.release.outputs.needed == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -31,9 +79,11 @@ jobs:
           cache: gradle
 
       - name: Install dependencies
+        if: steps.release.outputs.needed == 'true'
         run: npm ci
 
       - name: Verify project
+        if: steps.release.outputs.needed == 'true'
         env:
           RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
         run: |
@@ -42,6 +92,7 @@ jobs:
           npm audit --omit=dev
 
       - name: Decode Android signing key
+        if: steps.release.outputs.needed == 'true'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -50,6 +101,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/dnd-signing/release.jks"
 
       - name: Build signed APK
+        if: steps.release.outputs.needed == 'true'
         env:
           DND_RELEASE_STORE_FILE: ${{ runner.temp }}/dnd-signing/release.jks
           DND_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -57,10 +109,12 @@ jobs:
           DND_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: npm run build:apk --workspace mobile
       - name: Run Android release lint
+        if: steps.release.outputs.needed == 'true'
         working-directory: mobile/android
         run: ./gradlew lintRelease
 
       - name: Upload workflow artifact
+        if: steps.release.outputs.needed == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: DnDCompanion-Android
@@ -69,10 +123,18 @@ jobs:
             mobile/release/*.sha256
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.release.outputs.needed == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ steps.release.outputs.sha }}
+          body_path: release-notes.md
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             mobile/release/*.apk
             mobile/release/*.sha256
+
+      - name: Remove signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/dnd-signing"

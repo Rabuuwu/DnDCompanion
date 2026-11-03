@@ -21,11 +21,12 @@ export const INVENTORY_ICONS = [
 
 export const INVENTORY_ICON_KEYS = new Set(INVENTORY_ICONS.map(([key]) => key));
 export const INVENTORY_MAX_LENGTH = 100_000;
+export const INVENTORY_MAX_QUANTITY = Number.MAX_SAFE_INTEGER;
 
 export function inventoryQuantity(value, fallback = 1) {
   if (value === null || value === undefined || String(value).trim() === '') return fallback;
   const number = Number(value);
-  return Number.isFinite(number) ? Math.max(0, Math.min(9999, Math.trunc(number))) : fallback;
+  return Number.isFinite(number) ? Math.max(0, Math.min(INVENTORY_MAX_QUANTITY, Math.trunc(number))) : fallback;
 }
 
 export function parseInventoryCategories(value) {

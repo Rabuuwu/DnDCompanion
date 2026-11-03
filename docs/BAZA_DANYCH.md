@@ -8,6 +8,8 @@ API używa PostgreSQL wskazanego przez `DATABASE_URL`; `DATABASE_SSL=true` włą
 npm run db:migrate
 ```
 
+Start API w produkcji lub na Render uruchamia ten sam runner przed nasłuchem; błąd uniemożliwia uruchomienie API. Runner utrzymuje blokadę advisory na dedykowanym połączeniu, aby kolejne instancje nie wykonały tej samej migracji jednocześnie. Lokalne uruchomienie developerskie pozostawia migracje pod jawną kontrolą.
+
 Skrypt stosuje pliki `server/migrations/*.sql` alfabetycznie i zapisuje pełną nazwę w `schema_migrations`. Migracje są jednokierunkowe — przed zmianą schematu produkcyjnego należy wykonać backup.
 
 ## Tabele
@@ -16,6 +18,7 @@ Skrypt stosuje pliki `server/migrations/*.sql` alfabetycznie i zapisuje pełną 
 | ------------------------------------------- | -------------------------------------------------------------------------- |
 | `schema_migrations`                         | historia zastosowanych plików migracji                                     |
 | `users`                                     | nazwa, hash bcrypt, awatar Data URL i znaczniki czasu                      |
+| `auth_sessions`                           | sesje JWT: UUID, właściciel, termin ważności i unieważnienie; kasowane z kontem |
 | `refresh_tokens`                            | hash SHA-256 tokenu, wygaśnięcie i unieważnienie; FK do użytkownika        |
 | `characters`                                | właściciel, nazwa i dokument `data JSONB`; kasowanie kaskadowe z kontem    |
 | `friendships`                               | symetryczna relacja zapisana jako uporządkowana para użytkowników          |
@@ -80,3 +83,8 @@ pg_dump --format=custom --file=dnd_app.dump "$DATABASE_URL"
 ```
 
 Plik backupu zawiera dane użytkowników i musi być szyfrowany oraz przechowywany poza repozytorium.
+
+
+## Migracja 016 w wydaniu 1.6.4
+
+`016_security_sessions_and_quotas.sql` dodaje `auth_sessions`, powiązanie `refresh_tokens.session_id`, indeksy i limity danych konta. Stare tokeny wymagają nowego logowania. Access tokeny są sprawdzane względem sesji przy każdym chronionym żądaniu, a zdarzenia PostgreSQL zamykają unieważnione SSE. Kwoty nie usuwają istniejących postaci, kampanii ani wiadomości. Szczegóły limitów i wdrożenia: [poprawki bezpieczeństwa](POPRAWKI_BEZPIECZENSTWA_2026-11-03.md).

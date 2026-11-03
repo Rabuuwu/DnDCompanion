@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('./db');
+const { isSessionActive } = require('./sessions');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_ACCESS_TTL = process.env.JWT_ACCESS_TTL || '15m';
@@ -10,6 +11,10 @@ const JWT_ISSUER = 'dnd-api';
 const JWT_AUDIENCE = 'dnd-mobile';
 const PASSWORD_ROUNDS = 12;
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-user-password', PASSWORD_ROUNDS);
+
+if (!Number.isFinite(REFRESH_TOKEN_DAYS) || REFRESH_TOKEN_DAYS < 1 || REFRESH_TOKEN_DAYS > 90) {
+  throw new Error('REFRESH_TOKEN_DAYS must be between 1 and 90');
+}
 
 if (!JWT_SECRET || JWT_SECRET.length < 64) {
   throw new Error('JWT_SECRET must contain at least 64 characters');
@@ -26,7 +31,11 @@ function profileImage(value) {
   return /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(image) ? image : null;
 }
 
-function validateCredentials(username, password) {
+function validNewPassword(password) {
+  return password.length >= 8 && !bcrypt.truncates(password);
+}
+
+function validateCredentials(username, password, newAccount = false) {
   const normalizedUsername = String(username || '').trim();
   const normalizedPassword = String(password || '');
 
@@ -34,7 +43,11 @@ function validateCredentials(username, password) {
     return { error: 'invalid_username' };
   }
 
-  if (normalizedPassword.length < 8 || normalizedPassword.length > 128) {
+  if (
+    normalizedPassword.length < 8 ||
+    normalizedPassword.length > 128 ||
+    (newAccount && !validNewPassword(normalizedPassword))
+  ) {
     return { error: 'invalid_password' };
   }
 
@@ -45,8 +58,8 @@ function hashRefreshToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function createAccessToken(user) {
-  return jwt.sign({ sub: String(user.id), username: user.username }, JWT_SECRET, {
+function createAccessToken(user, sessionId) {
+  return jwt.sign({ sub: String(user.id), username: user.username, sid: sessionId }, JWT_SECRET, {
     algorithm: 'HS256',
     expiresIn: JWT_ACCESS_TTL,
     issuer: JWT_ISSUER,
@@ -54,31 +67,43 @@ function createAccessToken(user) {
   });
 }
 
-async function createRefreshToken(userId, client = pool) {
+async function createRefreshToken(userId, session, client) {
   const token = crypto.randomBytes(48).toString('base64url');
   const tokenHash = hashRefreshToken(token);
-  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 86_400_000);
+  const expiresAt = session.expiresAt;
 
   await client.query(
-    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-     VALUES ($1, $2, $3)`,
-    [userId, tokenHash, expiresAt],
+    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, session_id)
+     VALUES ($1, $2, $3, $4)`,
+    [userId, tokenHash, expiresAt, session.id],
   );
 
   return token;
 }
 
-async function createSession(user, client = pool) {
+async function createSession(user, client, session = null) {
+  if (!session) {
+    session = { id: crypto.randomUUID(), expiresAt: new Date(Date.now() + REFRESH_TOKEN_DAYS * 86_400_000) };
+    // Remove expired/revoked sessions before enforcing the active-session quota.
+    await client.query('DELETE FROM auth_sessions WHERE user_id=$1 AND (expires_at<=NOW() OR revoked_at IS NOT NULL)', [
+      user.id,
+    ]);
+    await client.query('INSERT INTO auth_sessions (id,user_id,expires_at) VALUES ($1,$2,$3)', [
+      session.id,
+      user.id,
+      session.expiresAt,
+    ]);
+  }
   return {
-    token: createAccessToken(user),
-    refreshToken: await createRefreshToken(user.id, client),
+    token: createAccessToken(user, session.id),
+    refreshToken: await createRefreshToken(user.id, session, client),
     expiresIn: JWT_ACCESS_TTL,
     user: publicUser(user),
   };
 }
 
 async function register(req, res) {
-  const credentials = validateCredentials(req.body?.username, req.body?.password);
+  const credentials = validateCredentials(req.body?.username, req.body?.password, true);
   if (credentials.error) {
     return res.status(400).json({ error: credentials.error });
   }
@@ -127,7 +152,23 @@ async function login(req, res) {
     return res.status(401).json({ error: 'invalid_credentials' });
   }
 
-  return res.json(await createSession(user));
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const locked = await client.query('SELECT password_hash FROM users WHERE id=$1 FOR UPDATE', [user.id]);
+    if (locked.rows[0]?.password_hash !== user.password_hash) {
+      await client.query('ROLLBACK');
+      return res.status(401).json({ error: 'invalid_credentials' });
+    }
+    const session = await createSession(user, client);
+    await client.query('COMMIT');
+    return res.json(session);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function refresh(req, res) {
@@ -141,8 +182,14 @@ async function refresh(req, res) {
 
   try {
     await client.query('BEGIN');
+    // Use the same user-first lock order as login/password changes/deletion.
+    await client.query(
+      `SELECT u.id FROM users u JOIN refresh_tokens rt ON rt.user_id=u.id
+                        WHERE rt.token_hash=$1 FOR UPDATE OF u`,
+      [tokenHash],
+    );
     const result = await client.query(
-      `SELECT rt.id, rt.user_id, rt.expires_at, rt.revoked_at, u.username, u.avatar
+      `SELECT rt.id, rt.user_id, rt.expires_at, rt.revoked_at, rt.session_id, u.username, u.avatar
        FROM refresh_tokens rt
        JOIN users u ON u.id = rt.user_id
        WHERE rt.token_hash = $1
@@ -151,7 +198,18 @@ async function refresh(req, res) {
     );
     const storedToken = result.rows[0];
 
-    if (!storedToken || storedToken.revoked_at || new Date(storedToken.expires_at) <= new Date()) {
+    const sessionState = storedToken?.session_id
+      ? await client.query(
+          'SELECT expires_at FROM auth_sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>NOW()',
+          [storedToken.session_id, storedToken.user_id],
+        )
+      : { rows: [] };
+    if (
+      !storedToken ||
+      storedToken.revoked_at ||
+      new Date(storedToken.expires_at) <= new Date() ||
+      !sessionState.rows[0]
+    ) {
       await client.query('ROLLBACK');
       return res.status(401).json({ error: 'invalid_refresh_token' });
     }
@@ -160,6 +218,7 @@ async function refresh(req, res) {
     const session = await createSession(
       { id: storedToken.user_id, username: storedToken.username, avatar: storedToken.avatar },
       client,
+      { id: storedToken.session_id, expiresAt: sessionState.rows[0].expires_at },
     );
     await client.query('COMMIT');
     return res.json(session);
@@ -175,9 +234,13 @@ async function logout(req, res) {
   const refreshToken = String(req.body?.refreshToken || '');
   if (refreshToken) {
     await pool.query(
-      `UPDATE refresh_tokens
-       SET revoked_at = COALESCE(revoked_at, NOW())
-       WHERE token_hash = $1`,
+      `WITH revoked AS (
+         UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW())
+         WHERE id=(SELECT session_id FROM refresh_tokens WHERE token_hash=$1)
+         RETURNING id,user_id
+       ) SELECT pg_notify('dnd_user_notifications',json_build_object(
+         'userId',user_id,'event',json_build_object('type','session_revoked','sessionId',id))::text)
+         FROM revoked`,
       [hashRefreshToken(refreshToken)],
     );
   }
@@ -188,7 +251,7 @@ async function changePassword(req, res) {
   const currentPassword = String(req.body?.currentPassword || '');
   const newPassword = String(req.body?.newPassword || '');
 
-  if (newPassword.length < 8 || newPassword.length > 128) {
+  if (!validNewPassword(newPassword)) {
     return res.status(400).json({ error: 'invalid_new_password' });
   }
   if (currentPassword === newPassword) {
@@ -206,6 +269,14 @@ async function changePassword(req, res) {
 
   try {
     await client.query('BEGIN');
+    const locked = await client.query('SELECT password_hash FROM users WHERE id=$1 FOR UPDATE', [req.user.id]);
+    if (locked.rows[0]?.password_hash !== user.password_hash) {
+      await client.query('ROLLBACK');
+      return res.status(401).json({ error: 'invalid_current_password' });
+    }
+    await client.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW()) WHERE user_id=$1', [
+      req.user.id,
+    ]);
     await client.query(
       `UPDATE users
        SET password_hash = $1, updated_at = NOW()
@@ -216,6 +287,11 @@ async function changePassword(req, res) {
       `UPDATE refresh_tokens
        SET revoked_at = COALESCE(revoked_at, NOW())
        WHERE user_id = $1`,
+      [req.user.id],
+    );
+    await client.query(
+      `SELECT pg_notify('dnd_user_notifications',json_build_object(
+      'userId',$1::bigint,'event',json_build_object('type','session_revoked'))::text)`,
       [req.user.id],
     );
     await client.query('COMMIT');
@@ -237,7 +313,14 @@ async function deleteAccount(req, res) {
     return res.status(401).json({ error: 'invalid_current_password' });
   }
 
-  await pool.query('DELETE FROM users WHERE id = $1', [req.user.id]);
+  // Compare the verified hash again atomically: a concurrent password change wins.
+  const deleted = await pool.query(
+    `WITH deleted AS (DELETE FROM users WHERE id=$1 AND password_hash=$2 RETURNING id)
+     SELECT id,pg_notify('dnd_user_notifications',json_build_object(
+       'userId',id,'event',json_build_object('type','session_revoked'))::text) FROM deleted`,
+    [req.user.id, user.password_hash],
+  );
+  if (!deleted.rowCount) return res.status(401).json({ error: 'invalid_current_password' });
   return res.status(204).end();
 }
 
@@ -256,25 +339,32 @@ async function updateAvatar(req, res) {
   return res.json(publicUser(result.rows[0]));
 }
 
-function requireAuth(req, res, next) {
-  const authorization = req.headers.authorization || '';
-  const [scheme, token] = authorization.split(' ');
-
-  if (scheme !== 'Bearer' || !token) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-
+async function requireAuth(req, res, next) {
+  const [scheme, token] = String(req.headers.authorization || '').split(' ');
+  if (scheme !== 'Bearer' || !token) return res.status(401).json({ error: 'unauthorized' });
+  let payload;
   try {
-    const payload = jwt.verify(token, JWT_SECRET, {
+    payload = jwt.verify(token, JWT_SECRET, {
       algorithms: ['HS256'],
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     });
-    req.user = { id: Number(payload.sub), username: payload.username };
-    return next();
   } catch {
     return res.status(401).json({ error: 'unauthorized' });
   }
+  const userId = Number(payload.sub);
+  if (
+    !Number.isSafeInteger(userId) ||
+    userId < 1 ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.sid || '') ||
+    !Number.isFinite(payload.exp)
+  )
+    return res.status(401).json({ error: 'unauthorized' });
+  if (!(await isSessionActive(payload.sid, userId))) return res.status(401).json({ error: 'unauthorized' });
+  req.user = { id: userId, username: payload.username };
+  req.auth = { sessionId: payload.sid, expiresAt: payload.exp * 1000 };
+  res.set('Cache-Control', 'no-store');
+  return next();
 }
 
 module.exports = {

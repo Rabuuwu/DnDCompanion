@@ -6,11 +6,14 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const express = require('express');
 const cors = require('cors');
+const { corsOptions } = require('./cors-options');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const { rateLimit } = require('express-rate-limit');
+const { globalLimiter, accountLimiter, skipTestLimits } = require('./request-limits');
 const { checkDatabase, pool } = require('./db');
 const { auditMiddleware, writeAuditLog } = require('./audit');
+const { handleHttpError } = require('./http-errors');
 const changelog = require('../data/changelog.json');
 const privacyPolicy = require('../data/privacy.json');
 const helpContent = require('../data/help.json');
@@ -23,7 +26,7 @@ const {
   logout,
   refresh,
   register,
-  requireAuth,
+  requireAuth: authenticate,
   updateAvatar,
 } = require('./auth');
 const {
@@ -109,37 +112,34 @@ const {
   deleteQuestStep,
 } = require('./dm-workspace');
 
+function requireAuth(req, res, next) {
+  return authenticate(req, res, () => accountLimiter(req, res, next));
+}
+
 const app = express();
 
 // Middleware
 // Render terminates HTTPS at a single reverse proxy. Trust only that first hop so
 // rate limiters use the real client address supplied in X-Forwarded-For.
-app.set('trust proxy', 1);
+const proxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
+if (![0, 1].includes(proxyHops)) throw new Error('TRUST_PROXY_HOPS must be 0 or 1');
+app.set('trust proxy', proxyHops || false);
 app.use(helmet());
-const nativeOrigins = ['https://localhost', 'capacitor://localhost'];
-const allowedOrigins = new Set([
-  ...nativeOrigins,
-  ...String(process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean),
-]);
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-      return callback(new Error('origin_not_allowed'));
-    },
-  }),
-);
-app.use(bodyParser.json({ limit: '1mb' }));
-app.use(bodyParser.urlencoded({ extended: true }));
+// Apply before parsing, auth database reads and auditing.
+app.use(cors(corsOptions()));
+app.use(globalLimiter);
+app.use('/api/auth', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+app.use(bodyParser.json({ limit: '1mb', inflate: false }));
+app.use(bodyParser.urlencoded({ extended: true, inflate: false }));
 app.use(auditMiddleware);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: skipTestLimits,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'too_many_attempts' },
@@ -148,6 +148,7 @@ const authLimiter = rateLimit({
 const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
+  skip: skipTestLimits,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'too_many_requests' },
@@ -156,6 +157,7 @@ const readLimiter = rateLimit({
 const mutationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 120,
+  skip: skipTestLimits,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'too_many_requests' },
@@ -230,7 +232,7 @@ app.get('/api/app/help', (req, res) => {
 app.post('/api/auth/login', authLimiter, login);
 app.post('/api/auth/register', authLimiter, register);
 app.post('/api/auth/refresh', authLimiter, refresh);
-app.post('/api/auth/logout', logout);
+app.post('/api/auth/logout', authLimiter, logout);
 app.post('/api/auth/change-password', authLimiter, requireAuth, changePassword);
 app.put('/api/auth/avatar', requireAuth, updateAvatar);
 app.delete('/api/auth/account', authLimiter, requireAuth, deleteAccount);
@@ -331,10 +333,7 @@ app.get('/api/campaigns/:campaignId/characters/:characterId', requireAuth, getCa
 app.delete('/api/characters/:characterId/campaigns/:campaignId', requireAuth, leaveCampaign);
 
 // Global error handler
-app.use((err, req, res, _next) => {
-  console.error(err && err.stack ? err.stack : err);
-  res.status(500).json({ error: 'server_error' });
-});
+app.use(handleHttpError);
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';

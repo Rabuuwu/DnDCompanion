@@ -485,7 +485,9 @@ async function addDmCharacterInventoryItem(req, res) {
   const rawQuantity = req.body?.quantity;
   const numericQuantity =
     rawQuantity === '' || rawQuantity === null || rawQuantity === undefined ? 1 : Number(rawQuantity);
-  const quantity = Number.isFinite(numericQuantity) ? Math.max(0, Math.min(9999, Math.trunc(numericQuantity))) : 1;
+  const quantity = Number.isFinite(numericQuantity)
+    ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.trunc(numericQuantity)))
+    : 1;
   const duration = String(req.body?.duration || '')
     .trim()
     .replace(/\r?\n/g, ' ')

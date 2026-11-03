@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.6.4",
+    "date": "2026-11-03",
+    "title": "Duże ilości złota, czarne pióro i bezpieczniejsze sesje",
+    "changes": [
+      "Usunięto limit 9999 sztuk dla przedmiotów i złota, również podczas dodawania przedmiotów przez DM.",
+      "Dodano przycisk Czarny w palecie notatnika, aby można było wrócić do czarnego pióra po zmianie koloru.",
+      "Poprawiono unieważnianie sesji po wylogowaniu, zmianie hasła i usunięciu konta. Aktualizacja wymaga ponownego logowania.",
+      "Wzmocniono ochronę danych wyświetlanych w interfejsie oraz ograniczono nadmierne żądania i połączenia powiadomień.",
+      "Naprawiono dostęp do kolejnych stron danych w kliencie web i dodano testy regresji ekwipunku, kartki i sesji."
+    ]
+  },
+  {
     "version": "1.6.3",
     "date": "2026-08-23",
     "title": "Pełna obsługa kostek w kreatorze wzorów",

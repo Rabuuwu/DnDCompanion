@@ -1,7 +1,24 @@
 export function escapeHtml(value) {
-  const element = document.createElement('div');
-  element.textContent = String(value || '');
-  return element.innerHTML;
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character],
+  );
+}
+
+export function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
 }
 
 export function avatarMarkup(image, name, className = '') {
@@ -12,10 +29,10 @@ export function avatarMarkup(image, name, className = '') {
       .toUpperCase() || '?',
   );
   const source = String(image || '');
-  const imageHtml = /^data:image\/(?:jpeg|png|webp);base64,/i.test(source)
+  const imageHtml = /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(source)
     ? `<img src="${source}" alt="" />`
     : `<span aria-hidden="true">${initial}</span>`;
-  return `<span class="profile-avatar ${className}">${imageHtml}</span>`;
+  return `<span class="profile-avatar ${escapeHtml(className)}">${imageHtml}</span>`;
 }
 
 export function prepareProfileImage(file) {

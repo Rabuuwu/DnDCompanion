@@ -20,6 +20,7 @@ import {
   inventoryQuantity,
   INVENTORY_ICON_KEYS,
   INVENTORY_ICONS,
+  INVENTORY_MAX_QUANTITY,
   parseInventory,
   parseInventoryCategories,
   serializeInventory,
@@ -27,6 +28,7 @@ import {
 import {
   avatarMarkup,
   escapeHtml,
+  safeExternalUrl,
   formatFeatureText,
   prepareProfileImage,
   showConfirmationDialog,
@@ -34,6 +36,11 @@ import {
   showPromptDialog,
 } from './ui-utils.js';
 
+// GitHub Pages cannot set frame-ancestors. Fail closed before creating any UI.
+if (window.top !== window.self) {
+  document.body.textContent = 'Otwórz D&D Companion bezpośrednio w osobnym oknie.';
+  throw new Error('embedded_app_blocked');
+}
 const app = document.querySelector('#app');
 let currentAppVersion = WEB_APP_VERSION;
 let availableUpdate = null;
@@ -689,6 +696,11 @@ function renderApp(statusMessage = null) {
   }
 
   async function handleRegister(event) {
+    if (new TextEncoder().encode(registerPasswordInput.value).length > 72 || registerPasswordInput.value.length < 8) {
+      event.preventDefault();
+      authMessage.textContent = 'Hasło musi mieć co najmniej 8 znaków i najwyżej 72 bajty UTF-8.';
+      return;
+    }
     await handleAuthRequest(
       event,
       '/api/auth/register',
@@ -1941,7 +1953,7 @@ function renderApp(statusMessage = null) {
                     </label>
                   <label>
                     <span>Ilość</span>
-                    <input name="quantity" type="number" min="0" max="9999" value="1" inputmode="numeric" required />
+                    <input name="quantity" type="number" min="0" max="${INVENTORY_MAX_QUANTITY}" value="1" inputmode="numeric" required />
                   </label>
                   <label class="inventory-description-field">
                     <span>Opis</span>
@@ -1995,6 +2007,7 @@ function renderApp(statusMessage = null) {
                           <button type="button" class="secondary" data-notebook-color-toggle aria-label="Wybierz kolor" title="Kolor"><span id="notebook-color-preview" aria-hidden="true"></span><span>Kolor</span></button>
                           <div class="notebook-color-popover hidden" data-notebook-color-popover>
                             <canvas id="notebook-color-wheel" width="144" height="144" aria-label="Koło wyboru koloru"></canvas>
+                            <button type="button" class="secondary notebook-black-color" data-notebook-color="#000000" aria-pressed="true">Czarny</button>
                           </div>
                         </div>
                       </div>
@@ -2183,7 +2196,7 @@ function renderApp(statusMessage = null) {
       let notebookSaveTimer = null;
       let notebookSaving = false;
       let notebookSaveQueued = false;
-      let notebookPenColor = '#1f2937';
+      let notebookPenColor = '#000000';
       let notebookColorMarker = null;
 
       const updateNotebookStatus = (message, isError = false) => {
@@ -2323,6 +2336,15 @@ function renderApp(statusMessage = null) {
         if (notebookColorPreview) notebookColorPreview.style.background = notebookPenColor;
       }
 
+      function setNotebookPenColor(color, marker = null) {
+        notebookPenColor = color;
+        notebookColorMarker = marker;
+        contentPanel.querySelectorAll('[data-notebook-color]').forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.notebookColor === color));
+        });
+        renderNotebookColorWheel();
+      }
+
       function selectNotebookColor(event) {
         const bounds = notebookColorWheel.getBoundingClientRect();
         const scaleX = notebookColorWheel.width / bounds.width;
@@ -2335,9 +2357,7 @@ function renderApp(statusMessage = null) {
         if (distance > radius) return;
         const hue = ((Math.atan2(offsetY, offsetX) * 180) / Math.PI + 360) % 360;
         const saturation = Math.min(1, distance / (radius - 2));
-        notebookPenColor = rgbHex(...hsvToRgb(hue, saturation, 0.88));
-        notebookColorMarker = point;
-        renderNotebookColorWheel();
+        setNotebookPenColor(rgbHex(...hsvToRgb(hue, saturation, 0.88)), point);
       }
 
       function renderNotebookCanvas() {
@@ -2456,6 +2476,9 @@ function renderApp(statusMessage = null) {
       });
       contentPanel.querySelector('[data-notebook-color-toggle]')?.addEventListener('click', () => {
         notebookColorPopover?.classList.toggle('hidden');
+      });
+      contentPanel.querySelectorAll('[data-notebook-color]').forEach((button) => {
+        button.addEventListener('click', () => setNotebookPenColor(button.dataset.notebookColor));
       });
       contentPanel.querySelector('[data-notebook-undo]')?.addEventListener('click', () => {
         notebook.strokes.pop();
@@ -2900,7 +2923,7 @@ function renderApp(statusMessage = null) {
               ${section('Notatnik postaci', `<div class="dm-character-notebook">${teammate.notebook?.text ? `<p>${escapeHtml(teammate.notebook.text).replace(/\r?\n/g, '<br>')}</p>` : '<p class="section-note">Brak notatek tekstowych.</p>'}<canvas class="dm-notebook-preview" data-dm-notebook-preview aria-label="Podgląd rysunku z notatnika"></canvas><small>Kreski na kartce: ${teammate.notebook?.strokes?.length || 0}</small></div>`, true)}
             </div>
             <div class="dm-character-panel" data-dm-character-panel="inventory">
-              ${section('Ekwipunek', `${inventoryRows}<section class="inventory-add-card"><button class="inventory-add-trigger" type="button" data-dm-open-inventory><span class="inventory-icon add">+</span><span><strong>Dodaj przedmiot</strong><small>Dodaj przedmiot jako DM</small></span></button><form class="inventory-item-form dm-inventory-add-form hidden" data-dm-add-inventory><label><span>Nazwa przedmiotu</span><input name="name" maxlength="150" required></label><label><span>Ilość</span><input name="quantity" type="number" min="1" max="9999" value="1" required></label>${inventoryDurationControl()}${inventoryIconPicker()}<div class="dm-form-actions"><button type="button" class="secondary small" data-cancel-dm-inventory>Anuluj</button><button type="submit" class="small">Dodaj do ekwipunku</button></div></form></section>`, true)}
+              ${section('Ekwipunek', `${inventoryRows}<section class="inventory-add-card"><button class="inventory-add-trigger" type="button" data-dm-open-inventory><span class="inventory-icon add">+</span><span><strong>Dodaj przedmiot</strong><small>Dodaj przedmiot jako DM</small></span></button><form class="inventory-item-form dm-inventory-add-form hidden" data-dm-add-inventory><label><span>Nazwa przedmiotu</span><input name="name" maxlength="150" required></label><label><span>Ilość</span><input name="quantity" type="number" min="1" max="${INVENTORY_MAX_QUANTITY}" value="1" required></label>${inventoryDurationControl()}${inventoryIconPicker()}<div class="dm-form-actions"><button type="button" class="secondary small" data-cancel-dm-inventory>Anuluj</button><button type="submit" class="small">Dodaj do ekwipunku</button></div></form></section>`, true)}
             </div>
             <div class="dm-character-panel" data-dm-character-panel="notes">
               <label class="dm-note-field general"><span>Prywatne notatki DM o tej postaci</span><textarea data-dm-character-note maxlength="50000" placeholder="Twoje prywatne notatki…">${escapeHtml(teammate.dmNote)}</textarea></label>
@@ -3406,7 +3429,7 @@ function renderApp(statusMessage = null) {
           if (!materialResponse.ok || !teamResponse.ok) throw new Error('dm_materials_load_failed');
           const materials = await materialResponse.json();
           const team = await teamResponse.json();
-          target.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Handouty</p><h3>Materiały</h3></div><button data-new-material>+ Materiał</button></div><div class="dm-material-grid">${materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content.slice(0, 300))}</p>${material.external_url ? `<a href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}<div class="dm-form-actions"><button class="small" data-share-material="${material.id}">Pokaż graczom…</button><button class="small secondary" data-edit-material="${material.id}">Edytuj</button><button class="small danger" data-archive-material="${material.id}">Archiwizuj</button></div></article>`).join('') || '<div class="empty-state"><p>Brak materiałów.</p></div>'}</div>`;
+          target.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">Handouty</p><h3>Materiały</h3></div><button data-new-material>+ Materiał</button></div><div class="dm-material-grid">${materials.map((material) => `<article class="dm-material-card"><span>${escapeHtml(material.material_type)}</span><h4>${escapeHtml(material.title)}</h4><p>${escapeHtml(material.content.slice(0, 300))}</p>${material.external_url ? `<a href="${escapeHtml(safeExternalUrl(material.external_url))}" target="_blank" rel="noopener noreferrer">Otwórz link</a>` : ''}<div class="dm-form-actions"><button class="small" data-share-material="${material.id}">Pokaż graczom…</button><button class="small secondary" data-edit-material="${material.id}">Edytuj</button><button class="small danger" data-archive-material="${material.id}">Archiwizuj</button></div></article>`).join('') || '<div class="empty-state"><p>Brak materiałów.</p></div>'}</div>`;
           target.querySelector('[data-new-material]')?.addEventListener('click', async () => {
             const title = window.prompt('Nazwa materiału:');
             if (!title) return;
@@ -3800,7 +3823,7 @@ function renderApp(statusMessage = null) {
                 });
                 const materialDialog = sharedTarget.querySelector('[data-shared-material-dialog]');
                 const openSharedMaterial = (material) => {
-                  materialDialog.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">${escapeHtml(material.material_type)}</p><h3>${escapeHtml(material.title)}</h3></div><button type="button" class="secondary small" data-close-shared-material>Zamknij</button></div><div class="shared-material-content"><p>${escapeHtml(material.content).replace(/\r?\n/g, '<br>')}</p>${material.external_url ? `<a class="shared-material-link" href="${escapeHtml(material.external_url)}" target="_blank" rel="noopener noreferrer">Otwórz załączony link ↗</a>` : ''}</div>`;
+                  materialDialog.innerHTML = `<div class="dm-module-toolbar"><div><p class="eyebrow">${escapeHtml(material.material_type)}</p><h3>${escapeHtml(material.title)}</h3></div><button type="button" class="secondary small" data-close-shared-material>Zamknij</button></div><div class="shared-material-content"><p>${escapeHtml(material.content).replace(/\r?\n/g, '<br>')}</p>${material.external_url ? `<a class="shared-material-link" href="${escapeHtml(safeExternalUrl(material.external_url))}" target="_blank" rel="noopener noreferrer">Otwórz załączony link ↗</a>` : ''}</div>`;
                   materialDialog
                     .querySelector('[data-close-shared-material]')
                     ?.addEventListener('click', () => materialDialog.close());
@@ -3920,7 +3943,7 @@ function renderApp(statusMessage = null) {
                   ? `
               <form class="inventory-edit-form" data-edit-inventory-form="${item.index}">
                 <input name="name" maxlength="150" value="${escapeHtml(item.item.name)}" aria-label="Nazwa przedmiotu" required />
-                <input name="quantity" type="number" min="0" max="9999" value="${item.item.quantity}" inputmode="numeric" aria-label="Ilość" required />
+                <input name="quantity" type="number" min="0" max="${INVENTORY_MAX_QUANTITY}" value="${item.item.quantity}" inputmode="numeric" aria-label="Ilość" required />
                 <label class="inventory-description-field"><span>Opis</span><textarea name="description" maxlength="1000" rows="3" placeholder="Opis przedmiotu, jego działanie lub pochodzenie">${escapeHtml(item.item.description || '')}</textarea></label>
                 ${inventoryDurationControl(item.item.duration)}
                 <div>
@@ -4874,6 +4897,10 @@ function renderApp(statusMessage = null) {
       const confirmPassword = String(formData.get('confirmPassword') || '');
 
       errorElement.textContent = '';
+      if (new TextEncoder().encode(newPassword).length > 72 || newPassword.length < 8) {
+        errorElement.textContent = 'Nowe hasło musi mieć co najmniej 8 znaków i najwyżej 72 bajty UTF-8.';
+        return;
+      }
       if (newPassword !== confirmPassword) {
         errorElement.textContent = 'Nowe hasła nie są takie same.';
         return;
@@ -4896,7 +4923,7 @@ function renderApp(statusMessage = null) {
           const data = await response.json().catch(() => ({}));
           const messages = {
             invalid_current_password: 'Obecne hasło jest nieprawidłowe.',
-            invalid_new_password: 'Nowe hasło musi mieć od 8 do 128 znaków.',
+            invalid_new_password: 'Nowe hasło musi mieć co najmniej 8 znaków i najwyżej 72 bajty UTF-8.',
             password_unchanged: 'Nowe hasło musi różnić się od obecnego.',
           };
           throw new Error(messages[data.error] || 'Nie udało się zmienić hasła.');
