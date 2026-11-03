@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveCapacitorCli } from '../../scripts/resolve-capacitor-cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const mobileDir = path.resolve(__dirname, '..');
@@ -27,7 +28,7 @@ const version = String(release.version || '');
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid version in release.json');
 
 run('npm', ['run', 'build']);
-run(process.execPath, [path.join(mobileDir, 'node_modules', '@capacitor', 'cli', 'bin', 'capacitor'), 'sync', 'android']);
+run(process.execPath, [resolveCapacitorCli(mobileDir), 'sync', 'android']);
 run('./gradlew', ['assembleRelease'], path.join(mobileDir, 'android'));
 
 const source = path.join(mobileDir, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
