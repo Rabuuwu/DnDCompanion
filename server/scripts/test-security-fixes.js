@@ -139,7 +139,12 @@ async function run() {
     ]);
     const attempts = await Promise.all(
       Array.from({ length: 2 }, () =>
-        request('/api/characters', current, 'POST', { name: 'Last slot', attributes: {} }),
+        request('/api/characters', current, 'POST', {
+          name: 'Last slot',
+          race: 'Human',
+          classes: 'Ranger',
+          attributes: {},
+        }),
       ),
     );
     assert.deepEqual(attempts.map((res) => res.status).sort(), [201, 409]);
