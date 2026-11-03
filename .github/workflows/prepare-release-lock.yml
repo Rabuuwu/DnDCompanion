@@ -19,7 +19,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - run: npm install --package-lock-only --ignore-scripts --no-audit
+      - run: |
+          rm package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit
       - name: Export lockfile for local verification
         run: |
           node --input-type=module <<'JS'
